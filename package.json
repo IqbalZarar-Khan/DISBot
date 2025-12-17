@@ -1,0 +1,41 @@
+{
+  "name": "patreon-discord-bot",
+  "version": "1.0.0",
+  "description": "Patreon Tier-Waterfall Bot for automated content distribution to Discord",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "deploy-commands": "ts-node src/commands/deploy-commands.ts",
+    "verify": "ts-node src/scripts/verify-deployment.ts",
+    "test:webhooks": "ts-node src/tests/manual-webhook-test.ts",
+    "test": "jest",
+    "test:integration": "jest --testPathPattern=integration"
+  },
+  "keywords": [
+    "discord",
+    "patreon",
+    "bot",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "axios": "^1.6.2",
+    "sql.js": "^1.10.2",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/express": "^4.17.21",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2",
+    "nodemon": "^3.0.2",
+    "@types/jest": "^29.5.11",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1"
+  }
+}
