@@ -1,6 +1,8 @@
 import { EmbedBuilder } from 'discord.js';
 import { getTierColor, getTierEmoji } from './tierRanking';
 
+// Fixed: URL validation to prevent embed errors
+
 interface PostAlertData {
     title: string;
     url: string;
