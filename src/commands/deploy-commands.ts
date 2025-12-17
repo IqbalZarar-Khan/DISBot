@@ -78,9 +78,15 @@ const rest = new REST({ version: '10' }).setToken(config.discordToken);
     try {
         console.log(`🔄 Started refreshing ${commands.length} application (/) commands.`);
 
+        // Get Discord Application ID from environment or extract from token
+        const applicationId = process.env.DISCORD_APPLICATION_ID || config.discordToken.split('.')[0];
+
+        // Decode base64 to get the actual application ID
+        const decodedId = Buffer.from(applicationId, 'base64').toString('utf-8');
+
         // Register commands to guild (faster for development)
         const data = await rest.put(
-            Routes.applicationGuildCommands(config.patreonClientId, config.guildId),
+            Routes.applicationGuildCommands(decodedId, config.guildId),
             { body: commands }
         ) as any[];
 
