@@ -31,27 +31,5 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             default:
                 await interaction.reply({
-                    content: '❌ Unknown admin command.',
-                    ephemeral: true
-                });
-        }
-    } catch (error) {
-        logger.error(`Error in admin command: ${subcommand}`, error as Error);
-
-        // Try to send error message to user
-        try {
-            const errorMessage = {
-                content: '❌ An error occurred while executing this command. Please check the logs.',
-                ephemeral: true
-            };
-
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(errorMessage);
-            } else {
-                await interaction.reply(errorMessage);
-            }
-        } catch (replyError) {
-            logger.error('Failed to send error message to user', replyError as Error);
-        }
-    }
+                }
 }
