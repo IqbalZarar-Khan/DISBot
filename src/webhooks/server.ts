@@ -19,7 +19,7 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
     }));
 
     // Health check endpoint
-    app.get('/health', (req: Request, res: Response) => {
+    app.get('/health', (_req: Request, res: Response) => {
         res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 

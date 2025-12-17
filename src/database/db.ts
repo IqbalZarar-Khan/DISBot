@@ -1,7 +1,7 @@
 import initSqlJs, { Database } from 'sql.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TrackedPost, BotConfig, TierMapping, TrackedMember } from './schema';
+import { TrackedPost, TierMapping, TrackedMember } from './schema';
 
 let db: Database | null = null;
 

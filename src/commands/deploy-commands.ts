@@ -1,4 +1,4 @@
-import { REST, Routes, SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { REST, Routes, SlashCommandBuilder } from 'discord.js';
 import { config, validateConfig } from '../config';
 
 // Validate configuration

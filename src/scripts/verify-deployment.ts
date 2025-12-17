@@ -81,7 +81,7 @@ async function runChecks() {
     );
 
     // 5. Check Discord token format
-    const discordTokenValid = config.discordToken && config.discordToken.length > 50;
+    const discordTokenValid = Boolean(config.discordToken && config.discordToken.length > 50);
     check(
         'Discord Token',
         discordTokenValid,
