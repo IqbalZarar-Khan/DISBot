@@ -13,7 +13,7 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
 
     // Raw body parser for signature verification
     app.use(express.json({
-        verify: (req: any, res, buf) => {
+        verify: (req: any, _res, buf) => {
             req.rawBody = buf.toString('utf8');
         }
     }));
