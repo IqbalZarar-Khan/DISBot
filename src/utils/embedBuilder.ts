@@ -27,9 +27,13 @@ export function createPostEmbed(data: PostAlertData): EmbedBuilder {
 
     const embed = new EmbedBuilder()
         .setTitle(`${emoji} ${data.title}`)
-        .setURL(data.url)
         .setColor(color)
         .setTimestamp();
+
+    // Only set the URL if it actually exists and is not empty
+    if (data.url && data.url.length > 0) {
+        embed.setURL(data.url);
+    }
 
     if (data.isUpdate) {
         embed.setDescription(`✨ **Update:** This chapter is now available for **${data.tierName}** members!`);
