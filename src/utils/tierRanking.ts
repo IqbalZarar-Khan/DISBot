@@ -2,9 +2,11 @@ import { TierRank } from '../database/schema';
 
 /**
  * Get tier rank by tier name
+ * Handles tier names with or without trailing dots (e.g., "Diamond" or "Diamond.")
  */
 export function getTierRank(tierName: string): number {
-    const normalizedName = tierName.toLowerCase();
+    // Normalize: lowercase and remove trailing dots/spaces
+    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
 
     switch (normalizedName) {
         case 'diamond':
@@ -49,7 +51,8 @@ export function isWaterfall(oldTierRank: number, newTierRank: number): boolean {
  * Get tier color for Discord embeds
  */
 export function getTierColor(tierName: string): number {
-    const normalizedName = tierName.toLowerCase();
+    // Normalize: lowercase and remove trailing dots/spaces
+    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
 
     switch (normalizedName) {
         case 'diamond':
@@ -71,7 +74,8 @@ export function getTierColor(tierName: string): number {
  * Get tier emoji
  */
 export function getTierEmoji(tierName: string): string {
-    const normalizedName = tierName.toLowerCase();
+    // Normalize: lowercase and remove trailing dots/spaces
+    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
 
     switch (normalizedName) {
         case 'diamond':
