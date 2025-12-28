@@ -12,7 +12,7 @@ export async function handleTestAlert(interaction: ChatInputCommandInteraction):
 
     try {
         // Get tier mapping
-        const mapping = getTierMappingByName(tierName);
+        const mapping = await getTierMappingByName(tierName);
 
         if (!mapping) {
             await interaction.reply({

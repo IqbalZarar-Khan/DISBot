@@ -10,10 +10,10 @@ node_modules/
 dist/
 build/
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+# Database files (but preserve data directory structure)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
 
 # Logs
 logs/

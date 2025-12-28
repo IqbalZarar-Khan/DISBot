@@ -2,7 +2,6 @@ import { ChatInputCommandInteraction, ChannelType } from 'discord.js';
 import { checkAdminPermission } from '../../middleware/adminCheck';
 import { upsertTierMapping } from '../../database/db';
 import { getTierRank } from '../../utils/tierRanking';
-import { config } from '../../config';
 
 export async function handleSetChannel(interaction: ChatInputCommandInteraction): Promise<void> {
     // Check admin permission
@@ -33,10 +32,10 @@ export async function handleSetChannel(interaction: ChatInputCommandInteraction)
         };
 
         // Save to database
-        upsertTierMapping(mapping, config.databasePath);
+        await upsertTierMapping(mapping);
 
         await interaction.reply({
-            content: `✅ **Tier Mapping Updated**\n\n**${tierName}** tier is now mapped to ${channel}.\n\nAll alerts for this tier will be sent to this channel.`,
+            content: `✅ **Tier Mapping Updated**\\n\\n**${tierName}** tier is now mapped to ${channel}.\\n\\nAll alerts for this tier will be sent to this channel.`,
             ephemeral: true
         });
 

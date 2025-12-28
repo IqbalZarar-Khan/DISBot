@@ -32,7 +32,7 @@ export async function handleStatus(interaction: ChatInputCommandInteraction): Pr
         }
 
         // Get tier mappings
-        const tierMappings = getAllTierMappings();
+        const tierMappings = await getAllTierMappings();
         let tierMappingText = '';
 
         if (tierMappings.length === 0) {

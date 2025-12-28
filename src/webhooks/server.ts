@@ -92,6 +92,21 @@ async function routeWebhookEvent(eventType: WebhookEventType, payload: any): Pro
                 await handleMembersDelete(payload);
                 break;
 
+            case 'members:pledge:create':
+                const { handleMembersPledgeCreate } = await import('./handlers/members-pledge-create');
+                await handleMembersPledgeCreate(payload);
+                break;
+
+            case 'members:pledge:update':
+                const { handleMembersPledgeUpdate } = await import('./handlers/members-pledge-update');
+                await handleMembersPledgeUpdate(payload);
+                break;
+
+            case 'members:pledge:delete':
+                const { handleMembersPledgeDelete } = await import('./handlers/members-pledge-delete');
+                await handleMembersPledgeDelete(payload);
+                break;
+
             case 'posts:publish':
                 const { handlePostsPublish } = await import('./handlers/posts-publish');
                 await handlePostsPublish(payload);
@@ -100,6 +115,11 @@ async function routeWebhookEvent(eventType: WebhookEventType, payload: any): Pro
             case 'posts:update':
                 const { handlePostsUpdate } = await import('./handlers/posts-update');
                 await handlePostsUpdate(payload);
+                break;
+
+            case 'posts:delete':
+                const { handlePostsDelete } = await import('./handlers/posts-delete');
+                await handlePostsDelete(payload);
                 break;
 
             default:

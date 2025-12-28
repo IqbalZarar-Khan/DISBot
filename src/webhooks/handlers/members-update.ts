@@ -40,11 +40,11 @@ export async function handleMembersUpdate(payload: WebhookPayload): Promise<void
         }
 
         // Get old member data from database
-        const oldMember = getTrackedMember(memberId);
+        const oldMember = await getTrackedMember(memberId);
 
         if (oldMember) {
             // Get tier mappings to find tier names
-            const oldTierMapping = getTierMapping(oldMember.current_tier_id);
+            const oldTierMapping = await getTierMapping(oldMember.current_tier_id);
             const oldTierName = oldTierMapping?.tier_name || 'Free';
 
             // Compare tier ranks
@@ -85,7 +85,7 @@ export async function handleMembersUpdate(payload: WebhookPayload): Promise<void
             updated_at: Date.now()
         };
 
-        upsertTrackedMember(trackedMember, config.databasePath);
+        await upsertTrackedMember(trackedMember);
 
     } catch (error) {
         logger.error('Error handling members:update webhook', error as Error);

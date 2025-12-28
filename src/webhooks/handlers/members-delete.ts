@@ -14,7 +14,7 @@ export async function handleMembersDelete(payload: WebhookPayload): Promise<void
         const memberId = member.id;
 
         // Get member info from database
-        const trackedMember = getTrackedMember(memberId);
+        const trackedMember = await getTrackedMember(memberId);
 
         if (trackedMember) {
             logger.info(`Member departed: ${trackedMember.full_name}`);

@@ -306,6 +306,63 @@ Or add to build command:
 npm install && npm run build && npm run deploy-commands
 ```
 
+### Unhandled Webhook Events
+
+**Error**: `Unhandled webhook event type: members:pledge:create`
+
+**Cause**: Missing webhook handler for the event type.
+
+**Solution**: The bot now supports all Patreon webhook events:
+- ✅ `members:create` - New member account
+- ✅ `members:update` - Member account update
+- ✅ `members:delete` - Member account deletion
+- ✅ `members:pledge:create` - New pledge/subscription
+- ✅ `members:pledge:update` - Pledge tier change
+- ✅ `members:pledge:delete` - Pledge cancellation
+- ✅ `posts:publish` - New post published
+- ✅ `posts:update` - Post updated
+- ✅ `posts:delete` - Post deleted
+
+If you see this error, ensure you've deployed the latest code with all handlers.
+
+### "No Mapping" Errors
+
+**Error**: `No tier mapping found for tier: Diamond`
+
+**Cause**: Tier mappings are stored in the SQLite database, which resets on Render's free tier.
+
+**Solutions**:
+
+**Option 1: Recreate Mappings After Each Deploy** (Temporary)
+After each deployment, run these commands in Discord:
+```
+/admin set-channel tier_name:Diamond channel:#diamond-alerts
+/admin set-channel tier_name:Gold channel:#gold-alerts
+/admin set-channel tier_name:Silver channel:#silver-alerts
+```
+
+**Option 2: Migrate to Supabase** (Recommended for Production)
+Render's free tier uses ephemeral storage. For persistent data:
+1. Create a free Supabase account at https://supabase.com
+2. Create a new project (free tier: 500MB PostgreSQL)
+3. Migrate the bot to use Supabase instead of SQLite
+4. Your tier mappings will persist across deployments
+
+**Verify Mappings**:
+```
+/admin status
+```
+This shows all configured tier mappings. If empty, you need to recreate them.
+
+**Check Database Path**:
+In Render logs, verify the database is being created:
+```
+✅ Database loaded from file
+✅ Database tables created
+```
+
+If you see "New database created" on every restart, the database is being reset.
+
 ---
 
 ## Upgrading to Paid Tier

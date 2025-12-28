@@ -21,8 +21,9 @@ interface Config {
     webhookSecret: string;
     webhookPort: number;
 
-    // Database
-    databasePath: string;
+    // Supabase
+    supabaseUrl: string;
+    supabaseKey: string;
 }
 
 function getEnvVar(key: string, required: boolean = true): string {
@@ -53,8 +54,9 @@ export const config: Config = {
     webhookSecret: getEnvVar('WEBHOOK_SECRET'),
     webhookPort: parseInt(process.env.PORT || getEnvVar('WEBHOOK_PORT', false) || '3000'),
 
-    // Database
-    databasePath: getEnvVar('DATABASE_PATH', false) || './data/bot.db'
+    // Supabase
+    supabaseUrl: getEnvVar('SUPABASE_URL'),
+    supabaseKey: getEnvVar('SUPABASE_KEY')
 };
 
 // Validate configuration

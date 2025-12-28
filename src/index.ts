@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, Events } from 'discord.js';
 import { config, validateConfig } from './config';
+import { initSupabase } from './database/supabase';
 import { initDatabase } from './database/db';
 import { initLogger, logger } from './utils/logger';
 import { startWebhookServer } from './webhooks/server';
@@ -22,8 +23,11 @@ async function main() {
         // Validate configuration
         validateConfig();
 
-        // Initialize database
-        await initDatabase(config.databasePath);
+        // Initialize Supabase
+        initSupabase();
+
+        // Initialize database (test connection)
+        await initDatabase();
 
         // Initialize logger
         initLogger(client, config.logChannelId);

@@ -6,7 +6,6 @@
  */
 
 import * as fs from 'fs';
-import * as path from 'path';
 import axios from 'axios';
 import { config } from '../config';
 
@@ -66,18 +65,12 @@ async function runChecks() {
         check('TypeScript Compilation', false, 'Compilation errors detected');
     }
 
-    // 4. Check database directory
-    const dbPath = config.databasePath || './data/bot.db';
-    const dbDir = path.dirname(dbPath);
-
-    if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-    }
-
+    // 4. Check Supabase configuration
+    const supabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_KEY);
     check(
-        'Database Directory',
-        fs.existsSync(dbDir),
-        `Directory exists: ${dbDir}`
+        'Supabase Configuration',
+        supabaseConfigured,
+        supabaseConfigured ? 'Supabase URL and key configured' : 'SUPABASE_URL or SUPABASE_KEY missing'
     );
 
     // 5. Check Discord token format

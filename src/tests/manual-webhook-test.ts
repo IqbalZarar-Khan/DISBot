@@ -18,9 +18,11 @@ async function runTests() {
         validateConfig();
         console.log('✅ Configuration valid\n');
 
-        // Initialize database
+        // Initialize Supabase and database
         console.log('2️⃣ Initializing database...');
-        await initDatabase(config.databasePath);
+        const { initSupabase } = await import('../database/supabase');
+        initSupabase();
+        await initDatabase();
         console.log('✅ Database initialized\n');
 
         // Test webhook endpoint

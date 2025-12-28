@@ -5,7 +5,6 @@ import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { getTierRank, isWaterfall } from '../../utils/tierRanking';
 import { logger } from '../../utils/logger';
-import { config } from '../../config';
 
 /**
  * Handle posts:update webhook event
@@ -35,7 +34,7 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
 
             if (tierInfo) {
                 const tierTitle = tierInfo.attributes?.title || 'Unknown';
-                const tierMapping = getTierMappingByName(tierTitle);
+                const tierMapping = await getTierMappingByName(tierTitle);
 
                 if (tierMapping && tierMapping.tier_rank > newTierRank) {
                     newTierRank = tierMapping.tier_rank;
@@ -45,7 +44,7 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         }
 
         // Get old post data from database
-        const oldPost = getTrackedPost(postId);
+        const oldPost = await getTrackedPost(postId);
 
         if (oldPost) {
             const oldTierName = oldPost.last_tier_access;
@@ -64,7 +63,7 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                 }
 
                 // Send alert to the NEW tier channel (the one that just gained access)
-                const tierMapping = getTierMappingByName(newTierName);
+                const tierMapping = await getTierMappingByName(newTierName);
 
                 if (tierMapping) {
                     try {
@@ -109,7 +108,7 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
             updated_at: Date.now()
         };
 
-        upsertTrackedPost(trackedPost, config.databasePath);
+        await upsertTrackedPost(trackedPost);
 
     } catch (error) {
         logger.error('Error handling posts:update webhook', error as Error);

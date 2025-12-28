@@ -4,7 +4,6 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { config } from '../../config';
 
 /**
  * Handle posts:publish webhook event
@@ -33,7 +32,7 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
 
             if (tierInfo) {
                 const tierTitle = tierInfo.attributes?.title || 'Unknown';
-                const tierMapping = getTierMappingByName(tierTitle);
+                const tierMapping = await getTierMappingByName(tierTitle);
 
                 if (tierMapping && tierMapping.tier_rank > highestTierRank) {
                     highestTierRank = tierMapping.tier_rank;
@@ -59,10 +58,10 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             updated_at: Date.now()
         };
 
-        upsertTrackedPost(trackedPost, config.databasePath);
+        await upsertTrackedPost(trackedPost);
 
         // Get tier mapping for channel
-        const tierMapping = getTierMappingByName(highestTierName);
+        const tierMapping = await getTierMappingByName(highestTierName);
 
         if (tierMapping) {
             try {
