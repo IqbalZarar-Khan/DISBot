@@ -28,13 +28,13 @@ export interface TrackedMember {
     updated_at: number;
 }
 
-// Tier ranking enum
+// Tier ranking enum (higher number = higher tier)
 export enum TierRank {
-    Free = 0,
-    Bronze = 1,
-    Silver = 2,
-    Gold = 3,
-    Diamond = 4
+    Free = 0,      // Lowest Priority - Public access
+    Bronze = 25,   // Entry tier
+    Silver = 50,   // Mid tier
+    Gold = 75,     // Premium tier
+    Diamond = 100  // Highest Priority - Top tier
 }
 
 // Webhook event types
