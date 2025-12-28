@@ -25,14 +25,20 @@ export function createPostEmbed(data: PostAlertData): EmbedBuilder {
     const emoji = getTierEmoji(data.tierName);
     const color = getTierColor(data.tierName);
 
+    // Fix: Convert relative URLs to absolute URLs
+    let finalUrl = data.url;
+    if (finalUrl && finalUrl.startsWith('/')) {
+        finalUrl = `https://www.patreon.com${finalUrl}`;
+    }
+
     const embed = new EmbedBuilder()
         .setTitle(`${emoji} ${data.title}`)
         .setColor(color)
         .setTimestamp();
 
     // Only set the URL if it actually exists and is not empty
-    if (data.url && data.url.length > 0) {
-        embed.setURL(data.url);
+    if (finalUrl && finalUrl.length > 0) {
+        embed.setURL(finalUrl);
     }
 
     if (data.isUpdate) {
