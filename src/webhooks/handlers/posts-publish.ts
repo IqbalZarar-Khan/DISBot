@@ -19,9 +19,26 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         const title = attributes.title || 'Untitled Post';
         const url = attributes.url || `https://www.patreon.com/posts/${postId}`;
 
-        // Get tier access from relationships
+        // Get tier access from multiple possible locations
         const relationships = post.relationships || {};
-        const tierData = relationships.tiers?.data || [];
+
+        // 1. Try relationships.tiers (Standard V2)
+        let rawTierData = relationships.tiers?.data;
+
+        // 2. If empty, try relationships.access_rules (Alternative V2)
+        if (!rawTierData || rawTierData.length === 0) {
+            rawTierData = relationships.access_rules?.data;
+        }
+
+        // 3. If still empty, try attributes.tiers (Mobile/Legacy)
+        if (!rawTierData || rawTierData.length === 0) {
+            if (attributes.tiers) {
+                rawTierData = attributes.tiers;
+            }
+        }
+
+        // 4. Normalize to array
+        const tierData = Array.isArray(rawTierData) ? rawTierData : [];
 
         // === DEBUG LOGGING START ===
         logger.info('--- POST PUBLISH DEBUG START ---');
@@ -36,12 +53,15 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         // === DEEP DEBUG START ===
         logger.info('--- DEEP DEBUG START ---');
         logger.info(`Attributes Keys: ${Object.keys(attributes).join(', ')}`);
+        logger.info(`Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
         logger.info(`Legacy Tier IDs: ${JSON.stringify(attributes.tier_ids)}`);
         logger.info(`Upgrade IDs: ${JSON.stringify(attributes.upgrade_ids)}`);
         logger.info(`Has Access Rules in Relationships?: ${!!relationships?.access_rules}`);
         if (relationships?.access_rules) {
             logger.info(`Access Rules Data: ${JSON.stringify(relationships.access_rules)}`);
         }
+        const tierIds = tierData.map((item: any) => item.id || item);
+        logger.info(`Found Tier IDs: ${JSON.stringify(tierIds)}`);
         logger.info('--- DEEP DEBUG END ---');
         // === DEBUG LOGGING END ===
 
