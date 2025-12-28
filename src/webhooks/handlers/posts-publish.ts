@@ -23,6 +23,16 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         const relationships = post.relationships || {};
         const tierData = relationships.tiers?.data || [];
 
+        // === DEBUG LOGGING START ===
+        logger.info('--- POST PUBLISH DEBUG START ---');
+        logger.info(`Post Title: ${title}`);
+        logger.info(`Post ID: ${postId}`);
+        logger.info(`Is Public Flag: ${attributes.is_public}`);
+        logger.info(`Raw Tier Data: ${JSON.stringify(tierData)}`);
+        logger.info(`Included Items Count: ${included.length}`);
+        logger.info(`Raw Relationships: ${JSON.stringify(relationships)}`);
+        // === DEBUG LOGGING END ===
+
         // Determine the highest tier (most restrictive)
         let highestTierName = 'Free';
         let highestTierRank = 0;
@@ -32,14 +42,24 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
 
             if (tierInfo) {
                 const tierTitle = tierInfo.attributes?.title || 'Unknown';
+                logger.info(`Found tier in included data: "${tierTitle}" (ID: ${tierRef.id})`);
+
                 const tierMapping = await getTierMappingByName(tierTitle);
 
                 if (tierMapping && tierMapping.tier_rank > highestTierRank) {
                     highestTierRank = tierMapping.tier_rank;
                     highestTierName = tierMapping.tier_name;
+                    logger.info(`Updated highest tier: ${highestTierName} (Rank: ${highestTierRank})`);
+                } else if (!tierMapping) {
+                    logger.warn(`No tier mapping found for: "${tierTitle}"`);
                 }
+            } else {
+                logger.warn(`Tier info not found in included data for tier ID: ${tierRef.id}`);
             }
         }
+
+        logger.info(`Final determined tier: ${highestTierName} (Rank: ${highestTierRank})`);
+        logger.info('--- POST PUBLISH DEBUG END ---');
 
         // Extract tags and collections (if available)
         const tags: string[] = [];

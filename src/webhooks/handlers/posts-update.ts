@@ -25,6 +25,15 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         const relationships = post.relationships || {};
         const tierData = relationships.tiers?.data || [];
 
+        // === DEBUG LOGGING START ===
+        logger.info('--- POST UPDATE DEBUG START ---');
+        logger.info(`Post Title: ${title}`);
+        logger.info(`Post ID: ${postId}`);
+        logger.info(`Is Public Flag: ${attributes.is_public}`);
+        logger.info(`Raw Tier Data: ${JSON.stringify(tierData)}`);
+        logger.info(`Included Items Count: ${included.length}`);
+        // === DEBUG LOGGING END ===
+
         // Determine the highest tier (most restrictive)
         let newTierName = 'Free';
         let newTierRank = 0;
@@ -34,14 +43,23 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
 
             if (tierInfo) {
                 const tierTitle = tierInfo.attributes?.title || 'Unknown';
+                logger.info(`Found tier in included data: "${tierTitle}" (ID: ${tierRef.id})`);
+
                 const tierMapping = await getTierMappingByName(tierTitle);
 
                 if (tierMapping && tierMapping.tier_rank > newTierRank) {
                     newTierRank = tierMapping.tier_rank;
                     newTierName = tierMapping.tier_name;
+                    logger.info(`Updated new tier: ${newTierName} (Rank: ${newTierRank})`);
+                } else if (!tierMapping) {
+                    logger.warn(`No tier mapping found for: "${tierTitle}"`);
                 }
+            } else {
+                logger.warn(`Tier info not found in included data for tier ID: ${tierRef.id}`);
             }
         }
+
+        logger.info(`Final determined new tier: ${newTierName} (Rank: ${newTierRank})`);
 
         // Get old post data from database
         const oldPost = await getTrackedPost(postId);
