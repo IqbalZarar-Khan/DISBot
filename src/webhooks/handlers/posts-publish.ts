@@ -31,6 +31,7 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         logger.info(`Raw Tier Data: ${JSON.stringify(tierData)}`);
         logger.info(`Included Items Count: ${included.length}`);
         logger.info(`Raw Relationships: ${JSON.stringify(relationships)}`);
+        logger.info(`Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
         // === DEBUG LOGGING END ===
 
         // Determine the highest tier (most restrictive)
@@ -56,6 +57,28 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             } else {
                 logger.warn(`Tier info not found in included data for tier ID: ${tierRef.id}`);
             }
+        }
+
+        // Fallback: If no tiers found, check minimum pledge amount
+        if (highestTierRank === 0 && attributes.min_cents_pledged_to_view) {
+            const minCents = parseInt(attributes.min_cents_pledged_to_view);
+            logger.info(`No tier data found, using min_cents_pledged_to_view: ${minCents}`);
+
+            // Map pledge amounts to tiers (adjust these values to match your Patreon tier prices)
+            if (minCents >= 2000) { // $20+
+                highestTierName = 'Diamond';
+                highestTierRank = 100;
+            } else if (minCents >= 1000) { // $10+
+                highestTierName = 'Gold';
+                highestTierRank = 75;
+            } else if (minCents >= 500) { // $5+
+                highestTierName = 'Silver';
+                highestTierRank = 50;
+            } else if (minCents > 0) { // Any pledge
+                highestTierName = 'Bronze';
+                highestTierRank = 25;
+            }
+            logger.info(`Mapped pledge amount to tier: ${highestTierName} (Rank: ${highestTierRank})`);
         }
 
         logger.info(`Final determined tier: ${highestTierName} (Rank: ${highestTierRank})`);
