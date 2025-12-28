@@ -65,17 +65,17 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
             const minCents = parseInt(attributes.min_cents_pledged_to_view);
             logger.info(`No tier data found, using min_cents_pledged_to_view: ${minCents}`);
 
-            // Map pledge amounts to tiers (adjust these values to match your Patreon tier prices)
-            if (minCents >= 2000) { // $20+
+            // Map pledge amounts to tiers (based on your Patreon tier prices)
+            if (minCents >= 2500) { // $25+ = Diamond
                 newTierName = 'Diamond';
                 newTierRank = 100;
-            } else if (minCents >= 1000) { // $10+
+            } else if (minCents >= 1500) { // $15+ = Gold
                 newTierName = 'Gold';
                 newTierRank = 75;
-            } else if (minCents >= 500) { // $5+
+            } else if (minCents >= 1000) { // $10+ = Silver
                 newTierName = 'Silver';
                 newTierRank = 50;
-            } else if (minCents > 0) { // Any pledge
+            } else if (minCents >= 300) { // $3+ = Bronze
                 newTierName = 'Bronze';
                 newTierRank = 25;
             }
