@@ -32,6 +32,17 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         logger.info(`Included Items Count: ${included.length}`);
         logger.info(`Raw Relationships: ${JSON.stringify(relationships)}`);
         logger.info(`Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
+
+        // === DEEP DEBUG START ===
+        logger.info('--- DEEP DEBUG START ---');
+        logger.info(`Attributes Keys: ${Object.keys(attributes).join(', ')}`);
+        logger.info(`Legacy Tier IDs: ${JSON.stringify(attributes.tier_ids)}`);
+        logger.info(`Upgrade IDs: ${JSON.stringify(attributes.upgrade_ids)}`);
+        logger.info(`Has Access Rules in Relationships?: ${!!relationships?.access_rules}`);
+        if (relationships?.access_rules) {
+            logger.info(`Access Rules Data: ${JSON.stringify(relationships.access_rules)}`);
+        }
+        logger.info('--- DEEP DEBUG END ---');
         // === DEBUG LOGGING END ===
 
         // Determine the highest tier (most restrictive)
