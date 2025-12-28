@@ -47,19 +47,11 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         logger.info(`Is Public Flag: ${attributes.is_public}`);
         logger.info(`Raw Tier Data: ${JSON.stringify(tierData)}`);
         logger.info(`Included Items Count: ${included.length}`);
-        logger.info(`Raw Relationships: ${JSON.stringify(relationships)}`);
         logger.info(`Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
 
         // === DEEP DEBUG START ===
         logger.info('--- DEEP DEBUG START ---');
-        logger.info(`Attributes Keys: ${Object.keys(attributes).join(', ')}`);
         logger.info(`Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
-        logger.info(`Legacy Tier IDs: ${JSON.stringify(attributes.tier_ids)}`);
-        logger.info(`Upgrade IDs: ${JSON.stringify(attributes.upgrade_ids)}`);
-        logger.info(`Has Access Rules in Relationships?: ${!!relationships?.access_rules}`);
-        if (relationships?.access_rules) {
-            logger.info(`Access Rules Data: ${JSON.stringify(relationships.access_rules)}`);
-        }
         const tierIds = tierData.map((item: any) => item.id || item);
         logger.info(`Found Tier IDs: ${JSON.stringify(tierIds)}`);
         logger.info('--- DEEP DEBUG END ---');
@@ -70,11 +62,33 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         let highestTierRank = 0;
 
         for (const tierRef of tierData) {
-            const tierInfo = included.find((item: any) => item.type === 'tier' && item.id === tierRef.id);
+            let tierTitle: string | undefined;
 
-            if (tierInfo) {
-                const tierTitle = tierInfo.attributes?.title || 'Unknown';
-                logger.info(`Found tier in included data: "${tierTitle}" (ID: ${tierRef.id})`);
+            // Method 1: Check if tier object has title directly (attributes.tiers case)
+            if (tierRef.title) {
+                tierTitle = tierRef.title;
+                logger.info(`✅ Found tier title directly in tier object: "${tierTitle}"`);
+            }
+            // Method 2: Check if tier object has attributes.title
+            else if (tierRef.attributes?.title) {
+                tierTitle = tierRef.attributes.title;
+                logger.info(`✅ Found tier title in tier.attributes: "${tierTitle}"`);
+            }
+            // Method 3: Look up by ID in included data (standard method)
+            else if (tierRef.id) {
+                const tierInfo = included.find((item: any) => item.type === 'tier' && item.id === tierRef.id);
+                if (tierInfo) {
+                    tierTitle = tierInfo.attributes?.title;
+                    logger.info(`Found tier in included data: "${tierTitle}" (ID: ${tierRef.id})`);
+                } else {
+                    logger.warn(`Tier info not found in included data for tier ID: ${tierRef.id}`);
+                }
+            }
+
+            // If we found a tier title, try to map it
+            if (tierTitle) {
+                // Remove trailing dots (e.g., "Diamond." -> "Diamond")
+                tierTitle = tierTitle.trim().replace(/\.+$/, '');
 
                 const tierMapping = await getTierMappingByName(tierTitle);
 
@@ -85,8 +99,6 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                 } else if (!tierMapping) {
                     logger.warn(`No tier mapping found for: "${tierTitle}"`);
                 }
-            } else {
-                logger.warn(`Tier info not found in included data for tier ID: ${tierRef.id}`);
             }
         }
 
@@ -112,7 +124,7 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             logger.info(`Mapped pledge amount to tier: ${highestTierName} (Rank: ${highestTierRank})`);
         }
 
-        logger.info(`Final determined tier: ${highestTierName} (Rank: ${highestTierRank})`);
+        logger.info(`✅ Final determined tier: ${highestTierName} (Rank: ${highestTierRank})`);
         logger.info('--- POST PUBLISH DEBUG END ---');
 
         // Extract tags and collections (if available)
