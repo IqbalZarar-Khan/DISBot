@@ -191,3 +191,39 @@ export async function getAllTrackedMembers(): Promise<TrackedMember[]> {
 
     return (data as TrackedMember[]) || [];
 }
+
+// ===== CUSTOM MESSAGES OPERATIONS =====
+
+/**
+ * Save a custom message template
+ */
+export async function setCustomMessage(type: string, content: string): Promise<void> {
+    const supabase = getSupabase();
+
+    const { error } = await supabase
+        .from('custom_messages')
+        .upsert({ type, content }, { onConflict: 'type' });
+
+    if (error) throw error;
+}
+
+/**
+ * Retrieve a custom message template
+ */
+export async function getCustomMessage(type: string): Promise<string | null> {
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+        .from('custom_messages')
+        .select('content')
+        .eq('type', type)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') return null; // No rows found
+        throw error;
+    }
+
+    return data.content;
+}
+
