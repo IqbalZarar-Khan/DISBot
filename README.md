@@ -104,9 +104,10 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_supabase_anon_or_service_key
 
 # Tier Configuration (JSON array)
-# Format: [{"name":"TierName","id":"PatreonTierID","rank":RankNumber}]
+# Format: [{"name":"TierName","id":"PatreonTierID","rank":RankNumber,"cents":AmountInCents}]
 # Rank: 100 = Highest priority, 0 = Free
-TIER_CONFIG='[{"name":"Tier1","id":"TIER_ID_1","rank":100},{"name":"Tier2","id":"TIER_ID_2","rank":75}]'
+# cents: Optional pledge amount in cents for fallback tier detection
+TIER_CONFIG='[{"name":"Tier1","id":"TIER_ID_1","rank":100,"cents":2500},{"name":"Tier2","id":"TIER_ID_2","rank":75,"cents":1500}]'
 ```
 
 ### Tier Configuration
