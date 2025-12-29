@@ -1,30 +1,37 @@
 import { TierRank } from '../database/schema';
+import { config } from '../config';
 
 /**
  * Tier ID to Name Translation Map
- * Maps Patreon tier IDs to tier names for cases where Patreon sends IDs without titles
- * The bot uses this to convert the ID back to the name you used in /admin set-channel
+ * Dynamically populated from TIER_CONFIG environment variable
  */
-export const tierIdMap: Record<string, string> = {
-    '25684252': 'Diamond',
-    '25588630': 'Gold',
-    '25588424': 'Silver',
-    '25508381': 'Bronze',
-    '25508367': 'Free'
-};
+export const tierIdMap: Record<string, string> = {};
 
 /**
  * Tier Rankings
- * Defines the value of each tier for the Waterfall strategy
+ * Dynamically populated from TIER_CONFIG environment variable
  * Higher number = Higher priority
  */
-export const tierRankings: Record<string, number> = {
-    'Diamond': 100,
-    'Gold': 75,
-    'Silver': 50,
-    'Bronze': 25,
-    'Free': 0
-};
+export const tierRankings: Record<string, number> = {};
+
+// Dynamically populate tier maps from configuration
+if (config.tierConfig && config.tierConfig.length > 0) {
+    config.tierConfig.forEach(tier => {
+        // Map Name -> Rank (e.g., "Diamond" -> 100)
+        tierRankings[tier.name] = tier.rank;
+
+        // Map ID -> Name (e.g., "25684252" -> "Diamond")
+        tierIdMap[tier.id] = tier.name;
+    });
+
+    console.log(`✅ Global Tier System Loaded: ${config.tierConfig.length} tier(s) configured.`);
+    console.log(`   Tiers: ${config.tierConfig.map(t => `${t.name}(${t.rank})`).join(', ')}`);
+} else {
+    console.warn("⚠️ NO TIERS CONFIGURED. Please set TIER_CONFIG in .env");
+    console.warn("   Example: TIER_CONFIG='[{\"name\":\"Diamond\",\"id\":\"123\",\"rank\":100}]'");
+    // Default fallback (keeps the bot from crashing if config is missing)
+    tierRankings['Free'] = 0;
+}
 
 /**
  * Get tier rank by tier name

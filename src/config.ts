@@ -3,6 +3,13 @@ import * as dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Define the interface for a Tier
+export interface TierDefinition {
+    name: string;
+    id: string;
+    rank: number;
+}
+
 interface Config {
     // Discord
     discordToken: string;
@@ -24,6 +31,9 @@ interface Config {
     // Supabase
     supabaseUrl: string;
     supabaseKey: string;
+
+    // Tier Configuration
+    tierConfig: TierDefinition[];
 }
 
 function getEnvVar(key: string, required: boolean = true): string {
@@ -34,6 +44,25 @@ function getEnvVar(key: string, required: boolean = true): string {
     }
 
     return value || '';
+}
+
+// Helper to safely parse the tier configuration JSON from .env
+function parseTierConfig(): TierDefinition[] {
+    try {
+        const rawConfig = process.env.TIER_CONFIG;
+        if (!rawConfig) {
+            console.warn("⚠️ TIER_CONFIG not set in .env. Using empty tier configuration.");
+            return [];
+        }
+        const parsed = JSON.parse(rawConfig);
+        console.log(`✅ Loaded ${parsed.length} tier(s) from TIER_CONFIG`);
+        return parsed;
+    } catch (error) {
+        console.error("❌ FATAL ERROR: TIER_CONFIG in .env is not valid JSON.");
+        console.error("Please format it like: [{'name':'Diamond','id':'123','rank':100}]");
+        console.error("Error:", error);
+        return [];
+    }
 }
 
 export const config: Config = {
@@ -56,7 +85,10 @@ export const config: Config = {
 
     // Supabase
     supabaseUrl: getEnvVar('SUPABASE_URL'),
-    supabaseKey: getEnvVar('SUPABASE_KEY')
+    supabaseKey: getEnvVar('SUPABASE_KEY'),
+
+    // Tier Configuration
+    tierConfig: parseTierConfig()
 };
 
 // Validate configuration
