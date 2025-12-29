@@ -42,16 +42,20 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         // 4. Normalize to array
         const tierData = Array.isArray(rawTierData) ? rawTierData : [];
 
-        // === DEBUG LOGGING START ===
-        logger.info('--- POST UPDATE DEBUG START ---');
-        logger.info(`Post Title: ${title}`);
-        logger.info(`Post ID: ${postId}`);
-        logger.info(`Is Public Flag: ${attributes.is_public}`);
-        logger.info(`Raw Tier Data: ${JSON.stringify(tierData)}`);
-        logger.info(`Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
-        logger.info(`Included Items Count: ${included.length}`);
-        logger.info(`Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
-        // === DEBUG LOGGING END ===
+        // === ENHANCED DEBUG LOGGING START ===
+        logger.info('\n🐛 ========================================');
+        logger.info('🐛 [POST UPDATE DEBUG START]');
+        logger.info('🐛 ========================================');
+        logger.info(`🐛 Post Title: "${title}"`);
+        logger.info(`🐛 Post ID: ${postId}`);
+        logger.info(`🐛 Published At: ${attributes.published_at}`);
+        logger.info(`🐛 Is Public Flag: ${attributes.is_public}`);
+        logger.info(`🐛 Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
+        logger.info(`🐛 Raw Tier Data: ${JSON.stringify(tierData)}`);
+        logger.info(`🐛 Raw Access Rules: ${JSON.stringify(relationships.access_rules?.data)}`);
+        logger.info(`🐛 Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
+        logger.info(`🐛 Included Items Count: ${included.length}`);
+        // === ENHANCED DEBUG LOGGING END ===
 
         // --- START OF UPDATE FIX ---
 
@@ -67,20 +71,27 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
             }
         });
 
-        logger.info(`✅ Update Event - Extracted Tier IDs: ${JSON.stringify(tierIds)}`);
+        logger.info(`\n🐛 [STRATEGY 1: ID MATCH]`);
+        logger.info(`🐛 Extracted Tier IDs: ${JSON.stringify(tierIds)}`);
+        logger.info(`🐛 Available Tier ID Map Keys: ${JSON.stringify(Object.keys(tierIdMap))}`);
 
         // 2. Translate IDs to Names
         const availableTiers: string[] = [];
+        let detectionStrategy = 'None';
 
         tierIds.forEach(id => {
+            logger.info(`🐛 Checking Tier ID: ${id} against tierIdMap...`);
             if (tierIdMap[id]) {
                 availableTiers.push(tierIdMap[id]); // Converts "25588630" to "Gold"
-                logger.info(`✅ ID Translation: ${id} -> ${tierIdMap[id]}`);
+                detectionStrategy = 'ID Match';
+                logger.info(`✅ [ID MATCH FOUND] ${id} -> ${tierIdMap[id]}`);
             } else {
+                logger.warn(`❌ [ID NOT FOUND] Tier ID ${id} not found in TIER_CONFIG`);
                 // Optional: Try standard lookup if ID is missing from map
                 const includedTier = included.find((item: any) => item.type === 'tier' && String(item.id) === id);
                 if (includedTier && includedTier.attributes && includedTier.attributes.title) {
                     availableTiers.push(includedTier.attributes.title);
+                    detectionStrategy = 'Title Match (Included Data)';
                     logger.info(`Found tier in included data: "${includedTier.attributes.title}" (ID: ${id})`);
                 } else {
                     logger.warn(`⚠️ Tier ID ${id} not found in tierIdMap or included data`);
@@ -88,7 +99,7 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
             }
         });
 
-        logger.info(`✅ Update Event - Translated Tier Names: ${JSON.stringify(availableTiers)}`);
+        logger.info(`🐛 Translated Tier Names: ${JSON.stringify(availableTiers)}`);
 
         // 3. WATERFALL LOGIC: Find the "Lowest" Tier (Widest Audience)
         // If a post is available to Diamond AND Gold, we want to alert Gold 
@@ -96,12 +107,16 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         let newTierName = 'Free';
         let newTierRank = 999; // Start high to find the lowest
 
+        logger.info(`\n🐛 [WATERFALL LOGIC]`);
+        logger.info(`🐛 Finding lowest tier (widest audience)...`);
+
         availableTiers.forEach(tierName => {
             // Sanitize dot if present
             const cleanName = tierName.trim().replace(/\.+$/, '');
 
             // Get the rank value from tierRankings (Diamond=100, Gold=75)
             const rank = tierRankings[cleanName];
+            logger.info(`🐛 Checking tier: ${cleanName} (Rank: ${rank})`);
 
             // We want the tier with the LOWEST rank number that is > 0
             // (This ensures we alert the widest audience, e.g., Gold instead of Diamond)
@@ -115,25 +130,33 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         // If no valid tier found, reset to 0
         if (newTierRank === 999) {
             newTierRank = 0;
+            logger.warn(`⚠️ No valid tier found in waterfall logic`);
         }
 
         // Fallback: If no tiers found, check minimum pledge amount using centsMap
         if (newTierRank === 0 && attributes.min_cents_pledged_to_view) {
             const minCents = parseInt(attributes.min_cents_pledged_to_view);
-            logger.info(`No tier data found, using min_cents_pledged_to_view: ${minCents}`);
+
+            logger.info(`\n🐛 [STRATEGY 2: CENTS FALLBACK]`);
+            logger.info(`🐛 No tier data found, trying min_cents_pledged_to_view: ${minCents}`);
+            logger.info(`🐛 Available Cents Map Keys: ${JSON.stringify(Object.keys(centsMap).map(Number))}`);
 
             // Check centsMap for exact match
             if (centsMap[minCents]) {
                 newTierName = centsMap[minCents];
                 newTierRank = tierRankings[newTierName] || 0;
-                logger.info(`✅ Cents Map Match: ${minCents} cents -> ${newTierName} (Rank: ${newTierRank})`);
+                detectionStrategy = 'Cents Match';
+                logger.info(`✅ [CENTS MATCH FOUND] ${minCents} cents -> ${newTierName} (Rank: ${newTierRank})`);
             } else {
-                logger.warn(`⚠️ No tier configured for ${minCents} cents in TIER_CONFIG`);
-                logger.warn(`   Add "cents":${minCents} to the appropriate tier in your TIER_CONFIG`);
+                logger.warn(`❌ [CENTS NOT FOUND] No tier configured for ${minCents} cents in TIER_CONFIG`);
+                logger.warn(`💡 Add "cents":${minCents} to the appropriate tier in your TIER_CONFIG`);
             }
         }
 
-        logger.info(`✅ Final determined new tier: ${newTierName} (Rank: ${newTierRank})`);
+        logger.info(`\n🐛 [FINAL DECISION]`);
+        logger.info(`🐛 Detection Strategy: ${detectionStrategy}`);
+        logger.info(`🐛 Final Tier: "${newTierName}" (Rank: ${newTierRank})`);
+        logger.info('🐛 ========================================\n');
 
         // --- END OF UPDATE FIX ---
 
