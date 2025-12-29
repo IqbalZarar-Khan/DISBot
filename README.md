@@ -50,7 +50,7 @@ A Discord bot that automates content distribution from Patreon to Discord using 
    
    Edit the `TIER_CONFIG` in your `.env` file:
    ```bash
-   TIER_CONFIG='[{"name":"Tier1","id":"YOUR_TIER_ID","rank":100},{"name":"Tier2","id":"YOUR_TIER_ID","rank":75}]'
+   TIER_CONFIG='[{"name":"Tier1","id":"YOUR_TIER_ID","rank":100,"cents":1000},{"name":"Tier2","id":"YOUR_TIER_ID","rank":75,"cents":500}]'
    ```
    
    **Finding Tier IDs:**
