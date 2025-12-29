@@ -1,4 +1,4 @@
-# 🤖 Patreon Tier-Waterfall Bot
+# 🤖 Patreon Tier-Waterfall Discord Bot
 
 A Discord bot that automates content distribution from Patreon to Discord using a tiered "waterfall" release strategy. The bot tracks when content becomes available to different patron tiers and notifies the appropriate Discord channels in real-time.
 
@@ -9,6 +9,8 @@ A Discord bot that automates content distribution from Patreon to Discord using 
 - **🔒 Secure Admin Panel**: User ID-based authentication for admin commands
 - **📊 Real-time Webhooks**: Instant notifications via Patreon webhooks
 - **💎 Tier Management**: Easy mapping of Patreon tiers to Discord channels
+- **⚙️ Configuration-Driven**: 100% configurable via environment variables (no code changes needed!)
+- **🔄 Dynamic Tier System**: Support for any number of custom tiers via JSON configuration
 
 ## 🚀 Quick Start
 
@@ -17,7 +19,8 @@ A Discord bot that automates content distribution from Patreon to Discord using 
 - Node.js 18+ and npm
 - A Discord bot token ([Create one here](https://discord.com/developers/applications))
 - A Patreon Creator account with OAuth app ([Setup guide](https://www.patreon.com/portal/registration/register-clients))
-- A server with HTTPS support for webhooks (VPS, ngrok, etc.)
+- A Supabase account ([Sign up here](https://supabase.com))
+- A server with HTTPS support for webhooks (Render, Railway, ngrok, etc.)
 
 ### Installation
 
@@ -38,17 +41,34 @@ A Discord bot that automates content distribution from Patreon to Discord using 
    # Edit .env with your credentials
    ```
 
-4. **Build the project**
+4. **Set up Supabase database**
+   - Create a new Supabase project
+   - Run the SQL migration from `supabase/migrations/`
+   - Copy your Supabase URL and anon key to `.env`
+
+5. **Configure your tiers**
+   
+   Edit the `TIER_CONFIG` in your `.env` file:
+   ```bash
+   TIER_CONFIG='[{"name":"Tier1","id":"YOUR_TIER_ID","rank":100},{"name":"Tier2","id":"YOUR_TIER_ID","rank":75}]'
+   ```
+   
+   **Finding Tier IDs:**
+   - Start the bot and create a test post on Patreon
+   - Check the bot logs for: `✅ Extracted Tier IDs: ["12345678"]`
+   - Use these IDs in your `TIER_CONFIG`
+
+6. **Build the project**
    ```bash
    npm run build
    ```
 
-5. **Deploy slash commands**
+7. **Deploy slash commands**
    ```bash
    npm run deploy-commands
    ```
 
-6. **Start the bot**
+8. **Start the bot**
    ```bash
    npm start
    # For development with auto-reload:
@@ -79,8 +99,45 @@ PATREON_CAMPAIGN_ID=your_campaign_id
 WEBHOOK_SECRET=your_webhook_secret
 WEBHOOK_PORT=3000
 
-# Database
-DATABASE_PATH=./data/bot.db
+# Supabase Configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your_supabase_anon_or_service_key
+
+# Tier Configuration (JSON array)
+# Format: [{"name":"TierName","id":"PatreonTierID","rank":RankNumber}]
+# Rank: 100 = Highest priority, 0 = Free
+TIER_CONFIG='[{"name":"Tier1","id":"TIER_ID_1","rank":100},{"name":"Tier2","id":"TIER_ID_2","rank":75}]'
+```
+
+### Tier Configuration
+
+The bot uses a dynamic tier system configured via the `TIER_CONFIG` environment variable:
+
+**JSON Structure:**
+```json
+[
+  {
+    "name": "YourTierName",
+    "id": "PatreonTierID",
+    "rank": 100
+  }
+]
+```
+
+- **name**: Tier name used in `/admin set-channel` commands
+- **id**: Patreon tier ID (found in bot logs when creating posts)
+- **rank**: Priority level (100 = highest, 0 = free)
+
+**Examples:**
+
+Standard 5-tier setup:
+```bash
+TIER_CONFIG='[{"name":"Diamond","id":"12345","rank":100},{"name":"Gold","id":"67890","rank":75},{"name":"Silver","id":"11111","rank":50},{"name":"Bronze","id":"22222","rank":25},{"name":"Free","id":"33333","rank":0}]'
+```
+
+Custom tier names:
+```bash
+TIER_CONFIG='[{"name":"Captain","id":"123","rank":100},{"name":"Crew","id":"456","rank":50}]'
 ```
 
 ### Initial Setup
@@ -92,15 +149,14 @@ DATABASE_PATH=./data/bot.db
 
 2. **Configure tier mappings** using `/admin set-channel`:
    ```
-   /admin set-channel tier_name:Diamond channel:#diamond-alerts
-   /admin set-channel tier_name:Gold channel:#gold-alerts
-   /admin set-channel tier_name:Silver channel:#silver-alerts
+   /admin set-channel tier_name:Tier1 channel:#tier1-alerts
+   /admin set-channel tier_name:Tier2 channel:#tier2-alerts
    ```
 
 3. **Test the setup**:
    ```
    /admin status
-   /admin test-alert tier_name:Diamond
+   /admin test-alert tier_name:Tier1
    ```
 
 ## 📚 Admin Commands
@@ -118,9 +174,17 @@ All admin commands are restricted to the user specified in `ROOT_ADMIN_ID`.
 
 ### Waterfall Release Strategy
 
-1. **New Content**: When you publish a chapter for Diamond tier, the bot alerts #diamond-alerts
-2. **Tier Update**: When you change access from Diamond to Gold, the bot alerts #gold-alerts
+1. **New Content**: When you publish content for Tier1, the bot alerts #tier1-alerts
+2. **Tier Update**: When you change access from Tier1 to Tier2, the bot alerts #tier2-alerts
 3. **Cascade**: Continue lowering tiers, and each channel gets notified when they gain access
+
+### Tier Detection
+
+The bot uses multiple methods to detect post tiers:
+
+1. **Tier ID Translation**: Converts Patreon tier IDs to tier names using `TIER_CONFIG`
+2. **Included Data Lookup**: Searches for tier information in webhook payload
+3. **Pledge Amount Fallback**: Uses `min_cents_pledged_to_view` as last resort
 
 ### Member Tracking
 
@@ -137,14 +201,14 @@ src/
 ├── commands/           # Slash command handlers
 │   ├── admin/         # Admin-only commands
 │   └── deploy-commands.ts
-├── database/          # Database layer
-│   ├── db.ts         # SQL.js operations
+├── database/          # Database layer (Supabase)
+│   ├── db.ts         # Database operations
 │   └── schema.ts     # TypeScript interfaces
 ├── middleware/        # Authorization middleware
 ├── utils/            # Utility functions
 │   ├── embedBuilder.ts
 │   ├── logger.ts
-│   └── tierRanking.ts
+│   └── tierRanking.ts  # Dynamic tier system
 ├── webhooks/         # Webhook server and handlers
 │   ├── handlers/     # Event-specific handlers
 │   ├── server.ts
@@ -161,11 +225,38 @@ src/
 - `npm run deploy-commands` - Register slash commands
 - `npm test` - Run tests
 
+## 🚢 Deployment
+
+### Render Deployment
+
+1. Create a new Web Service on Render
+2. Connect your GitHub repository
+3. Set environment variables in Render dashboard
+4. Deploy!
+
+See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) for detailed instructions.
+
+### Docker Deployment
+
+```bash
+docker build -t patreon-bot .
+docker run -d --env-file .env patreon-bot
+```
+
 ## 🔐 Security
 
 - **User ID Whitelisting**: Only the root admin can execute admin commands
 - **Webhook Verification**: All Patreon webhooks are verified using HMAC signatures
 - **Environment Variables**: Sensitive data stored in `.env` (never committed)
+- **Supabase RLS**: Row-level security policies protect database access
+
+## 🆕 Recent Updates
+
+- ✅ **Dynamic Tier Configuration**: Configure tiers via `TIER_CONFIG` environment variable
+- ✅ **Tier ID Translation**: Automatic conversion of Patreon tier IDs to tier names
+- ✅ **Supabase Integration**: Migrated from SQLite to Supabase for persistent storage
+- ✅ **Enhanced Logging**: Comprehensive debug logging for tier detection
+- ✅ **Fallback Mechanisms**: Multiple methods to detect post tiers
 
 ## 📝 License
 
@@ -174,3 +265,7 @@ MIT
 ## 🤝 Support
 
 For issues or questions, please open an issue on GitHub.
+
+## 🙏 Acknowledgments
+
+Built with ❤️ for Patreon creators who want to automate their content distribution workflow.
