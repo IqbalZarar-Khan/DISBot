@@ -52,8 +52,8 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         // === DEEP DEBUG START ===
         logger.info('--- DEEP DEBUG START ---');
         logger.info(`Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
-        const tierIds = tierData.map((item: any) => item.id || item);
-        logger.info(`Found Tier IDs: ${JSON.stringify(tierIds)}`);
+        const tierIds = tierData.map((item: any) => String(item.id || item));
+        logger.info(`✅ Extracted Tier IDs: ${JSON.stringify(tierIds)}`);
         logger.info('--- DEEP DEBUG END ---');
         // === DEBUG LOGGING END ===
 
@@ -62,42 +62,55 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         let highestTierRank = 0;
 
         for (const tierRef of tierData) {
-            let tierTitle: string | undefined;
+            let tierKey: string | undefined; // Can be either title or ID
+            let tierId: string | undefined;
+
+            // Extract tier ID (convert to string if it's a number)
+            if (typeof tierRef === 'string' || typeof tierRef === 'number') {
+                // attributes.tiers might be an array of IDs directly
+                tierId = String(tierRef);
+            } else if (tierRef.id) {
+                tierId = String(tierRef.id);
+            }
 
             // Method 1: Check if tier object has title directly (attributes.tiers case)
             if (tierRef.title) {
-                tierTitle = tierRef.title;
-                logger.info(`✅ Found tier title directly in tier object: "${tierTitle}"`);
+                tierKey = tierRef.title;
+                logger.info(`✅ Found tier title directly in tier object: "${tierKey}"`);
             }
             // Method 2: Check if tier object has attributes.title
             else if (tierRef.attributes?.title) {
-                tierTitle = tierRef.attributes.title;
-                logger.info(`✅ Found tier title in tier.attributes: "${tierTitle}"`);
+                tierKey = tierRef.attributes.title;
+                logger.info(`✅ Found tier title in tier.attributes: "${tierKey}"`);
             }
             // Method 3: Look up by ID in included data (standard method)
-            else if (tierRef.id) {
-                const tierInfo = included.find((item: any) => item.type === 'tier' && item.id === tierRef.id);
-                if (tierInfo) {
-                    tierTitle = tierInfo.attributes?.title;
-                    logger.info(`Found tier in included data: "${tierTitle}" (ID: ${tierRef.id})`);
+            else if (tierId) {
+                const tierInfo = included.find((item: any) => item.type === 'tier' && String(item.id) === tierId);
+                if (tierInfo && tierInfo.attributes?.title) {
+                    tierKey = tierInfo.attributes.title;
+                    logger.info(`Found tier title in included data: "${tierKey}" (ID: ${tierId})`);
                 } else {
-                    logger.warn(`Tier info not found in included data for tier ID: ${tierRef.id}`);
+                    // CRITICAL FALLBACK: Use the ID itself as the key
+                    tierKey = tierId;
+                    logger.info(`⚠️ Tier title not found in included data, using ID as key: "${tierKey}"`);
                 }
             }
 
-            // If we found a tier title, try to map it
-            if (tierTitle) {
+            // If we found a tier key (title or ID), try to map it
+            if (tierKey) {
                 // Remove trailing dots (e.g., "Diamond." -> "Diamond")
-                tierTitle = tierTitle.trim().replace(/\.+$/, '');
+                tierKey = tierKey.trim().replace(/\.+$/, '');
 
-                const tierMapping = await getTierMappingByName(tierTitle);
+                logger.info(`Attempting to map tier key: "${tierKey}"`);
+                const tierMapping = await getTierMappingByName(tierKey);
 
                 if (tierMapping && tierMapping.tier_rank > highestTierRank) {
                     highestTierRank = tierMapping.tier_rank;
                     highestTierName = tierMapping.tier_name;
-                    logger.info(`Updated highest tier: ${highestTierName} (Rank: ${highestTierRank})`);
+                    logger.info(`✅ Updated highest tier: ${highestTierName} (Rank: ${highestTierRank})`);
                 } else if (!tierMapping) {
-                    logger.warn(`No tier mapping found for: "${tierTitle}"`);
+                    logger.warn(`❌ No tier mapping found for: "${tierKey}"`);
+                    logger.warn(`   Run this command in Discord: /admin set-channel tier_name:${tierKey} channel:#your-channel`);
                 }
             }
         }
