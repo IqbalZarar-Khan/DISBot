@@ -12,6 +12,13 @@ A Discord bot that automates content distribution from Patreon to Discord using 
 - **⚙️ Configuration-Driven**: 100% configurable via environment variables (no code changes needed!)
 - **🔄 Dynamic Tier System**: Support for any number of custom tiers via JSON configuration
 
+## 📚 Documentation
+
+- **[Setup Guide](SETUP.md)** - Detailed setup instructions for Discord, Patreon, and Supabase
+- **[Deployment Guide](RENDER_DEPLOYMENT.md)** - Deploy to Render.com with automatic HTTPS
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to this project
+- **[Code of Conduct](CPDSC.md)** - Community guidelines and standards
+
 ## 🚀 Quick Start
 
 ### Prerequisites

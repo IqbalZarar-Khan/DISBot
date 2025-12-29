@@ -33,3 +33,9 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+
+# Outdated documentation (not for distribution)
+DEPLOYMENT.md
+DEPLOY_QUICK.md
+PRD&IMPIM.md
+QUICKSTART.md
