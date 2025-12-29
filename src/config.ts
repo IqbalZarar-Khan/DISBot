@@ -8,6 +8,7 @@ export interface TierDefinition {
     name: string;
     id: string;
     rank: number;
+    cents?: number; // Optional: minimum pledge amount in cents for this tier
 }
 
 interface Config {

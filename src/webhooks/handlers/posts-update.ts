@@ -1,10 +1,10 @@
 import { WebhookPayload } from '../../database/schema';
-import { getTrackedPost, upsertTrackedPost, getTierMappingByName } from '../../database/db';
+import { upsertTrackedPost, getTrackedPost, getTierMappingByName } from '../../database/db';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
-import { getTierRank, isWaterfall } from '../../utils/tierRanking';
 import { logger } from '../../utils/logger';
+import { centsMap, tierRankings, getTierRank, isWaterfall } from '../../utils/tierRanking';
 
 /**
  * Handle posts:update webhook event
@@ -60,26 +60,20 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
             }
         }
 
-        // Fallback: If no tiers found, check minimum pledge amount
+        // Fallback: If no tiers found, check minimum pledge amount using centsMap
         if (newTierRank === 0 && attributes.min_cents_pledged_to_view) {
             const minCents = parseInt(attributes.min_cents_pledged_to_view);
             logger.info(`No tier data found, using min_cents_pledged_to_view: ${minCents}`);
 
-            // Map pledge amounts to tiers (based on your Patreon tier prices)
-            if (minCents >= 2500) { // $25+ = Diamond
-                newTierName = 'Diamond';
-                newTierRank = 100;
-            } else if (minCents >= 1500) { // $15+ = Gold
-                newTierName = 'Gold';
-                newTierRank = 75;
-            } else if (minCents >= 1000) { // $10+ = Silver
-                newTierName = 'Silver';
-                newTierRank = 50;
-            } else if (minCents >= 300) { // $3+ = Bronze
-                newTierName = 'Bronze';
-                newTierRank = 25;
+            // Check centsMap for exact match
+            if (centsMap[minCents]) {
+                newTierName = centsMap[minCents];
+                newTierRank = tierRankings[newTierName] || 0;
+                logger.info(`✅ Cents Map Match: ${minCents} cents -> ${newTierName} (Rank: ${newTierRank})`);
+            } else {
+                logger.warn(`⚠️ No tier configured for ${minCents} cents in TIER_CONFIG`);
+                logger.warn(`   Add "cents":${minCents} to the appropriate tier in your TIER_CONFIG`);
             }
-            logger.info(`Mapped pledge amount to tier: ${newTierName} (Rank: ${newTierRank})`);
         }
 
         logger.info(`Final determined new tier: ${newTierName} (Rank: ${newTierRank})`);

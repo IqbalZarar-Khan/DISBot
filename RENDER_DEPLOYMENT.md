@@ -96,9 +96,26 @@ Add all these variables:
 | `PATREON_CAMPAIGN_ID` | `your_campaign_id` | Your Patreon campaign ID |
 | `WEBHOOK_SECRET` | `random_32_char_string` | Generate a random secret |
 | `WEBHOOK_PORT` | `10000` | **Important: Use 10000 for Render** |
-| `DATABASE_PATH` | `./data/bot.db` | SQLite database path |
+| `SUPABASE_URL` | `https://xxx.supabase.co` | From Supabase project settings |
+| `SUPABASE_KEY` | `your_anon_key` | From Supabase project settings |
+| `TIER_CONFIG` | See below | JSON array of your Patreon tiers |
 
 **Important**: Render uses port `10000` by default, not `3000`!
+
+### TIER_CONFIG Format
+
+This is a JSON array defining your Patreon tiers. Find your tier IDs by creating a test post and checking the bot logs.
+
+**Example:**
+```json
+[{"name":"Tier1","id":"YOUR_TIER_ID_1","rank":100,"cents":2500},{"name":"Tier2","id":"YOUR_TIER_ID_2","rank":75,"cents":1500},{"name":"Tier3","id":"YOUR_TIER_ID_3","rank":50,"cents":1000}]
+```
+
+**Fields:**
+- `name`: Your tier name (used in `/admin set-channel` commands)
+- `id`: Patreon tier ID (from bot logs)
+- `rank`: Priority (100 = highest, 0 = free)
+- `cents`: (Optional) Pledge amount in cents for fallback detection
 
 ---
 
@@ -169,15 +186,15 @@ Should show:
 ### Configure Tier Mappings:
 
 ```
-/admin set-channel tier_name:Diamond channel:#diamond-alerts
-/admin set-channel tier_name:Gold channel:#gold-alerts
-/admin set-channel tier_name:Silver channel:#silver-alerts
+/admin set-channel tier_name:Tier1 channel:#tier1-alerts
+/admin set-channel tier_name:Tier2 channel:#tier2-alerts
+/admin set-channel tier_name:Tier3 channel:#tier3-alerts
 ```
 
 ### Test Alerts:
 
 ```
-/admin test-alert tier_name:Diamond
+/admin test-alert tier_name:Tier1
 ```
 
 ---
@@ -201,10 +218,10 @@ Should show:
 
 ## Step 10: Test End-to-End
 
-1. Create a test post on Patreon (set to Diamond tier)
-2. Check if alert appears in `#diamond-alerts` ✅
-3. Edit the post to change tier to Gold
-4. Check if alert appears in `#gold-alerts` ✅
+1. Create a test post on Patreon (set to your highest tier)
+2. Check if alert appears in the corresponding channel ✅
+3. Edit the post to change tier to a lower tier
+4. Check if alert appears in the new tier's channel ✅
 
 ---
 
@@ -333,12 +350,12 @@ If you see this error, ensure you've deployed the latest code with all handlers.
 
 **Solutions**:
 
-**Option 1: Recreate Mappings After Each Deploy** (Temporary)
-After each deployment, run these commands in Discord:
+**Option 1: Recreate Mappings After Each Deploy** (Not needed with Supabase)
+With Supabase, your tier mappings persist. If using SQLite locally, run these commands in Discord:
 ```
-/admin set-channel tier_name:Diamond channel:#diamond-alerts
-/admin set-channel tier_name:Gold channel:#gold-alerts
-/admin set-channel tier_name:Silver channel:#silver-alerts
+/admin set-channel tier_name:Tier1 channel:#tier1-alerts
+/admin set-channel tier_name:Tier2 channel:#tier2-alerts
+/admin set-channel tier_name:Tier3 channel:#tier3-alerts
 ```
 
 **Option 2: Migrate to Supabase** (Recommended for Production)

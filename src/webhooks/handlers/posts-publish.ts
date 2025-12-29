@@ -4,7 +4,7 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { tierIdMap } from '../../utils/tierRanking';
+import { tierIdMap, centsMap } from '../../utils/tierRanking';
 
 /**
  * Handle posts:publish webhook event
@@ -89,22 +89,19 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
 
         // --- END OF TRANSLATION LOGIC ---
 
-        // Fallback: If still Free, check minimum pledge amount
+        // Fallback: If still Free, check minimum pledge amount using centsMap
         if (tierName === 'Free' && attributes.min_cents_pledged_to_view) {
             const minCents = parseInt(attributes.min_cents_pledged_to_view);
             logger.info(`Checking min_cents_pledged_to_view fallback: ${minCents}`);
 
-            // Map pledge amounts to tiers (based on your Patreon tier prices)
-            if (minCents >= 2500) { // $25+ = Diamond
-                tierName = 'Diamond';
-            } else if (minCents >= 1500) { // $15+ = Gold
-                tierName = 'Gold';
-            } else if (minCents >= 1000) { // $10+ = Silver
-                tierName = 'Silver';
-            } else if (minCents >= 300) { // $3+ = Bronze
-                tierName = 'Bronze';
+            // Check centsMap for exact match
+            if (centsMap[minCents]) {
+                tierName = centsMap[minCents];
+                logger.info(`✅ Cents Map Match: ${minCents} cents -> ${tierName}`);
+            } else {
+                logger.warn(`⚠️ No tier configured for ${minCents} cents in TIER_CONFIG`);
+                logger.warn(`   Add "cents":${minCents} to the appropriate tier in your TIER_CONFIG`);
             }
-            logger.info(`Mapped pledge amount to tier: ${tierName}`);
         }
 
         logger.info('--- POST PUBLISH DEBUG END ---');

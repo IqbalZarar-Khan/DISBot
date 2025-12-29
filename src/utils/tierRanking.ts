@@ -14,28 +14,43 @@ export const tierIdMap: Record<string, string> = {};
  */
 export const tierRankings: Record<string, number> = {};
 
+/**
+ * Cents to Tier Name Map
+ * Maps pledge amounts (in cents) to tier names
+ * Used as fallback when tier ID is not available
+ */
+export const centsMap: Record<number, string> = {};
+
 // Dynamically populate tier maps from configuration
 if (config.tierConfig && config.tierConfig.length > 0) {
     config.tierConfig.forEach(tier => {
-        // Map Name -> Rank (e.g., "Diamond" -> 100)
+        // Map Name -> Rank (e.g., "Tier1" -> 100)
         tierRankings[tier.name] = tier.rank;
 
-        // Map ID -> Name (e.g., "25684252" -> "Diamond")
+        // Map ID -> Name (e.g., "TIER_ID_1" -> "Tier1")
         tierIdMap[tier.id] = tier.name;
+
+        // Map Cents -> Name (e.g., 2500 -> "Tier1")
+        if (tier.cents !== undefined) {
+            centsMap[tier.cents] = tier.name;
+        }
     });
 
     console.log(`✅ Global Tier System Loaded: ${config.tierConfig.length} tier(s) configured.`);
     console.log(`   Tiers: ${config.tierConfig.map(t => `${t.name}(${t.rank})`).join(', ')}`);
+    if (Object.keys(centsMap).length > 0) {
+        console.log(`✅ Cents Fallback Map: ${Object.keys(centsMap).length} tier(s) with pledge amounts`);
+    }
 } else {
     console.warn("⚠️ NO TIERS CONFIGURED. Please set TIER_CONFIG in .env");
-    console.warn("   Example: TIER_CONFIG='[{\"name\":\"Diamond\",\"id\":\"123\",\"rank\":100}]'");
+    console.warn("   Example: TIER_CONFIG='[{\"name\":\"Tier1\",\"id\":\"TIER_ID_1\",\"rank\":100,\"cents\":2500}]'");
     // Default fallback (keeps the bot from crashing if config is missing)
     tierRankings['Free'] = 0;
 }
 
 /**
  * Get tier rank by tier name
- * Handles tier names with or without trailing dots (e.g., "Diamond" or "Diamond.")
+ * Handles tier names with or without trailing dots (e.g., "Tier1" or "Tier1.")
  */
 export function getTierRank(tierName: string): number {
     // Normalize: lowercase and remove trailing dots/spaces

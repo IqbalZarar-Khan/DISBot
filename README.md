@@ -119,7 +119,8 @@ The bot uses a dynamic tier system configured via the `TIER_CONFIG` environment 
   {
     "name": "YourTierName",
     "id": "PatreonTierID",
-    "rank": 100
+    "rank": 100,
+    "cents": 2500
   }
 ]
 ```
@@ -127,12 +128,13 @@ The bot uses a dynamic tier system configured via the `TIER_CONFIG` environment 
 - **name**: Tier name used in `/admin set-channel` commands
 - **id**: Patreon tier ID (found in bot logs when creating posts)
 - **rank**: Priority level (100 = highest, 0 = free)
+- **cents**: (Optional) Minimum pledge amount in cents for fallback tier detection
 
 **Examples:**
 
-Standard 5-tier setup:
+Standard 5-tier setup with cents fallback:
 ```bash
-TIER_CONFIG='[{"name":"Diamond","id":"12345","rank":100},{"name":"Gold","id":"67890","rank":75},{"name":"Silver","id":"11111","rank":50},{"name":"Bronze","id":"22222","rank":25},{"name":"Free","id":"33333","rank":0}]'
+TIER_CONFIG='[{"name":"Tier1","id":"TIER_ID_1","rank":100,"cents":2500},{"name":"Tier2","id":"TIER_ID_2","rank":75,"cents":1500},{"name":"Tier3","id":"TIER_ID_3","rank":50,"cents":1000},{"name":"Tier4","id":"TIER_ID_4","rank":25,"cents":300},{"name":"Tier5","id":"TIER_ID_5","rank":0,"cents":0}]'
 ```
 
 Custom tier names:
