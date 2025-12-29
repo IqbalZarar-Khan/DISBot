@@ -1,6 +1,20 @@
 import { TierRank } from '../database/schema';
 
 /**
+ * Tier ID to Name Translation Map
+ * Maps Patreon tier IDs to tier names for cases where Patreon sends IDs without titles
+ * Format: 'Patreon_Tier_ID': 'Your_Tier_Name'
+ */
+export const tierIdMap: Record<string, string> = {
+    '25684252': 'Diamond', // Diamond tier ID from Patreon
+    // Add other tier IDs as you discover them in the logs:
+    // 'GOLD_ID': 'Gold',
+    // 'SILVER_ID': 'Silver',
+    // 'BRONZE_ID': 'Bronze',
+};
+
+
+/**
  * Get tier rank by tier name
  * Handles tier names with or without trailing dots (e.g., "Diamond" or "Diamond.")
  */

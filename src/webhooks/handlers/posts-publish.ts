@@ -4,6 +4,7 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
+import { tierIdMap } from '../../utils/tierRanking';
 
 /**
  * Handle posts:publish webhook event
@@ -90,9 +91,16 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                     tierKey = tierInfo.attributes.title;
                     logger.info(`Found tier title in included data: "${tierKey}" (ID: ${tierId})`);
                 } else {
-                    // CRITICAL FALLBACK: Use the ID itself as the key
-                    tierKey = tierId;
-                    logger.info(`⚠️ Tier title not found in included data, using ID as key: "${tierKey}"`);
+                    // Check translation map first (THE FIX!)
+                    if (tierIdMap[tierId]) {
+                        tierKey = tierIdMap[tierId];
+                        logger.info(`✅ ID Match Found in Translation Map: ${tierId} = ${tierKey}`);
+                    } else {
+                        // Final fallback: Use the ID itself
+                        tierKey = tierId;
+                        logger.info(`⚠️ Tier title not found, using ID as key: "${tierKey}"`);
+                        logger.info(`   Add to tierIdMap in src/utils/tierRanking.ts: '${tierId}': 'YourTierName'`);
+                    }
                 }
             }
 
