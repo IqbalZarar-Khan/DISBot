@@ -4,7 +4,7 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { centsMap, tierRankings, getTierRank, isWaterfall } from '../../utils/tierRanking';
+import { centsMap, tierRankings, tierIdMap, getTierRank, isWaterfall } from '../../utils/tierRanking';
 
 /**
  * Handle posts:update webhook event
@@ -21,9 +21,26 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         const title = attributes.title || 'Untitled Post';
         const url = attributes.url || `https://www.patreon.com/posts/${postId}`;
 
-        // Get tier access from relationships
+        // Get tier access from multiple possible locations
         const relationships = post.relationships || {};
-        const tierData = relationships.tiers?.data || [];
+
+        // 1. Try relationships.tiers (Standard V2)
+        let rawTierData = relationships.tiers?.data;
+
+        // 2. If empty, try relationships.access_rules (Alternative V2)
+        if (!rawTierData || rawTierData.length === 0) {
+            rawTierData = relationships.access_rules?.data;
+        }
+
+        // 3. If still empty, try attributes.tiers (Mobile/Legacy)
+        if (!rawTierData || rawTierData.length === 0) {
+            if (attributes.tiers) {
+                rawTierData = attributes.tiers;
+            }
+        }
+
+        // 4. Normalize to array
+        const tierData = Array.isArray(rawTierData) ? rawTierData : [];
 
         // === DEBUG LOGGING START ===
         logger.info('--- POST UPDATE DEBUG START ---');
@@ -31,33 +48,73 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         logger.info(`Post ID: ${postId}`);
         logger.info(`Is Public Flag: ${attributes.is_public}`);
         logger.info(`Raw Tier Data: ${JSON.stringify(tierData)}`);
+        logger.info(`Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
         logger.info(`Included Items Count: ${included.length}`);
         logger.info(`Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
         // === DEBUG LOGGING END ===
 
-        // Determine the highest tier (most restrictive)
-        let newTierName = 'Free';
-        let newTierRank = 0;
+        // --- START OF UPDATE FIX ---
 
-        for (const tierRef of tierData) {
-            const tierInfo = included.find((item: any) => item.type === 'tier' && item.id === tierRef.id);
+        // 1. Extract ALL Tier IDs (The "Side Door")
+        // When you update a post to include Gold, Patreon sends [DiamondID, GoldID]
+        let tierIds: string[] = [];
 
-            if (tierInfo) {
-                const tierTitle = tierInfo.attributes?.title || 'Unknown';
-                logger.info(`Found tier in included data: "${tierTitle}" (ID: ${tierRef.id})`);
-
-                const tierMapping = await getTierMappingByName(tierTitle);
-
-                if (tierMapping && tierMapping.tier_rank > newTierRank) {
-                    newTierRank = tierMapping.tier_rank;
-                    newTierName = tierMapping.tier_name;
-                    logger.info(`Updated new tier: ${newTierName} (Rank: ${newTierRank})`);
-                } else if (!tierMapping) {
-                    logger.warn(`No tier mapping found for: "${tierTitle}"`);
-                }
-            } else {
-                logger.warn(`Tier info not found in included data for tier ID: ${tierRef.id}`);
+        tierData.forEach((tierRef: any) => {
+            if (typeof tierRef === 'string' || typeof tierRef === 'number') {
+                tierIds.push(String(tierRef));
+            } else if (tierRef.id) {
+                tierIds.push(String(tierRef.id));
             }
+        });
+
+        logger.info(`✅ Update Event - Extracted Tier IDs: ${JSON.stringify(tierIds)}`);
+
+        // 2. Translate IDs to Names
+        const availableTiers: string[] = [];
+
+        tierIds.forEach(id => {
+            if (tierIdMap[id]) {
+                availableTiers.push(tierIdMap[id]); // Converts "25588630" to "Gold"
+                logger.info(`✅ ID Translation: ${id} -> ${tierIdMap[id]}`);
+            } else {
+                // Optional: Try standard lookup if ID is missing from map
+                const includedTier = included.find((item: any) => item.type === 'tier' && String(item.id) === id);
+                if (includedTier && includedTier.attributes && includedTier.attributes.title) {
+                    availableTiers.push(includedTier.attributes.title);
+                    logger.info(`Found tier in included data: "${includedTier.attributes.title}" (ID: ${id})`);
+                } else {
+                    logger.warn(`⚠️ Tier ID ${id} not found in tierIdMap or included data`);
+                }
+            }
+        });
+
+        logger.info(`✅ Update Event - Translated Tier Names: ${JSON.stringify(availableTiers)}`);
+
+        // 3. WATERFALL LOGIC: Find the "Lowest" Tier (Widest Audience)
+        // If a post is available to Diamond AND Gold, we want to alert Gold 
+        // (because Gold is the "new" audience that needs to know)
+        let newTierName = 'Free';
+        let newTierRank = 999; // Start high to find the lowest
+
+        availableTiers.forEach(tierName => {
+            // Sanitize dot if present
+            const cleanName = tierName.trim().replace(/\.+$/, '');
+
+            // Get the rank value from tierRankings (Diamond=100, Gold=75)
+            const rank = tierRankings[cleanName];
+
+            // We want the tier with the LOWEST rank number that is > 0
+            // (This ensures we alert the widest audience, e.g., Gold instead of Diamond)
+            if (rank !== undefined && rank > 0 && rank < newTierRank) {
+                newTierRank = rank;
+                newTierName = cleanName;
+                logger.info(`Updated target tier: ${cleanName} (Rank: ${rank})`);
+            }
+        });
+
+        // If no valid tier found, reset to 0
+        if (newTierRank === 999) {
+            newTierRank = 0;
         }
 
         // Fallback: If no tiers found, check minimum pledge amount using centsMap
@@ -76,7 +133,9 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
             }
         }
 
-        logger.info(`Final determined new tier: ${newTierName} (Rank: ${newTierRank})`);
+        logger.info(`✅ Final determined new tier: ${newTierName} (Rank: ${newTierRank})`);
+
+        // --- END OF UPDATE FIX ---
 
         // Get old post data from database
         const oldPost = await getTrackedPost(postId);
@@ -87,7 +146,7 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
 
             // Check if this is a waterfall event (tier requirement decreased)
             if (isWaterfall(oldTierRank, newTierRank)) {
-                logger.info(`Waterfall event: ${title} (${oldTierName} → ${newTierName})`);
+                logger.info(`🌊 Waterfall event: ${title} (${oldTierName} → ${newTierName})`);
 
                 // Extract tags and collections
                 const tags: string[] = [];
@@ -115,7 +174,7 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                             });
 
                             await channel.send({ embeds: [embed] });
-                            logger.info(`Waterfall alert sent to ${newTierName} channel: ${title}`);
+                            logger.info(`✅ Waterfall alert sent to ${newTierName} channel: ${title}`);
                         }
                     } catch (error) {
                         logger.error(`Failed to send waterfall alert to ${newTierName} channel`, error as Error);
