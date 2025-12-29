@@ -6,10 +6,12 @@ This guide will walk you through setting up the Patreon-Discord Content Distribu
 
 1. [Discord Bot Setup](#1-discord-bot-setup)
 2. [Patreon OAuth Application](#2-patreon-oauth-application)
-3. [Environment Configuration](#3-environment-configuration)
-4. [Webhook Configuration](#4-webhook-configuration)
-5. [Initial Bot Configuration](#5-initial-bot-configuration)
-6. [Testing](#6-testing)
+3. [Supabase Database Setup](#3-supabase-database-setup)
+4. [Tier Configuration](#4-tier-configuration)
+5. [Environment Configuration](#5-environment-configuration)
+6. [Webhook Configuration](#6-webhook-configuration)
+7. [Initial Bot Configuration](#7-initial-bot-configuration)
+8. [Testing](#8-testing)
 
 ---
 
@@ -120,7 +122,105 @@ You'll need to perform an OAuth flow to get your access token. Here's a simple m
 
 ---
 
-## 3. Environment Configuration
+## 3. Supabase Database Setup
+
+The bot uses Supabase for persistent data storage.
+
+### Create Supabase Project
+
+1. Go to [Supabase](https://supabase.com)
+2. Sign up or log in
+3. Click **"New Project"**
+4. Fill in:
+   - **Name**: Your project name
+   - **Database Password**: Strong password (save this!)
+   - **Region**: Choose closest to you
+5. Click **"Create new project"**
+6. Wait for setup to complete (~2 minutes)
+
+### Run Database Migration
+
+1. Go to **SQL Editor** in Supabase dashboard
+2. Click **"New Query"**
+3. Copy and paste the migration SQL from `supabase/migrations/`
+4. Click **"Run"**
+
+### Get Supabase Credentials
+
+1. Go to **Project Settings** → **API**
+2. Copy:
+   - **Project URL** → Save for `SUPABASE_URL`
+   - **anon public** key → Save for `SUPABASE_KEY`
+
+---
+
+## 4. Tier Configuration
+
+The bot uses a dynamic tier system configured via the `TIER_CONFIG` environment variable.
+
+### Find Your Tier IDs
+
+1. Start the bot (after completing environment setup)
+2. Create a test post on Patreon for each tier
+3. Check the bot logs for messages like:
+   ```
+   ✅ Extracted Tier IDs: ["12345678"]
+   ```
+4. Note down the tier ID for each tier
+
+### Configure TIER_CONFIG
+
+Create a JSON array with your tiers:
+
+```json
+[
+  {
+    "name": "Diamond",
+    "id": "YOUR_DIAMOND_TIER_ID",
+    "rank": 100,
+    "cents": 2500
+  },
+  {
+    "name": "Gold",
+    "id": "YOUR_GOLD_TIER_ID",
+    "rank": 75,
+    "cents": 1500
+  },
+  {
+    "name": "Silver",
+    "id": "YOUR_SILVER_TIER_ID",
+    "rank": 50,
+    "cents": 1000
+  },
+  {
+    "name": "Bronze",
+    "id": "YOUR_BRONZE_TIER_ID",
+    "rank": 25,
+    "cents": 300
+  },
+  {
+    "name": "Free",
+    "id": "YOUR_FREE_TIER_ID",
+    "rank": 0,
+    "cents": 0
+  }
+]
+```
+
+**Fields:**
+- `name`: Tier name (used in `/admin set-channel` commands)
+- `id`: Patreon tier ID (from bot logs)
+- `rank`: Priority (100 = highest, 0 = free)
+- `cents`: (Optional) Pledge amount in cents for fallback detection
+
+**Convert to single line for .env:**
+```bash
+TIER_CONFIG='[{"name":"Diamond","id":"12345","rank":100,"cents":2500},{"name":"Gold","id":"67890","rank":75,"cents":1500}]'
+```
+
+---
+
+## 5. Environment Configuration
 
 Create a `.env` file in the project root:
 
@@ -142,8 +242,12 @@ PATREON_CAMPAIGN_ID=from_step_2
 WEBHOOK_SECRET=create_a_random_secret_string
 WEBHOOK_PORT=3000
 
-# Database
-DATABASE_PATH=./data/bot.db
+# Supabase Configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your_supabase_anon_key
+
+# Tier Configuration (JSON array - see Step 4)
+TIER_CONFIG='[{"name":"Diamond","id":"YOUR_TIER_ID","rank":100,"cents":2500}]'
 ```
 
 **Generate a webhook secret:**
@@ -156,7 +260,7 @@ openssl rand -hex 32
 
 ---
 
-## 4. Webhook Configuration
+## 6. Webhook Configuration
 
 ### Option A: Local Development (ngrok)
 
@@ -168,12 +272,9 @@ openssl rand -hex 32
    ```
 4. Copy the HTTPS URL (e.g., `https://abc123.ngrok.io`)
 
-### Option B: Production (VPS)
+### Option B: Production (Render.com)
 
-1. Deploy your bot to a VPS with a domain
-2. Set up HTTPS (using Let's Encrypt/Certbot)
-3. Ensure port 3000 is accessible
-4. Your webhook URL will be: `https://yourdomain.com/webhooks/patreon`
+See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) for detailed deployment instructions.
 
 ### Register Webhook with Patreon
 
@@ -192,7 +293,19 @@ openssl rand -hex 32
 
 ---
 
-## 5. Initial Bot Configuration
+## 7. Initial Bot Configuration
+
+### Install Dependencies
+
+```bash
+npm install
+```
+
+### Build the Project
+
+```bash
+npm run build
+```
 
 ### Deploy Commands
 
@@ -215,7 +328,9 @@ npm start
 
 ### Configure Tier Mappings
 
-In Discord, use the `/admin set-channel` command to map tiers to channels:
+In Discord, use the `/admin set-channel` command to map tiers to channels.
+
+**Important:** Use the same tier names as in your `TIER_CONFIG`:
 
 ```
 /admin set-channel tier_name:Diamond channel:#diamond-alerts
@@ -227,7 +342,7 @@ In Discord, use the `/admin set-channel` command to map tiers to channels:
 
 ---
 
-## 6. Testing
+## 8. Testing
 
 ### Test Bot Status
 
@@ -238,6 +353,7 @@ In Discord, use the `/admin set-channel` command to map tiers to channels:
 Should show:
 - ✅ Patreon API: Connected
 - ✅ Webhooks: Listening
+- ✅ Database: Connected (Supabase)
 - ✅ Your tier mappings
 
 ### Test Alerts
@@ -248,12 +364,27 @@ Should show:
 
 Check if the test message appears in your #diamond-alerts channel.
 
-### Test Webhooks
+### Test Tier Detection
 
-1. Create a test post on Patreon (set to Diamond tier)
-2. Check if alert appears in #diamond-alerts
-3. Edit the post to change tier to Gold
-4. Check if alert appears in #gold-alerts
+1. Create a test post on Patreon (set to your highest tier)
+2. Check bot logs for:
+   ```
+   ✅ Extracted Tier IDs: ["12345678"]
+   ✅ ID Translation: 12345678 -> Diamond
+   ✅ Final Determined Tier Name: Diamond
+   ```
+3. Check if alert appears in the correct channel
+
+### Test Waterfall Logic
+
+1. Create a post for your highest tier (e.g., Diamond)
+2. Edit the post to add a lower tier (e.g., Gold)
+3. Check if waterfall alert appears in the Gold channel
+4. Bot logs should show:
+   ```
+   🌊 Waterfall event: Post Title (Diamond → Gold)
+   ✅ Waterfall alert sent to Gold channel
+   ```
 
 ---
 
@@ -278,6 +409,22 @@ Your bot is now ready to automatically distribute content based on Patreon tiers
 - Check if token needs refreshing
 - Ensure OAuth scopes include `campaigns`, `campaigns.members`, `campaigns.posts`
 
+### Tier detection issues
+- Verify `TIER_CONFIG` is valid JSON
+- Check tier IDs match your Patreon tiers
+- Look for tier translation logs in bot output
+
+### Database connection errors
+- Verify `SUPABASE_URL` and `SUPABASE_KEY` are correct
+- Check Supabase project is active
+- Ensure migration was run successfully
+
 ---
+
+## Next Steps
+
+- **Deploy to Production**: See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
+- **Contribute**: See [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Report Issues**: Open an issue on GitHub
 
 For more help, check the [README.md](README.md) or open an issue on GitHub.
