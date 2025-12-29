@@ -1,13 +1,15 @@
 import { WebhookPayload } from '../../database/schema';
-import { upsertTrackedPost, getTierMappingByName } from '../../database/db';
+import { upsertTrackedPost, getTrackedPost, getTierMappingByName } from '../../database/db';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
 import { tierIdMap, centsMap } from '../../utils/tierRanking';
+import { handlePostsUpdate } from './posts-update';
 
 /**
  * Handle posts:publish webhook event
+ * CRITICAL: This also handles "Edit and Republish" workflow by redirecting to update handler
  */
 export async function handlePostsPublish(payload: WebhookPayload): Promise<void> {
     try {
@@ -20,102 +22,138 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         const title = attributes.title || 'Untitled Post';
         const url = attributes.url || `https://www.patreon.com/posts/${postId}`;
 
+        logger.info('\n📝 ========================================');
+        logger.info('📝 [POST PUBLISH HANDLER]');
+        logger.info('📝 ========================================');
+        logger.info(`📝 Post Title: "${title}"`);
+        logger.info(`📝 Post ID: ${postId}`);
+
+        // --- CRITICAL FIX: Check if post already exists ---
+        // If it exists, this "Publish" is actually an "Update" (Edit and Republish workflow)
+        const existingPost = await getTrackedPost(postId);
+
+        if (existingPost) {
+            logger.info(`🔄 [REDIRECT] Post ${postId} already exists in database`);
+            logger.info(`🔄 [REDIRECT] Previous tier: ${existingPost.last_tier_access}`);
+            logger.info(`🔄 [REDIRECT] This is an "Edit and Republish" - switching to UPDATE handler...`);
+            logger.info('📝 ========================================\n');
+
+            // Redirect to update handler to trigger waterfall logic
+            return await handlePostsUpdate(payload);
+        }
+
+        logger.info(`✨ [NEW POST] Post ${postId} not found in database - treating as genuinely new post`);
+
         // Get tier access from multiple possible locations
         const relationships = post.relationships || {};
 
-        // === DEBUG LOGGING START ===
-        logger.info('--- POST PUBLISH DEBUG START ---');
-        logger.info(`Post Title: ${title}`);
-        logger.info(`Post ID: ${postId}`);
-        logger.info(`Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
-        logger.info(`Relationships Tiers: ${JSON.stringify(relationships.tiers)}`);
-        logger.info(`Relationships Access Rules: ${JSON.stringify(relationships.access_rules)}`);
-        // === DEBUG LOGGING END ===
+        // === DEBUG LOGGING ===
+        logger.info(`📝 Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
+        logger.info(`📝 Relationships Access Rules: ${JSON.stringify(relationships.access_rules?.data)}`);
+        logger.info(`📝 Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
 
-        // --- START OF TRANSLATION LOGIC ---
+        // --- TIER DETECTION LOGIC ---
 
-        // 1. Extract the Tier ID (The "Barcode")
-        let tierId: string | null = null;
+        let tierName: string | null = null;
+        let detectionStrategy = 'None';
 
-        // Check "Side Door" (Attributes - where your data is appearing)
+        // 1. Try ID Translation (Primary Method)
+        let tierIds: string[] = [];
+
+        // Check attributes.tiers (where your data appears)
         if (attributes.tiers && Array.isArray(attributes.tiers) && attributes.tiers.length > 0) {
-            // Patreon sends this as an array of numbers
-            // We take the first one and turn it into a string
-            tierId = String(attributes.tiers[0]);
+            tierIds = attributes.tiers.map((id: any) => String(id));
         }
-        // Check "Front Door" (Relationships - Backup standard method)
-        else if (relationships.access_rules?.data && Array.isArray(relationships.access_rules.data) && relationships.access_rules.data.length > 0) {
-            tierId = String(relationships.access_rules.data[0].id);
+        // Check relationships.access_rules (standard method)
+        else if (relationships.access_rules?.data && Array.isArray(relationships.access_rules.data)) {
+            tierIds = relationships.access_rules.data.map((item: any) => String(item.id));
         }
-        // Another backup: relationships.tiers
-        else if (relationships.tiers?.data && Array.isArray(relationships.tiers.data) && relationships.tiers.data.length > 0) {
-            tierId = String(relationships.tiers.data[0].id);
+        // Check relationships.tiers (backup)
+        else if (relationships.tiers?.data && Array.isArray(relationships.tiers.data)) {
+            tierIds = relationships.tiers.data.map((item: any) => String(item.id));
         }
 
-        logger.info(`✅ Extracted Tier ID: ${tierId}`);
+        logger.info(`📝 Extracted Tier IDs: ${JSON.stringify(tierIds)}`);
 
-        // 2. Determine the Name using your ID Map
-        let tierName = 'Free'; // Default
-
-        if (tierId) {
-            // CHECK 1: Look at your hardcoded ID Map (Priority Fix)
-            if (tierIdMap[tierId]) {
-                tierName = tierIdMap[tierId];
-                logger.info(`✅ ID Translation Successful: ${tierId} -> ${tierName}`);
+        // Translate IDs to tier names
+        for (const id of tierIds) {
+            if (tierIdMap[id]) {
+                tierName = tierIdMap[id];
+                detectionStrategy = 'ID Match';
+                logger.info(`✅ [ID MATCH] ${id} -> ${tierName}`);
+                break;
             }
-            // CHECK 2: Try standard name lookup (Backup)
-            else {
-                logger.info(`⚠️ ID ${tierId} not found in map. Trying standard lookup.`);
+        }
 
-                const includedTier = included.find((item: any) => item.type === 'tier' && String(item.id) === tierId);
+        // 2. Fallback: Check Cents
+        if (!tierName && attributes.min_cents_pledged_to_view) {
+            const cents = parseInt(attributes.min_cents_pledged_to_view);
+            logger.info(`📝 Trying cents fallback: ${cents}`);
+
+            if (centsMap[cents]) {
+                tierName = centsMap[cents];
+                detectionStrategy = 'Cents Match';
+                logger.info(`✅ [CENTS MATCH] ${cents} cents -> ${tierName}`);
+            }
+        }
+
+        // 3. Fallback: Check included data
+        if (!tierName && tierIds.length > 0) {
+            for (const id of tierIds) {
+                const includedTier = included.find((item: any) => item.type === 'tier' && String(item.id) === id);
                 if (includedTier && includedTier.attributes && includedTier.attributes.title) {
                     tierName = includedTier.attributes.title;
-                    logger.info(`Found tier name in included data: ${tierName}`);
-                } else {
-                    logger.warn(`⚠️ Tier ID ${tierId} not found in map or included data. Defaulting to Free.`);
-                    logger.warn(`   Add to tierIdMap in src/utils/tierRanking.ts: '${tierId}': 'YourTierName'`);
+                    detectionStrategy = 'Title Match';
+                    logger.info(`✅ [TITLE MATCH] Found in included data: ${tierName}`);
+                    break;
                 }
             }
-        } else {
-            logger.warn('⚠️ No tier ID found. Defaulting to Free.');
         }
 
-        // 3. Sanitize (Just in case)
-        if (tierName.endsWith('.')) {
-            tierName = tierName.slice(0, -1);
+        if (!tierName) {
+            logger.error(`❌ Could not detect tier for post ${postId}`);
+            logger.error(`❌ Tier IDs: ${JSON.stringify(tierIds)}`);
+            logger.error(`❌ Available ID Map Keys: ${JSON.stringify(Object.keys(tierIdMap))}`);
+            logger.error(`❌ Available Cents Map Keys: ${JSON.stringify(Object.keys(centsMap).map(Number))}`);
+            logger.info('📝 ========================================\n');
+            return;
         }
 
-        logger.info(`✅ Final Determined Tier Name: ${tierName}`);
+        logger.info(`📝 Detection Strategy: ${detectionStrategy}`);
+        logger.info(`📝 Final Tier: ${tierName}`);
 
-        // --- END OF TRANSLATION LOGIC ---
+        // Get tier mapping for Discord channel
+        const tierMapping = await getTierMappingByName(tierName);
 
-        // Fallback: If still Free, check minimum pledge amount using centsMap
-        if (tierName === 'Free' && attributes.min_cents_pledged_to_view) {
-            const minCents = parseInt(attributes.min_cents_pledged_to_view);
-            logger.info(`Checking min_cents_pledged_to_view fallback: ${minCents}`);
+        if (!tierMapping) {
+            logger.warn(`No channel mapping found for tier: ${tierName}`);
+            logger.warn(`Use /admin set-channel tier_name:${tierName} channel:#your-channel`);
+            logger.info('📝 ========================================\n');
+            return;
+        }
 
-            // Check centsMap for exact match
-            if (centsMap[minCents]) {
-                tierName = centsMap[minCents];
-                logger.info(`✅ Cents Map Match: ${minCents} cents -> ${tierName}`);
-            } else {
-                logger.warn(`⚠️ No tier configured for ${minCents} cents in TIER_CONFIG`);
-                logger.warn(`   Add "cents":${minCents} to the appropriate tier in your TIER_CONFIG`);
+        // Send notification to Discord
+        try {
+            const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
+
+            if (channel && channel.isTextBased()) {
+                const embed = createPostEmbed({
+                    title,
+                    url,
+                    tierName,
+                    tags: attributes.tags,
+                    collections: undefined,
+                    isUpdate: false
+                });
+
+                await channel.send({ embeds: [embed] });
+                logger.info(`✅ New post alert sent to ${tierName} channel: ${title}`);
             }
+        } catch (error) {
+            logger.error(`Failed to send post alert to ${tierName} channel`, error as Error);
         }
 
-        logger.info('--- POST PUBLISH DEBUG END ---');
-
-        // Extract tags and collections (if available)
-        const tags: string[] = [];
-        const collections: string[] = [];
-
-        // Tags might be in attributes.tags
-        if (attributes.tags && Array.isArray(attributes.tags)) {
-            tags.push(...attributes.tags);
-        }
-
-        // Store post in database
+        // Save to database
         const trackedPost = {
             post_id: postId,
             last_tier_access: tierName,
@@ -124,34 +162,8 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         };
 
         await upsertTrackedPost(trackedPost);
-
-        // Get tier mapping for channel
-        const tierMapping = await getTierMappingByName(tierName);
-
-        if (tierMapping) {
-            try {
-                const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
-
-                if (channel) {
-                    const embed = createPostEmbed({
-                        title,
-                        url,
-                        tierName: tierName,
-                        tags: tags.length > 0 ? tags : undefined,
-                        collections: collections.length > 0 ? collections : undefined,
-                        isUpdate: false
-                    });
-
-                    await channel.send({ embeds: [embed] });
-                    logger.info(`✅ New post alert sent to ${tierName} channel: ${title}`);
-                }
-            } catch (error) {
-                logger.error(`Failed to send post alert to ${tierName} channel`, error as Error);
-            }
-        } else {
-            logger.warn(`No channel mapping found for tier: ${tierName}`);
-            logger.warn(`Run this command in Discord: /admin set-channel tier_name:${tierName} channel:#your-channel`);
-        }
+        logger.info(`💾 Saved post to database: ${postId} -> ${tierName}`);
+        logger.info('📝 ========================================\n');
 
     } catch (error) {
         logger.error('Error handling posts:publish webhook', error as Error);
