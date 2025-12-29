@@ -23,129 +23,90 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         // Get tier access from multiple possible locations
         const relationships = post.relationships || {};
 
-        // 1. Try relationships.tiers (Standard V2)
-        let rawTierData = relationships.tiers?.data;
-
-        // 2. If empty, try relationships.access_rules (Alternative V2)
-        if (!rawTierData || rawTierData.length === 0) {
-            rawTierData = relationships.access_rules?.data;
-        }
-
-        // 3. If still empty, try attributes.tiers (Mobile/Legacy)
-        if (!rawTierData || rawTierData.length === 0) {
-            if (attributes.tiers) {
-                rawTierData = attributes.tiers;
-            }
-        }
-
-        // 4. Normalize to array
-        const tierData = Array.isArray(rawTierData) ? rawTierData : [];
-
         // === DEBUG LOGGING START ===
         logger.info('--- POST PUBLISH DEBUG START ---');
         logger.info(`Post Title: ${title}`);
         logger.info(`Post ID: ${postId}`);
-        logger.info(`Is Public Flag: ${attributes.is_public}`);
-        logger.info(`Raw Tier Data: ${JSON.stringify(tierData)}`);
-        logger.info(`Included Items Count: ${included.length}`);
-        logger.info(`Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
-
-        // === DEEP DEBUG START ===
-        logger.info('--- DEEP DEBUG START ---');
         logger.info(`Attributes Tiers: ${JSON.stringify(attributes.tiers)}`);
-        const tierIds = tierData.map((item: any) => String(item.id || item));
-        logger.info(`✅ Extracted Tier IDs: ${JSON.stringify(tierIds)}`);
-        logger.info('--- DEEP DEBUG END ---');
+        logger.info(`Relationships Tiers: ${JSON.stringify(relationships.tiers)}`);
+        logger.info(`Relationships Access Rules: ${JSON.stringify(relationships.access_rules)}`);
         // === DEBUG LOGGING END ===
 
-        // Determine the highest tier (most restrictive)
-        let highestTierName = 'Free';
-        let highestTierRank = 0;
+        // --- START OF TRANSLATION LOGIC ---
 
-        for (const tierRef of tierData) {
-            let tierKey: string | undefined; // Can be either title or ID
-            let tierId: string | undefined;
+        // 1. Extract the Tier ID (The "Barcode")
+        let tierId: string | null = null;
 
-            // Extract tier ID (convert to string if it's a number)
-            if (typeof tierRef === 'string' || typeof tierRef === 'number') {
-                // attributes.tiers might be an array of IDs directly
-                tierId = String(tierRef);
-            } else if (tierRef.id) {
-                tierId = String(tierRef.id);
-            }
-
-            // Method 1: Check if tier object has title directly (attributes.tiers case)
-            if (tierRef.title) {
-                tierKey = tierRef.title;
-                logger.info(`✅ Found tier title directly in tier object: "${tierKey}"`);
-            }
-            // Method 2: Check if tier object has attributes.title
-            else if (tierRef.attributes?.title) {
-                tierKey = tierRef.attributes.title;
-                logger.info(`✅ Found tier title in tier.attributes: "${tierKey}"`);
-            }
-            // Method 3: Look up by ID in included data (standard method)
-            else if (tierId) {
-                const tierInfo = included.find((item: any) => item.type === 'tier' && String(item.id) === tierId);
-                if (tierInfo && tierInfo.attributes?.title) {
-                    tierKey = tierInfo.attributes.title;
-                    logger.info(`Found tier title in included data: "${tierKey}" (ID: ${tierId})`);
-                } else {
-                    // Check translation map first (THE FIX!)
-                    if (tierIdMap[tierId]) {
-                        tierKey = tierIdMap[tierId];
-                        logger.info(`✅ ID Match Found in Translation Map: ${tierId} = ${tierKey}`);
-                    } else {
-                        // Final fallback: Use the ID itself
-                        tierKey = tierId;
-                        logger.info(`⚠️ Tier title not found, using ID as key: "${tierKey}"`);
-                        logger.info(`   Add to tierIdMap in src/utils/tierRanking.ts: '${tierId}': 'YourTierName'`);
-                    }
-                }
-            }
-
-            // If we found a tier key (title or ID), try to map it
-            if (tierKey) {
-                // Remove trailing dots (e.g., "Diamond." -> "Diamond")
-                tierKey = tierKey.trim().replace(/\.+$/, '');
-
-                logger.info(`Attempting to map tier key: "${tierKey}"`);
-                const tierMapping = await getTierMappingByName(tierKey);
-
-                if (tierMapping && tierMapping.tier_rank > highestTierRank) {
-                    highestTierRank = tierMapping.tier_rank;
-                    highestTierName = tierMapping.tier_name;
-                    logger.info(`✅ Updated highest tier: ${highestTierName} (Rank: ${highestTierRank})`);
-                } else if (!tierMapping) {
-                    logger.warn(`❌ No tier mapping found for: "${tierKey}"`);
-                    logger.warn(`   Run this command in Discord: /admin set-channel tier_name:${tierKey} channel:#your-channel`);
-                }
-            }
+        // Check "Side Door" (Attributes - where your data is appearing)
+        if (attributes.tiers && Array.isArray(attributes.tiers) && attributes.tiers.length > 0) {
+            // Patreon sends this as an array of numbers
+            // We take the first one and turn it into a string
+            tierId = String(attributes.tiers[0]);
+        }
+        // Check "Front Door" (Relationships - Backup standard method)
+        else if (relationships.access_rules?.data && Array.isArray(relationships.access_rules.data) && relationships.access_rules.data.length > 0) {
+            tierId = String(relationships.access_rules.data[0].id);
+        }
+        // Another backup: relationships.tiers
+        else if (relationships.tiers?.data && Array.isArray(relationships.tiers.data) && relationships.tiers.data.length > 0) {
+            tierId = String(relationships.tiers.data[0].id);
         }
 
-        // Fallback: If no tiers found, check minimum pledge amount
-        if (highestTierRank === 0 && attributes.min_cents_pledged_to_view) {
+        logger.info(`✅ Extracted Tier ID: ${tierId}`);
+
+        // 2. Determine the Name using your ID Map
+        let tierName = 'Free'; // Default
+
+        if (tierId) {
+            // CHECK 1: Look at your hardcoded ID Map (Priority Fix)
+            if (tierIdMap[tierId]) {
+                tierName = tierIdMap[tierId];
+                logger.info(`✅ ID Translation Successful: ${tierId} -> ${tierName}`);
+            }
+            // CHECK 2: Try standard name lookup (Backup)
+            else {
+                logger.info(`⚠️ ID ${tierId} not found in map. Trying standard lookup.`);
+
+                const includedTier = included.find((item: any) => item.type === 'tier' && String(item.id) === tierId);
+                if (includedTier && includedTier.attributes && includedTier.attributes.title) {
+                    tierName = includedTier.attributes.title;
+                    logger.info(`Found tier name in included data: ${tierName}`);
+                } else {
+                    logger.warn(`⚠️ Tier ID ${tierId} not found in map or included data. Defaulting to Free.`);
+                    logger.warn(`   Add to tierIdMap in src/utils/tierRanking.ts: '${tierId}': 'YourTierName'`);
+                }
+            }
+        } else {
+            logger.warn('⚠️ No tier ID found. Defaulting to Free.');
+        }
+
+        // 3. Sanitize (Just in case)
+        if (tierName.endsWith('.')) {
+            tierName = tierName.slice(0, -1);
+        }
+
+        logger.info(`✅ Final Determined Tier Name: ${tierName}`);
+
+        // --- END OF TRANSLATION LOGIC ---
+
+        // Fallback: If still Free, check minimum pledge amount
+        if (tierName === 'Free' && attributes.min_cents_pledged_to_view) {
             const minCents = parseInt(attributes.min_cents_pledged_to_view);
-            logger.info(`No tier data found, using min_cents_pledged_to_view: ${minCents}`);
+            logger.info(`Checking min_cents_pledged_to_view fallback: ${minCents}`);
 
             // Map pledge amounts to tiers (based on your Patreon tier prices)
             if (minCents >= 2500) { // $25+ = Diamond
-                highestTierName = 'Diamond';
-                highestTierRank = 100;
+                tierName = 'Diamond';
             } else if (minCents >= 1500) { // $15+ = Gold
-                highestTierName = 'Gold';
-                highestTierRank = 75;
+                tierName = 'Gold';
             } else if (minCents >= 1000) { // $10+ = Silver
-                highestTierName = 'Silver';
-                highestTierRank = 50;
+                tierName = 'Silver';
             } else if (minCents >= 300) { // $3+ = Bronze
-                highestTierName = 'Bronze';
-                highestTierRank = 25;
+                tierName = 'Bronze';
             }
-            logger.info(`Mapped pledge amount to tier: ${highestTierName} (Rank: ${highestTierRank})`);
+            logger.info(`Mapped pledge amount to tier: ${tierName}`);
         }
 
-        logger.info(`✅ Final determined tier: ${highestTierName} (Rank: ${highestTierRank})`);
         logger.info('--- POST PUBLISH DEBUG END ---');
 
         // Extract tags and collections (if available)
@@ -160,7 +121,7 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         // Store post in database
         const trackedPost = {
             post_id: postId,
-            last_tier_access: highestTierName,
+            last_tier_access: tierName,
             title: title,
             updated_at: Date.now()
         };
@@ -168,7 +129,7 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         await upsertTrackedPost(trackedPost);
 
         // Get tier mapping for channel
-        const tierMapping = await getTierMappingByName(highestTierName);
+        const tierMapping = await getTierMappingByName(tierName);
 
         if (tierMapping) {
             try {
@@ -178,20 +139,21 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                     const embed = createPostEmbed({
                         title,
                         url,
-                        tierName: highestTierName,
+                        tierName: tierName,
                         tags: tags.length > 0 ? tags : undefined,
                         collections: collections.length > 0 ? collections : undefined,
                         isUpdate: false
                     });
 
                     await channel.send({ embeds: [embed] });
-                    logger.info(`New post alert sent to ${highestTierName} channel: ${title}`);
+                    logger.info(`✅ New post alert sent to ${tierName} channel: ${title}`);
                 }
             } catch (error) {
-                logger.error(`Failed to send post alert to ${highestTierName} channel`, error as Error);
+                logger.error(`Failed to send post alert to ${tierName} channel`, error as Error);
             }
         } else {
-            logger.warn(`No channel mapping found for tier: ${highestTierName}`);
+            logger.warn(`No channel mapping found for tier: ${tierName}`);
+            logger.warn(`Run this command in Discord: /admin set-channel tier_name:${tierName} channel:#your-channel`);
         }
 
     } catch (error) {
