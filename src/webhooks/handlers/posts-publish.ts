@@ -1,5 +1,5 @@
 import { WebhookPayload } from '../../database/schema';
-import { upsertTrackedPost, getTrackedPost, getTierMappingByName } from '../../database/db';
+import { getTierMappingByName, db } from '../../database/db';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
@@ -30,9 +30,12 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
 
         // --- CRITICAL FIX: Check if post already exists ---
         // If it exists, this "Publish" is actually an "Update" (Edit and Republish workflow)
-        const existingPost = await getTrackedPost(postId);
+        logger.info(`⏳ [DB CHECK] Connecting to Supabase...`);
+        const existingPost = await db.getPost(postId);
 
         if (existingPost) {
+            logger.info(`✅ [DB CHECK] Result: FOUND`);
+            logger.info(`✅ [DB CHECK] Found: ${existingPost.last_tier_access}`);
             logger.info(`🔄 [REDIRECT] Post ${postId} already exists in database`);
             logger.info(`🔄 [REDIRECT] Previous tier: ${existingPost.last_tier_access}`);
             logger.info(`🔄 [REDIRECT] This is an "Edit and Republish" - switching to UPDATE handler...`);
@@ -153,16 +156,8 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             logger.error(`Failed to send post alert to ${tierName} channel`, error as Error);
         }
 
-        // Save to database
-        const trackedPost = {
-            post_id: postId,
-            last_tier_access: tierName,
-            title: title,
-            updated_at: Date.now()
-        };
-
-        await upsertTrackedPost(trackedPost);
-        logger.info(`💾 Saved post to database: ${postId} -> ${tierName}`);
+        // Save to database using db.addPost (ensures correct schema mapping)
+        await db.addPost(postId, tierName, title);
         logger.info('📝 ========================================\n');
 
     } catch (error) {

@@ -227,3 +227,47 @@ export async function getCustomMessage(type: string): Promise<string | null> {
     return data.content;
 }
 
+// ===== UNIFIED DATABASE INTERFACE =====
+
+/**
+ * Unified database interface for cleaner API
+ * Ensures correct mapping to database schema (last_tier_access, post_id, etc.)
+ */
+export const db = {
+    /**
+     * Save a post to the database
+     * @param postId - Patreon post ID
+     * @param tierName - Tier name (e.g., "Diamond", "Gold")
+     * @param postTitle - Post title
+     */
+    addPost: async (postId: string, tierName: string, postTitle: string = 'Untitled'): Promise<void> => {
+        const payload: TrackedPost = {
+            post_id: postId,
+            last_tier_access: tierName, // ✅ Correct mapping to database column
+            title: postTitle,
+            updated_at: Date.now() // ✅ Current Unix timestamp
+        };
+
+        await upsertTrackedPost(payload);
+        console.log(`✅ 💾 Saved to tracked_posts: ${postId} -> ${tierName}`);
+    },
+
+    /**
+     * Get a post from the database
+     * @param postId - Patreon post ID
+     * @returns TrackedPost object or null if not found
+     */
+    getPost: async (postId: string): Promise<TrackedPost | null> => {
+        return await getTrackedPost(postId);
+    },
+
+    /**
+     * Save a custom message template
+     */
+    setCustomMessage: setCustomMessage,
+
+    /**
+     * Retrieve a custom message template
+     */
+    getCustomMessage: getCustomMessage
+};
