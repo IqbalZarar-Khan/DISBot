@@ -260,6 +260,63 @@ docker run -d --env-file .env patreon-bot
 - **Environment Variables**: Sensitive data stored in `.env` (never committed)
 - **Supabase RLS**: Row-level security policies protect database access
 
+## ❓ Frequently Asked Questions
+
+### 🛡️ Privacy & Transparency
+
+**Q: Is this bot completely transparent? How do I know it's safe?**
+
+A: Yes. This project is released under the MIT License, which is a permissive open-source license. This means the entire codebase—from the database logic to the webhook handlers—is fully visible and free for you to audit. Nothing is obfuscated or hidden in compiled binaries; what you see in the `src/` folder is exactly what runs on your server.
+
+**Q: Does the bot collect my data or send it to the developer?**
+
+A: No. This is a strictly self-hosted solution.
+- **Data Flow**: The bot acts as a direct bridge between your Patreon and your Discord. Data flows from Patreon's webhooks directly to your hosted instance.
+- **Storage**: All data, including channel mappings and member tracking, is stored in your Supabase database (PostgreSQL). No data is ever transmitted to the bot creator or any third-party analytics services.
+
+**Q: How is my Patreon data secured?**
+
+A: Security is handled through multiple layers:
+1. **Environment Variables**: Sensitive credentials (like your `DISCORD_TOKEN` and `PATREON_ACCESS_TOKEN`) are stored in a `.env` file or your cloud provider's secure environment dashboard. They are never hardcoded into the source code.
+2. **Webhook Verification**: The bot uses your `WEBHOOK_SECRET` to verify an HMAC signature on every request. This ensures the bot only accepts data that genuinely comes from Patreon.
+3. **Supabase RLS**: Row-level security policies protect your database from unauthorized access.
+
+### ⚙️ Configuration & Tiers
+
+**Q: Is this bot hardcoded for specific tiers like "Diamond" or "Gold"?**
+
+A: No. While the default examples use these names, the system is 100% configuration-driven. You define your own tier hierarchy using a standard JSON format in your environment variables (`TIER_CONFIG`). Whether you have 2 tiers or 20, and whatever you choose to name them, the bot adapts automatically without requiring code changes.
+
+**Q: How does the bot know which tier is which?**
+
+A: It uses a smart "Waterfall" logic with three layers of detection to ensure notifications never fail:
+1. **ID Match (Primary)**: It checks the unique Tier ID from Patreon using the `tierIdMap`.
+2. **Price Fallback (Secondary)**: If the ID is missing, it checks the `min_cents_pledged_to_view` (e.g., 2500 cents = $25.00) using the `centsMap`.
+3. **Title Match (Legacy)**: As a last resort, it attempts to match the tier title text from the `included` data.
+
+**Q: What happens when I update a post (e.g., from "Diamond" to "Gold")?**
+
+A: The bot detects the update and calculates the **lowest** tier that now has access (widest audience). For example, if a post was Diamond-only and you add Gold access, the bot identifies Gold as the new audience and sends the waterfall alert specifically to the Gold channel. This is the core "waterfall" feature.
+
+### ☁️ Deployment
+
+**Q: Can I run this on cloud services like Render or Heroku?**
+
+A: Yes. The project follows "12-Factor App" principles, meaning all configuration is handled via Environment Variables, making it cloud-ready.
+- **Database**: The bot uses Supabase (PostgreSQL), which is a cloud database service. Your data persists across deployments and restarts automatically.
+- **Recommended**: See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) for step-by-step deployment instructions.
+
+**Q: What do I need to get started?**
+
+A: You need:
+- Node.js 18+
+- A Discord Bot Token ([Create one here](https://discord.com/developers/applications))
+- A Patreon Creator account with OAuth app
+- A Supabase account (free tier available)
+- A server with HTTPS support for webhooks (Render, Railway, VPS, etc.)
+
+See [SETUP.md](SETUP.md) for detailed setup instructions.
+
 ## 🆕 Recent Updates
 
 - ✅ **Dynamic Tier Configuration**: Configure tiers via `TIER_CONFIG` environment variable
