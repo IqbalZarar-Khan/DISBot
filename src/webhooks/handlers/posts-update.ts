@@ -1,10 +1,11 @@
 import { WebhookPayload } from '../../database/schema';
-import { upsertTrackedPost, getTrackedPost, getTierMappingByName } from '../../database/db';
+import { upsertTrackedPost, getTrackedPost, getTierMappingByName, getMessageTemplate } from '../../database/db';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
 import { centsMap, tierRankings, tierIdMap, getTierRank, isWaterfall } from '../../utils/tierRanking';
+import { formatMessage } from '../../utils/formatter';
 
 /**
  * Handle posts:update webhook event
@@ -187,6 +188,17 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                         const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
 
                         if (channel) {
+                            // Fetch custom waterfall template from database
+                            const dbTemplate = await getMessageTemplate('post_waterfall');
+                            const template = dbTemplate || "🌊 This post is now available to {tier}! **{title}**\n{url}";
+
+                            // Format message with actual values
+                            const messageText = formatMessage(template, {
+                                tier: newTierName,
+                                title: title,
+                                url: url
+                            });
+
                             const embed = createPostEmbed({
                                 title,
                                 url,
@@ -195,6 +207,7 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                                 collections: collections.length > 0 ? collections : undefined,
                                 isUpdate: true
                             });
+                            embed.setDescription(messageText);
 
                             await channel.send({ embeds: [embed] });
                             logger.info(`✅ Waterfall alert sent to ${newTierName} channel: ${title}`);

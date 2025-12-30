@@ -1,11 +1,12 @@
 import { WebhookPayload } from '../../database/schema';
-import { getTierMappingByName, db } from '../../database/db';
+import { getTierMappingByName, db, getMessageTemplate } from '../../database/db';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
 import { tierIdMap, centsMap } from '../../utils/tierRanking';
 import { handlePostsUpdate } from './posts-update';
+import { formatMessage } from '../../utils/formatter';
 
 /**
  * Handle posts:publish webhook event
@@ -144,6 +145,17 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
 
             if (channel && channel.isTextBased()) {
+                // Fetch custom template from database
+                const dbTemplate = await getMessageTemplate('post_new');
+                const template = dbTemplate || "📢 New {tier} post: **{title}**\n{url}";
+
+                // Format message with actual values
+                const messageText = formatMessage(template, {
+                    tier: tierName,
+                    title: title,
+                    url: url
+                });
+
                 const embed = createPostEmbed({
                     title,
                     url,
@@ -152,6 +164,7 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                     collections: undefined,
                     isUpdate: false
                 });
+                embed.setDescription(messageText);
 
                 await channel.send({ embeds: [embed] });
                 logger.info(`✅ New post alert sent to ${tierName} channel: ${title}`);

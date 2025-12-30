@@ -227,6 +227,57 @@ export async function getCustomMessage(type: string): Promise<string | null> {
     return data.content;
 }
 
+// ===== MESSAGE TEMPLATES OPERATIONS =====
+
+export type MessageTemplateType = 'post_new' | 'post_waterfall' | 'welcome';
+
+/**
+ * Fetch a message template by its specific type key
+ * @param type - Template type (post_new, post_waterfall, welcome)
+ * @returns Template content or null if not found
+ */
+export async function getMessageTemplate(type: MessageTemplateType): Promise<string | null> {
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+        .from('custom_messages')
+        .select('content')
+        .eq('type', type)
+        .single();
+
+    if (error || !data) {
+        console.warn(`⚠️ [DB] Could not find template for ${type}. Using default.`);
+        return null;
+    }
+
+    return data.content;
+}
+
+/**
+ * Update a message template
+ * @param type - Template type
+ * @param newContent - New template content with placeholders
+ * @returns true if successful, false otherwise
+ */
+export async function setMessageTemplate(type: string, newContent: string): Promise<boolean> {
+    const supabase = getSupabase();
+
+    const { error } = await supabase
+        .from('custom_messages')
+        .upsert({
+            type,
+            content: newContent,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'type' });
+
+    if (error) {
+        console.error(`❌ [DB] Failed to update ${type}:`, error);
+        return false;
+    }
+
+    return true;
+}
+
 // ===== UNIFIED DATABASE INTERFACE =====
 
 /**
