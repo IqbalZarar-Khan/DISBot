@@ -359,3 +359,10 @@ For issues or questions, please open an issue on GitHub.
 ## 🙏 Acknowledgments
 
 Built with ❤️ for Patreon creators who want to automate their content distribution workflow.
+
+## 👨‍💻 Made By
+
+**[Iqbal Khan]**  
+[![GitHub](https://img.shields.io/badge/GitHub-Profile-black?style=flat&logo=github)](https://github.com/IqbalZarar-Khan) [![Patreon](https://img.shields.io/badge/Patreon-Support-red?style=flat&logo=patreon)](https://www.patreon.com/Fallen_Archangel_)
+
+> [Iqbal Khan] being a Fanfiction Translator and wanting to start a Discord Server but being too lazy to do the new chapter releases and update on Discord for every new chapter and updated chapter, he made this bot to do not only his job but that of many Patreon Creators.
