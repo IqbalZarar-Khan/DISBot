@@ -262,6 +262,33 @@ export const db = {
     },
 
     /**
+     * Silently delete a post from the database
+     * @param postId - Patreon post ID
+     * @returns true if successful, false otherwise
+     */
+    deletePost: async (postId: string): Promise<boolean> => {
+        const supabase = getSupabase();
+
+        try {
+            const { error } = await supabase
+                .from('tracked_posts')
+                .delete()
+                .eq('post_id', postId);
+
+            if (error) {
+                console.error(`❌ [DB ERROR] Failed to delete post ${postId}:`, error.message);
+                return false;
+            }
+
+            console.log(`✅ [DB SUCCESS] Silently removed post ${postId} from tracked_posts.`);
+            return true;
+        } catch (err) {
+            console.error(`❌ [DB EXCEPTION] Error deleting post ${postId}:`, err);
+            return false;
+        }
+    },
+
+    /**
      * Save a custom message template
      */
     setCustomMessage: setCustomMessage,

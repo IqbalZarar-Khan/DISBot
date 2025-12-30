@@ -1,46 +1,43 @@
 import { WebhookPayload } from '../../database/schema';
-import { deleteTrackedPost } from '../../database/db';
-import { client } from '../../index';
-import { TextChannel, EmbedBuilder } from 'discord.js';
-import { logger } from '../../utils/logger';
-import { config } from '../../config';
+import { db } from '../../database/db'; // Only importing DB logic - NO Discord imports
 
 /**
- * Handle posts:delete webhook event
+ * Handle posts:delete webhook event (SILENT - No Discord Notifications)
  * Triggered when a post is deleted from Patreon
+ * 
+ * This handler ONLY removes the post from the database.
+ * It does NOT send any notifications to Discord channels.
  */
 export async function handlePostsDelete(payload: WebhookPayload): Promise<void> {
     try {
+        // 1. Extract the Post ID from the webhook payload
         const post = payload.data;
-        const postId = post.id;
-        const attributes = post.attributes || {};
-        const title = attributes.title || 'Untitled Post';
 
-        // Remove post from database
-        deleteTrackedPost(postId);
-
-        // Send deletion notification to log channel (if configured)
-        if (config.logChannelId) {
-            try {
-                const channel = await client.channels.fetch(config.logChannelId) as TextChannel;
-                if (channel) {
-                    const embed = new EmbedBuilder()
-                        .setTitle('🗑️ Post Deleted')
-                        .setDescription(`**${title}** has been deleted from Patreon.`)
-                        .setColor(0x808080)
-                        .setTimestamp();
-
-                    await channel.send({ embeds: [embed] });
-                }
-            } catch (error) {
-                logger.warn('Failed to send post deletion notification', error as Error);
-            }
+        // Safety check: ensure ID exists
+        if (!post || !post.id) {
+            console.warn('⚠️ [WEBHOOK] Received posts:delete but no ID was found.');
+            return;
         }
 
-        logger.info(`Post deleted: ${title} (ID: ${postId})`);
+        const postId = post.id;
+        const title = post.attributes?.title || 'Untitled Post';
+
+        console.log(`🗑️ [WEBHOOK] Processing silent delete for Post ID: ${postId}`);
+        console.log(`🗑️ [WEBHOOK] Post Title: "${title}"`);
+
+        // 2. Perform Database Cleanup (Silent)
+        // We await the result just for logging, but we do not trigger any alerts.
+        const success = await db.deletePost(postId);
+
+        if (success) {
+            console.log(`✅ [CLEANUP] Post ${postId} wiped from database.`);
+            console.log(`✅ [CLEANUP] No Discord notifications sent (silent mode).`);
+        } else {
+            console.warn(`⚠️ [CLEANUP] Database delete operation for ${postId} reported failure (or item not found).`);
+        }
 
     } catch (error) {
-        logger.error('Error handling posts:delete webhook', error as Error);
+        console.error('❌ [WEBHOOK ERROR] Error processing posts:delete:', error);
         throw error;
     }
 }
