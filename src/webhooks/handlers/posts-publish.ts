@@ -11,6 +11,7 @@ import { formatMessage } from '../../utils/formatter';
 /**
  * Handle posts:publish webhook event
  * CRITICAL: This also handles "Edit and Republish" workflow by redirecting to update handler
+ * HYBRID BROADCAST: Sends to all channels when multiple tiers detected
  */
 export async function handlePostsPublish(payload: WebhookPayload): Promise<void> {
     try {
@@ -60,12 +61,9 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         logger.info(`📝 Relationships Access Rules: ${JSON.stringify(relationships.access_rules?.data)}`);
         logger.info(`📝 Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
 
-        // --- TIER DETECTION LOGIC ---
+        // --- HYBRID BROADCAST TIER DETECTION LOGIC ---
 
-        let tierName: string | null = null;
-        let detectionStrategy = 'None';
-
-        // 1. Try ID Translation (Primary Method)
+        // 1. Extract ALL tier IDs (not just first)
         let tierIds: string[] = [];
 
         // Check attributes.tiers (where your data appears)
@@ -83,43 +81,43 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
 
         logger.info(`📝 Extracted Tier IDs: ${JSON.stringify(tierIds)}`);
 
-        // Translate IDs to tier names
+        // 2. Translate ALL tier IDs to tier names (not just first match)
+        const detectedTierNames: string[] = [];
+
         for (const id of tierIds) {
             if (tierIdMap[id]) {
-                tierName = tierIdMap[id];
-                detectionStrategy = 'ID Match';
-                logger.info(`✅ [ID MATCH] ${id} -> ${tierName}`);
-                break;
+                detectedTierNames.push(tierIdMap[id]);
+                logger.info(`✅ [ID MATCH] ${id} -> ${tierIdMap[id]}`);
             }
         }
 
-        // 2. Fallback: Check Cents
-        if (!tierName && attributes.min_cents_pledged_to_view) {
+        // Remove duplicates
+        const uniqueTiers = [...new Set(detectedTierNames)];
+
+        // 3. Fallback: Check Cents if no tiers detected via ID
+        if (uniqueTiers.length === 0 && attributes.min_cents_pledged_to_view) {
             const cents = parseInt(attributes.min_cents_pledged_to_view);
             logger.info(`📝 Trying cents fallback: ${cents}`);
 
             if (centsMap[cents]) {
-                tierName = centsMap[cents];
-                detectionStrategy = 'Cents Match';
-                logger.info(`✅ [CENTS MATCH] ${cents} cents -> ${tierName}`);
+                uniqueTiers.push(centsMap[cents]);
+                logger.info(`✅ [CENTS MATCH] ${cents} cents -> ${centsMap[cents]}`);
             }
         }
 
-        // 3. Fallback: Check included data
-        if (!tierName && tierIds.length > 0) {
+        // 4. Fallback: Check included data
+        if (uniqueTiers.length === 0 && tierIds.length > 0) {
             for (const id of tierIds) {
                 const includedTier = included.find((item: any) => item.type === 'tier' && String(item.id) === id);
                 if (includedTier && includedTier.attributes && includedTier.attributes.title) {
-                    tierName = includedTier.attributes.title;
-                    detectionStrategy = 'Title Match';
-                    logger.info(`✅ [TITLE MATCH] Found in included data: ${tierName}`);
-                    break;
+                    uniqueTiers.push(includedTier.attributes.title);
+                    logger.info(`✅ [TITLE MATCH] Found in included data: ${includedTier.attributes.title}`);
                 }
             }
         }
 
-        if (!tierName) {
-            logger.error(`❌ Could not detect tier for post ${postId}`);
+        if (uniqueTiers.length === 0) {
+            logger.error(`❌ Could not detect any tiers for post ${postId}`);
             logger.error(`❌ Tier IDs: ${JSON.stringify(tierIds)}`);
             logger.error(`❌ Available ID Map Keys: ${JSON.stringify(Object.keys(tierIdMap))}`);
             logger.error(`❌ Available Cents Map Keys: ${JSON.stringify(Object.keys(centsMap).map(Number))}`);
@@ -127,54 +125,64 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             return;
         }
 
-        logger.info(`📝 Detection Strategy: ${detectionStrategy}`);
-        logger.info(`📝 Final Tier: ${tierName}`);
+        logger.info(`📝 Detected ${uniqueTiers.length} tier(s): ${uniqueTiers.join(', ')}`);
 
-        // Get tier mapping for Discord channel
-        const tierMapping = await getTierMappingByName(tierName);
-
-        if (!tierMapping) {
-            logger.warn(`No channel mapping found for tier: ${tierName}`);
-            logger.warn(`Use /admin set-channel tier_name:${tierName} channel:#your-channel`);
-            logger.info('📝 ========================================\n');
-            return;
+        // ============================================================
+        // 🔀 HYBRID BROADCAST LOGIC
+        // ============================================================
+        if (uniqueTiers.length > 1) {
+            logger.info(`⚡ [HYBRID] Multiple tiers detected. Engaging BROADCAST mode.`);
+        } else {
+            logger.info(`💧 [HYBRID] Single tier detected. Engaging STANDARD mode.`);
         }
 
-        // Send notification to Discord
-        try {
-            const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
+        // Send alerts to ALL detected tiers
+        for (const tierName of uniqueTiers) {
+            try {
+                const tierMapping = await getTierMappingByName(tierName);
 
-            if (channel && channel.isTextBased()) {
-                // Fetch custom template from database
-                const dbTemplate = await getMessageTemplate('post_new');
-                const template = dbTemplate || "📢 New {tier} post: **{title}**\n{url}";
+                if (!tierMapping) {
+                    logger.warn(`No channel mapping found for tier: ${tierName}`);
+                    logger.warn(`Use /admin set-channel tier_name:${tierName} channel:#your-channel`);
+                    continue;
+                }
 
-                // Format message with actual values
-                const messageText = formatMessage(template, {
-                    tier: tierName,
-                    title: title,
-                    url: url
-                });
+                const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
 
-                const embed = createPostEmbed({
-                    title,
-                    url,
-                    tierName,
-                    tags: attributes.tags,
-                    collections: undefined,
-                    isUpdate: false
-                });
-                embed.setDescription(messageText);
+                if (channel && channel.isTextBased()) {
+                    // Fetch custom template from database
+                    const dbTemplate = await getMessageTemplate('post_new');
+                    const template = dbTemplate || "📢 New {tier} post: **{title}**\n{url}";
 
-                await channel.send({ embeds: [embed] });
-                logger.info(`✅ New post alert sent to ${tierName} channel: ${title}`);
+                    // Format message with actual values
+                    const messageText = formatMessage(template, {
+                        tier: tierName,
+                        title: title,
+                        url: url
+                    });
+
+                    const embed = createPostEmbed({
+                        title,
+                        url,
+                        tierName,
+                        tags: attributes.tags,
+                        collections: undefined,
+                        isUpdate: false
+                    });
+                    embed.setDescription(messageText);
+
+                    await channel.send({ embeds: [embed] });
+                    logger.info(`✅ Broadcast alert sent to ${tierName} channel: ${title}`);
+                }
+            } catch (error) {
+                logger.error(`Failed to send alert to ${tierName} channel`, error as Error);
             }
-        } catch (error) {
-            logger.error(`Failed to send post alert to ${tierName} channel`, error as Error);
         }
 
-        // Save to database using db.addPost (ensures correct schema mapping)
-        await db.addPost(postId, tierName, title);
+        // Save to database with the LOWEST tier (widest audience) for waterfall tracking
+        const lowestTier = uniqueTiers[uniqueTiers.length - 1]; // Assuming tiers are ordered by rank
+        await db.addPost(postId, lowestTier, title);
+        logger.info(`💾 Saved post to database with tier: ${lowestTier}`);
         logger.info('📝 ========================================\n');
 
     } catch (error) {
