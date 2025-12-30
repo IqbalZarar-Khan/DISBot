@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "deploy-commands": "ts-node src/commands/deploy-commands.ts",
+    "setup:patreon": "ts-node scripts/fetch-patreon-config.ts",
     "verify": "ts-node src/scripts/verify-deployment.ts",
     "test:webhooks": "ts-node src/tests/manual-webhook-test.ts",
     "test": "jest",
