@@ -145,7 +145,7 @@ The bot uses a dynamic tier system configured via the `TIER_CONFIG` environment 
 ```
 
 - **name**: Tier name used in `/admin set-channel` commands
-- **id**: Patreon tier ID (found in bot logs when creating posts)
+- **id**: Patreon tier ID (found using tool setup:patreon)
 - **rank**: Priority level (100 = highest, 0 = free)
 - **cents**: (Optional) Minimum pledge amount in cents for fallback tier detection
 
