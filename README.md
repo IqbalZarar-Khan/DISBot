@@ -2,6 +2,8 @@
 
 A Discord bot that automates content distribution from Patreon to Discord using a tiered "waterfall" release strategy. The bot tracks when content becomes available to different patron tiers and notifies the appropriate Discord channels in real-time.
 
+![DISBot Waterfall System](docs/waterfall-diagram.png)
+
 ## ✨ Features
 
 - **🎯 Waterfall Release System**: Automatically alerts Discord channels when content becomes available to their tier
@@ -53,17 +55,26 @@ A Discord bot that automates content distribution from Patreon to Discord using 
    - Run the SQL migration from `supabase/migrations/`
    - Copy your Supabase URL and anon key to `.env`
 
-5. **Configure your tiers**
+5. **Configure your tiers (Automated Method)**
    
-   Edit the `TIER_CONFIG` in your `.env` file:
+   Run the automated setup tool to fetch your tier configuration:
    ```bash
-   TIER_CONFIG='[{"name":"Tier1","id":"YOUR_TIER_ID","rank":100,"cents":1000},{"name":"Tier2","id":"YOUR_TIER_ID","rank":75,"cents":500}]'
+   npm run setup:patreon
    ```
    
-   **Finding Tier IDs:**
-   - Start the bot and create a test post on Patreon
-   - Check the bot logs for: `✅ Extracted Tier IDs: ["12345678"]`
-   - Use these IDs in your `TIER_CONFIG`
+   This will output:
+   - Your `PATREON_CAMPAIGN_ID`
+   - A ready-to-use `TIER_CONFIG` JSON string with all tier IDs and prices
+   
+   Copy the output into your `.env` file and update the `rank` values:
+   ```bash
+   TIER_CONFIG='[{"name":"Diamond","id":"12345678","rank":100,"cents":2500},{"name":"Gold","id":"87654321","rank":75,"cents":1500}]'
+   ```
+   
+   **Rank Guidelines:**
+   - Higher rank = Higher tier (e.g., 100 for Diamond)
+   - Lower rank = Lower tier (e.g., 25 for Bronze)
+   - Free tier = 0
 
 6. **Build the project**
    ```bash
@@ -297,6 +308,18 @@ A: It uses a smart "Waterfall" logic with three layers of detection to ensure no
 **Q: What happens when I update a post (e.g., from "Diamond" to "Gold")?**
 
 A: The bot detects the update and calculates the **lowest** tier that now has access (widest audience). For example, if a post was Diamond-only and you add Gold access, the bot identifies Gold as the new audience and sends the waterfall alert specifically to the Gold channel. This is the core "waterfall" feature.
+
+**💡 Pro Tip: The "Invisible Space" Trick**
+
+Sometimes, when you only change the "Who can access this post?" settings (e.g., checking the box for Gold), Patreon's website may not immediately trigger the `posts:update` webhook. If the webhook isn't sent, the bot cannot detect the change.
+
+**To force the update without altering your content:**
+1. Open the Post: Go to the edit screen of your existing post
+2. Change Access: Check the box for the new lower tier (e.g., Gold)
+3. **The Trick**: Click inside your Post Title and add a single space at the very end
+4. Click Update/Publish
+
+**Why this works**: To your readers, "My Post Title" and "My Post Title " look exactly the same—the browser renders them identically. However, Patreon's server sees a difference in the text string. This forces Patreon to mark the post as "modified" and immediately send the `posts:update` signal to your bot, triggering the waterfall logic.
 
 ### ☁️ Deployment
 
