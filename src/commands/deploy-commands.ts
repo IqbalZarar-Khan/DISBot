@@ -68,6 +68,28 @@ const commands = [
                         )
                 )
         )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('set-message')
+                .setDescription('Customize automated bot messages')
+                .addStringOption(option =>
+                    option
+                        .setName('type')
+                        .setDescription('Which message to customize')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'New Post', value: 'post_new' },
+                            { name: 'Waterfall Update', value: 'post_waterfall' },
+                            { name: 'Welcome Message', value: 'welcome' }
+                        )
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('content')
+                        .setDescription('Message template. Use {tier}, {title}, {url}, {user}')
+                        .setRequired(true)
+                )
+        )
 ].map(command => command.toJSON());
 
 // Create REST instance
