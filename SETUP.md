@@ -274,7 +274,7 @@ openssl rand -hex 32
 
 ### Option B: Production (Render.com)
 
-See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) for detailed deployment instructions.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 
 ### Register Webhook with Patreon
 
@@ -423,7 +423,7 @@ Your bot is now ready to automatically distribute content based on Patreon tiers
 
 ## Next Steps
 
-- **Deploy to Production**: See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
+- **Deploy to Production**: See [DEPLOYMENT.md](DEPLOYMENT.md)
 - **Contribute**: See [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Report Issues**: Open an issue on GitHub
 

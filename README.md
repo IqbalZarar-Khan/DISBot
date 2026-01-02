@@ -6,18 +6,26 @@ A Discord bot that automates content distribution from Patreon to Discord using 
 
 ## ✨ Features
 
+### Core Features
 - **🎯 Waterfall Release System**: Automatically alerts Discord channels when content becomes available to their tier
+- **⚡ Hybrid Broadcast System**: Sends alerts to ALL channels when posts are released to multiple tiers simultaneously
 - **👥 Member Tracking**: Monitors new pledges, upgrades, and departures
 - **🔒 Secure Admin Panel**: User ID-based authentication for admin commands
 - **📊 Real-time Webhooks**: Instant notifications via Patreon webhooks
 - **💎 Tier Management**: Easy mapping of Patreon tiers to Discord channels
+
+### Advanced Features
+- **💬 Custom Message Templates**: Fully customizable bot messages with placeholder support (`{tier}`, `{title}`, `{url}`, `{user}`)
+- **🗑️ Silent Post Deletion**: Automatically removes deleted posts from database without Discord notifications
+- **🔧 Automated Setup**: One-command Patreon tier configuration fetcher (`npm run setup:patreon`)
 - **⚙️ Configuration-Driven**: 100% configurable via environment variables (no code changes needed!)
 - **🔄 Dynamic Tier System**: Support for any number of custom tiers via JSON configuration
+- **🕵️ Debug Logging**: Comprehensive X-Ray debugging for troubleshooting tier detection
 
 ## 📚 Documentation
 
 - **[Setup Guide](SETUP.md)** - Detailed setup instructions for Discord, Patreon, and Supabase
-- **[Deployment Guide](RENDER_DEPLOYMENT.md)** - Deploy to Render.com with automatic HTTPS
+- **[Deployment Guide](DEPLOYMENT.md)** - Deploy to Render, Railway, Heroku, VPS, or run locally
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to this project
 - **[Code of Conduct](CPDSC.md)** - Community guidelines and standards
 
@@ -188,6 +196,7 @@ All admin commands are restricted to the user specified in `ROOT_ADMIN_ID`.
 |---------|-------------|
 | `/admin status` | Display bot status and configuration |
 | `/admin set-channel <tier> <channel>` | Map a Patreon tier to a Discord channel |
+| `/admin set-message <type> <content>` | Customize bot message templates |
 | `/admin set-owner <user>` | Transfer bot control to another user |
 | `/admin test-alert <tier>` | Send a test alert to verify setup |
 
@@ -206,6 +215,52 @@ The bot uses multiple methods to detect post tiers:
 1. **Tier ID Translation**: Converts Patreon tier IDs to tier names using `TIER_CONFIG`
 2. **Included Data Lookup**: Searches for tier information in webhook payload
 3. **Pledge Amount Fallback**: Uses `min_cents_pledged_to_view` as last resort
+
+### Hybrid Broadcast System
+
+The bot intelligently handles multi-tier post releases:
+
+**BROADCAST Mode** (Multiple Tiers):
+- Post released to Diamond + Gold + Silver → All 3 channels get alerts
+- Each tier sees their own customized notification
+- Perfect for simultaneous multi-tier releases
+
+**STANDARD Mode** (Single Tier):
+- Post released to Diamond only → Only #diamond-chat gets alert
+- Traditional single-channel notification
+
+**WATERFALL Mode** (Updates):
+- Edit post to add lower tiers → Only new tier gets alert
+- Prevents spam by only notifying newly-added tiers
+
+**Example:**
+```
+Day 1: Release to Diamond + Gold
+→ Bot sends to #diamond-chat AND #gold-chat (BROADCAST)
+
+Day 7: Edit to add Silver access
+→ Bot sends ONLY to #silver-chat (WATERFALL)
+```
+
+### Custom Message Templates
+
+Customize all bot messages using the `/admin set-message` command:
+
+**Available Templates:**
+- `post_new` - New post notifications
+- `post_waterfall` - Waterfall update alerts
+- `welcome` - Welcome messages for new patrons
+
+**Placeholders:**
+- `{tier}` - Tier name (e.g., "Diamond", "Gold")
+- `{title}` - Post title
+- `{url}` - Post URL
+- `{user}` - User mention (for welcome messages)
+
+**Example:**
+```
+/admin set-message type:post_new content:🎉 New {tier} exclusive: {title} - {url}
+```
 
 ### Member Tracking
 
@@ -255,7 +310,7 @@ src/
 3. Set environment variables in Render dashboard
 4. Deploy!
 
-See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) for detailed instructions.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
 
 ### Docker Deployment
 
@@ -327,7 +382,7 @@ Sometimes, when you only change the "Who can access this post?" settings (e.g., 
 
 A: Yes. The project follows "12-Factor App" principles, meaning all configuration is handled via Environment Variables, making it cloud-ready.
 - **Database**: The bot uses Supabase (PostgreSQL), which is a cloud database service. Your data persists across deployments and restarts automatically.
-- **Recommended**: See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) for step-by-step deployment instructions.
+- **Recommended**: See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step deployment instructions.
 
 **Q: What do I need to get started?**
 
@@ -342,6 +397,15 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 
 ## 🆕 Recent Updates
 
+### Latest Features (2026)
+- ✅ **Hybrid Broadcast System**: Sends alerts to ALL channels when posts are released to multiple tiers simultaneously
+- ✅ **Custom Message Templates**: Fully customizable bot messages with placeholder support (`/admin set-message`)
+- ✅ **Silent Post Deletion**: Automatically removes deleted posts from database without Discord notifications
+- ✅ **Automated Patreon Setup**: One-command tier configuration fetcher (`npm run setup:patreon`)
+- ✅ **X-Ray Debug Logging**: Comprehensive debugging for database operations and tier detection
+- ✅ **Edit and Republish Fix**: Correctly handles Patreon's "Edit and Republish" workflow
+
+### Core Features
 - ✅ **Dynamic Tier Configuration**: Configure tiers via `TIER_CONFIG` environment variable
 - ✅ **Tier ID Translation**: Automatic conversion of Patreon tier IDs to tier names
 - ✅ **Supabase Integration**: Migrated from SQLite to Supabase for persistent storage
@@ -365,4 +429,4 @@ Built with ❤️ for Patreon creators who want to automate their content distri
 **Iqbal Khan**  
 [![GitHub](https://img.shields.io/badge/GitHub-Profile-black?style=flat&logo=github)](https://github.com/IqbalZarar-Khan) [![Patreon](https://img.shields.io/badge/Patreon-Support-red?style=flat&logo=patreon)](https://www.patreon.com/Fallen_Archangel_)
 
-> I, Iqbal Khan, a fanfiction translator, wanted to start a Discord Server but was too lazy to handle new chapter releases and updates on Discord for every new chapter and updated chapter. I created this bot to not only do my job but also that of many Patreon Creators.
+> I, being a fanfiction translator, wanted to start a Discord Server but was too lazy to handle new chapter releases and updates on Discord for every new chapter and updated chapter. I created this bot to not only do my job but also that of many Patreon Creators.
