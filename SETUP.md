@@ -158,6 +158,40 @@ The bot uses Supabase for persistent data storage.
 
 The bot uses a dynamic tier system configured via the `TIER_CONFIG` environment variable.
 
+### Automated Setup (Recommended)
+
+The easiest way to configure your tiers is using the automated setup script:
+
+1. **Set your Patreon Access Token** in `.env`:
+   ```bash
+   PATREON_ACCESS_TOKEN=your_access_token_from_step_2
+   ```
+
+2. **Run the setup script**:
+   ```bash
+   npm run setup:patreon
+   ```
+
+3. **Copy the output** to your `.env` file:
+   ```
+   ✅ Found Campaign ID: 12345678
+   ✅ Found 4 tiers
+   
+   📋 Add these to your .env file:
+   
+   PATREON_CAMPAIGN_ID=12345678
+   TIER_CONFIG='[{"name":"Diamond","id":"123","rank":100,"cents":2500},...]'
+   ```
+
+4. **Adjust ranks** (optional):
+   - The script assigns placeholder ranks (100, 75, 50, 25, 0)
+   - You can manually adjust these in your `.env` if needed
+   - Higher rank = higher tier priority
+
+### Manual Setup (Alternative)
+
+If you prefer to configure manually:
+
 ### Find Your Tier IDs
 
 1. Start the bot (after completing environment setup)
