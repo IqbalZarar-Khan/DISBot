@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: disbot
+    runtime: node
+    region: oregon # Change to your preferred region
+    plan: free
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WEBHOOK_PORT
+        value: 10000
+      # Add these environment variables in Render Dashboard
+      # or sync from .env file using Render's secret files feature
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: GUILD_ID
+        sync: false
+      - key: ROOT_ADMIN_ID
+        sync: false
+      - key: LOG_CHANNEL_ID
+        sync: false
+      - key: PATREON_CLIENT_ID
+        sync: false
+      - key: PATREON_CLIENT_SECRET
+        sync: false
+      - key: PATREON_ACCESS_TOKEN
+        sync: false
+      - key: PATREON_REFRESH_TOKEN
+        sync: false
+      - key: PATREON_CAMPAIGN_ID
+        sync: false
+      - key: WEBHOOK_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: TIER_CONFIG
+        sync: false

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  disbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: disbot
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - WEBHOOK_PORT=3000
+    volumes:
+      - ./data:/app/data
+    networks:
+      - disbot-network
+
+networks:
+  disbot-network:
+    driver: bridge
