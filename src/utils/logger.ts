@@ -7,15 +7,19 @@ export enum LogLevel {
 }
 
 let discordClient: Client | null = null;
-let logChannelId: string | null = null;
+let logChannel: TextChannel | null = null;
 
 /**
  * Initialize logger with Discord client
  */
-export function initLogger(client: Client, channelId?: string): void {
+export async function initLogger(client: Client, channelId?: string): Promise<void> {
     discordClient = client;
     if (channelId) {
-        logChannelId = channelId;
+        try {
+            logChannel = await client.channels.fetch(channelId) as TextChannel;
+        } catch (err) {
+            console.error('Failed to fetch log channel:', err);
+        }
     }
 }
 
@@ -33,12 +37,10 @@ export async function log(level: LogLevel, message: string, error?: Error): Prom
     }
 
     // Discord log (only for WARN and ERROR)
-    if ((level === LogLevel.WARN || level === LogLevel.ERROR) && discordClient && logChannelId) {
+    if ((level === LogLevel.WARN || level === LogLevel.ERROR) && logChannel) {
         try {
-            const channel = await discordClient.channels.fetch(logChannelId) as TextChannel;
-            if (channel) {
-                const embed = new EmbedBuilder()
-                    .setTitle(`${getLogEmoji(level)} ${level}`)
+            const embed = new EmbedBuilder()
+                .setTitle(`${getLogEmoji(level)} ${level}`)
                     .setDescription(message)
                     .setColor(getLogColor(level))
                     .setTimestamp();
@@ -56,9 +58,7 @@ export async function log(level: LogLevel, message: string, error?: Error): Prom
                         });
                     }
                 }
-
-                await channel.send({ embeds: [embed] });
-            }
+                await logChannel.send({ embeds: [embed] });
         } catch (err) {
             console.error('Failed to send log to Discord:', err);
         }

@@ -30,7 +30,7 @@ async function main() {
         await initDatabase();
 
         // Initialize logger
-        initLogger(client, config.logChannelId);
+        await initLogger(client, config.logChannelId);
 
         // Register event handlers
         registerEventHandlers();
