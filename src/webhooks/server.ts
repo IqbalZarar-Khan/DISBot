@@ -68,8 +68,10 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
 
             // Route to appropriate handler
             logger.info(`🚀 [EXECUTING] Calling handler for ${eventType}...`);
-            await routeWebhookEvent(eventType, req.body);
-            logger.info(`✅ [COMPLETE] Handler for ${eventType} completed successfully`);
+            routeWebhookEvent(eventType, req.body).catch(err => {
+                logger.error(`❌ [ASYNC HANDLER ERROR] Error in background handler for ${eventType}`, err);
+            });
+            logger.info(`✅ [DISPATCHED] Handler for ${eventType} dispatched to background`);
 
             logger.info('📡 [END TRAFFIC] ========================================\n');
 
