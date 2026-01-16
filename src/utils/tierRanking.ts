@@ -26,6 +26,8 @@ if (config.tierConfig && config.tierConfig.length > 0) {
     config.tierConfig.forEach(tier => {
         // Map Name -> Rank (e.g., "Tier1" -> 100)
         tierRankings[tier.name] = tier.rank;
+        // Also map lowercase name for case-insensitive lookup
+        tierRankings[tier.name.toLowerCase()] = tier.rank;
 
         // Map ID -> Name (e.g., "TIER_ID_1" -> "Tier1")
         tierIdMap[tier.id] = tier.name;
@@ -45,31 +47,28 @@ if (config.tierConfig && config.tierConfig.length > 0) {
     console.warn("⚠️ NO TIERS CONFIGURED. Please set TIER_CONFIG in .env");
     console.warn("   Example: TIER_CONFIG='[{\"name\":\"Tier1\",\"id\":\"TIER_ID_1\",\"rank\":100,\"cents\":2500}]'");
     // Default fallback (keeps the bot from crashing if config is missing)
-    tierRankings['Free'] = 0;
+    tierRankings['Free'] = TierRank.Free;
 }
 
 /**
  * Get tier rank by tier name
  * Handles tier names with or without trailing dots (e.g., "Tier1" or "Tier1.")
+ * Uses O(1) lookup map instead of switch statement
  */
 export function getTierRank(tierName: string): number {
-    // Normalize: lowercase and remove trailing dots/spaces
+    // 1. Try exact match
+    if (tierRankings[tierName] !== undefined) {
+        return tierRankings[tierName];
+    }
+
+    // 2. Try normalized match (lowercase, trim, and remove trailing dots)
     const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
 
-    switch (normalizedName) {
-        case 'diamond':
-            return TierRank.Diamond;
-        case 'gold':
-            return TierRank.Gold;
-        case 'silver':
-            return TierRank.Silver;
-        case 'bronze':
-            return TierRank.Bronze;
-        case 'free':
-            return TierRank.Free;
-        default:
-            return TierRank.Free;
+    if (tierRankings[normalizedName] !== undefined) {
+        return tierRankings[normalizedName];
     }
+
+    return TierRank.Free;
 }
 
 /**
