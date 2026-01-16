@@ -1,4 +1,3 @@
-import { TierRank } from '../database/schema';
 import { config } from '../config';
 
 /**
@@ -21,9 +20,34 @@ export const tierRankings: Record<string, number> = {};
  */
 export const centsMap: Record<number, string> = {};
 
+/**
+ * Tier Colors
+ * Dynamically populated from TIER_CONFIG environment variable or generated
+ */
+export const tierColors: Record<string, number> = {};
+
+/**
+ * Tier Emojis
+ * Dynamically populated from TIER_CONFIG environment variable or defaulted
+ */
+export const tierEmojis: Record<string, string> = {};
+
+// Default colors (Discord specific mostly)
+const DEFAULT_COLORS = [
+    0x00ffff, // Cyan
+    0xffd700, // Gold
+    0xc0c0c0, // Silver
+    0xcd7f32, // Bronze
+    0x5865f2, // Blurple
+    0xeb459e, // Fuchsia
+    0x57f287, // Green
+    0xfee75c, // Yellow
+    0xed4245, // Red
+];
+
 // Dynamically populate tier maps from configuration
 if (config.tierConfig && config.tierConfig.length > 0) {
-    config.tierConfig.forEach(tier => {
+    config.tierConfig.forEach((tier, index) => {
         // Map Name -> Rank (e.g., "Tier1" -> 100)
         tierRankings[tier.name] = tier.rank;
 
@@ -34,7 +58,20 @@ if (config.tierConfig && config.tierConfig.length > 0) {
         if (tier.cents !== undefined) {
             centsMap[tier.cents] = tier.name;
         }
+
+        // Assign default colors if not defined (cyclic)
+        tierColors[tier.name] = DEFAULT_COLORS[index % DEFAULT_COLORS.length];
+
+        // Assign default emoji
+        tierEmojis[tier.name] = '⭐';
     });
+
+    // Explicitly set Free tier
+    if (!tierRankings['Free']) {
+        tierRankings['Free'] = 0;
+        tierColors['Free'] = 0x808080; // Gray
+        tierEmojis['Free'] = '🆓';
+    }
 
     console.log(`✅ Global Tier System Loaded: ${config.tierConfig.length} tier(s) configured.`);
     console.log(`   Tiers: ${config.tierConfig.map(t => `${t.name}(${t.rank})`).join(', ')}`);
@@ -44,8 +81,26 @@ if (config.tierConfig && config.tierConfig.length > 0) {
 } else {
     console.warn("⚠️ NO TIERS CONFIGURED. Please set TIER_CONFIG in .env");
     console.warn("   Example: TIER_CONFIG='[{\"name\":\"Tier1\",\"id\":\"TIER_ID_1\",\"rank\":100,\"cents\":2500}]'");
-    // Default fallback (keeps the bot from crashing if config is missing)
+
+    // Default fallback to prevent regression for legacy users
+    // These match the old hardcoded enum
+    tierRankings['Diamond'] = 100;
+    tierRankings['Gold'] = 75;
+    tierRankings['Silver'] = 50;
+    tierRankings['Bronze'] = 25;
     tierRankings['Free'] = 0;
+
+    tierColors['Diamond'] = 0x00ffff;
+    tierColors['Gold'] = 0xffd700;
+    tierColors['Silver'] = 0xc0c0c0;
+    tierColors['Bronze'] = 0xcd7f32;
+    tierColors['Free'] = 0x808080;
+
+    tierEmojis['Diamond'] = '💎';
+    tierEmojis['Gold'] = '🥇';
+    tierEmojis['Silver'] = '🥈';
+    tierEmojis['Bronze'] = '🥉';
+    tierEmojis['Free'] = '🆓';
 }
 
 /**
@@ -54,22 +109,25 @@ if (config.tierConfig && config.tierConfig.length > 0) {
  */
 export function getTierRank(tierName: string): number {
     // Normalize: lowercase and remove trailing dots/spaces
-    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
+    // NOTE: This logic assumes keys in tierRankings are Case-Sensitive or we need to handle casing carefully.
+    // The previous implementation used lowercased switch cases.
+    // To support dynamic names properly, we should probably stick to case-insensitive matching or require config to match.
+    // Let's try to match exactly first, then fuzzy.
 
-    switch (normalizedName) {
-        case 'diamond':
-            return TierRank.Diamond;
-        case 'gold':
-            return TierRank.Gold;
-        case 'silver':
-            return TierRank.Silver;
-        case 'bronze':
-            return TierRank.Bronze;
-        case 'free':
-            return TierRank.Free;
-        default:
-            return TierRank.Free;
+    if (tierRankings[tierName] !== undefined) {
+        return tierRankings[tierName];
     }
+
+    // Fuzzy match (ignore case and trailing dots)
+    const normalizedInput = tierName.toLowerCase().trim().replace(/\.+$/, '');
+
+    for (const [name, rank] of Object.entries(tierRankings)) {
+        if (name.toLowerCase() === normalizedInput) {
+            return rank;
+        }
+    }
+
+    return 0; // Default to lowest rank (Free) if unknown
 }
 
 /**
@@ -99,44 +157,37 @@ export function isWaterfall(oldTierRank: number, newTierRank: number): boolean {
  * Get tier color for Discord embeds
  */
 export function getTierColor(tierName: string): number {
-    // Normalize: lowercase and remove trailing dots/spaces
-    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
-
-    switch (normalizedName) {
-        case 'diamond':
-            return 0x00ffff; // Cyan
-        case 'gold':
-            return 0xffd700; // Gold
-        case 'silver':
-            return 0xc0c0c0; // Silver
-        case 'bronze':
-            return 0xcd7f32; // Bronze
-        case 'free':
-            return 0x808080; // Gray
-        default:
-            return 0x5865f2; // Discord Blurple
+    if (tierColors[tierName]) {
+        return tierColors[tierName];
     }
+
+    // Fuzzy match
+    const normalizedInput = tierName.toLowerCase().trim().replace(/\.+$/, '');
+    for (const [name, color] of Object.entries(tierColors)) {
+        if (name.toLowerCase() === normalizedInput) {
+            return color;
+        }
+    }
+
+    // Default Fallback
+    return 0x5865f2; // Discord Blurple
 }
 
 /**
  * Get tier emoji
  */
 export function getTierEmoji(tierName: string): string {
-    // Normalize: lowercase and remove trailing dots/spaces
-    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
-
-    switch (normalizedName) {
-        case 'diamond':
-            return '💎';
-        case 'gold':
-            return '🥇';
-        case 'silver':
-            return '🥈';
-        case 'bronze':
-            return '🥉';
-        case 'free':
-            return '🆓';
-        default:
-            return '⭐';
+    if (tierEmojis[tierName]) {
+        return tierEmojis[tierName];
     }
+
+    // Fuzzy match
+    const normalizedInput = tierName.toLowerCase().trim().replace(/\.+$/, '');
+    for (const [name, emoji] of Object.entries(tierEmojis)) {
+        if (name.toLowerCase() === normalizedInput) {
+            return emoji;
+        }
+    }
+
+    return '⭐';
 }

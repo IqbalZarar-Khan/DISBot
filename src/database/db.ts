@@ -1,6 +1,52 @@
 import { getSupabase } from './supabase';
 import { TrackedPost, TierMapping, TrackedMember } from './schema';
 
+// ===== CACHING MECHANISM =====
+// Simple in-memory cache to reduce database hits for static configurations
+interface CacheEntry<T> {
+    data: T;
+    timestamp: number;
+}
+
+const cache: Record<string, CacheEntry<any>> = {};
+const CACHE_TTL_MS = 1000 * 60 * 5; // 5 minutes cache duration
+
+/**
+ * Get item from cache
+ */
+function getFromCache<T>(key: string): T | null {
+    const entry = cache[key];
+    if (!entry) return null;
+
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+        delete cache[key];
+        return null;
+    }
+
+    return entry.data;
+}
+
+/**
+ * Set item in cache
+ */
+function setInCache<T>(key: string, data: T): void {
+    cache[key] = {
+        data,
+        timestamp: Date.now()
+    };
+}
+
+/**
+ * Invalidate cache for a specific key
+ */
+function invalidateCache(keyPrefix: string): void {
+    Object.keys(cache).forEach(key => {
+        if (key.startsWith(keyPrefix)) {
+            delete cache[key];
+        }
+    });
+}
+
 /**
  * Initialize the database (Supabase connection)
  */
@@ -65,6 +111,10 @@ export async function deleteTrackedPost(postId: string): Promise<void> {
 // ===== BOT CONFIG OPERATIONS =====
 
 export async function getConfig(key: string): Promise<string | null> {
+    const cacheKey = `config:${key}`;
+    const cached = getFromCache<string>(cacheKey);
+    if (cached) return cached;
+
     const supabase = getSupabase();
 
     const { data, error } = await supabase
@@ -78,6 +128,7 @@ export async function getConfig(key: string): Promise<string | null> {
         throw error;
     }
 
+    setInCache(cacheKey, data.value);
     return data.value;
 }
 
@@ -89,11 +140,18 @@ export async function setConfig(key: string, value: string): Promise<void> {
         .upsert({ key, value }, { onConflict: 'key' });
 
     if (error) throw error;
+
+    // Update cache
+    setInCache(`config:${key}`, value);
 }
 
 // ===== TIER MAPPINGS OPERATIONS =====
 
 export async function getTierMapping(tierId: string): Promise<TierMapping | null> {
+    const cacheKey = `tier_mapping:id:${tierId}`;
+    const cached = getFromCache<TierMapping>(cacheKey);
+    if (cached) return cached;
+
     const supabase = getSupabase();
 
     const { data, error } = await supabase
@@ -107,10 +165,15 @@ export async function getTierMapping(tierId: string): Promise<TierMapping | null
         throw error;
     }
 
+    setInCache(cacheKey, data as TierMapping);
     return data as TierMapping;
 }
 
 export async function getTierMappingByName(tierName: string): Promise<TierMapping | null> {
+    const cacheKey = `tier_mapping:name:${tierName}`;
+    const cached = getFromCache<TierMapping>(cacheKey);
+    if (cached) return cached;
+
     const supabase = getSupabase();
 
     const { data, error } = await supabase
@@ -124,10 +187,15 @@ export async function getTierMappingByName(tierName: string): Promise<TierMappin
         throw error;
     }
 
+    setInCache(cacheKey, data as TierMapping);
     return data as TierMapping;
 }
 
 export async function getAllTierMappings(): Promise<TierMapping[]> {
+    const cacheKey = `tier_mappings:all`;
+    const cached = getFromCache<TierMapping[]>(cacheKey);
+    if (cached) return cached;
+
     const supabase = getSupabase();
 
     const { data, error } = await supabase
@@ -137,7 +205,9 @@ export async function getAllTierMappings(): Promise<TierMapping[]> {
 
     if (error) throw error;
 
-    return (data as TierMapping[]) || [];
+    const result = (data as TierMapping[]) || [];
+    setInCache(cacheKey, result);
+    return result;
 }
 
 export async function upsertTierMapping(mapping: TierMapping): Promise<void> {
@@ -148,6 +218,10 @@ export async function upsertTierMapping(mapping: TierMapping): Promise<void> {
         .upsert(mapping, { onConflict: 'tier_id' });
 
     if (error) throw error;
+
+    // Invalidate caches
+    invalidateCache('tier_mapping:');
+    invalidateCache('tier_mappings:all');
 }
 
 // ===== TRACKED MEMBERS OPERATIONS =====
@@ -205,12 +279,19 @@ export async function setCustomMessage(type: string, content: string): Promise<v
         .upsert({ type, content }, { onConflict: 'type' });
 
     if (error) throw error;
+
+    // Update cache
+    setInCache(`message:${type}`, content);
 }
 
 /**
  * Retrieve a custom message template
  */
 export async function getCustomMessage(type: string): Promise<string | null> {
+    const cacheKey = `message:${type}`;
+    const cached = getFromCache<string>(cacheKey);
+    if (cached) return cached;
+
     const supabase = getSupabase();
 
     const { data, error } = await supabase
@@ -224,6 +305,7 @@ export async function getCustomMessage(type: string): Promise<string | null> {
         throw error;
     }
 
+    setInCache(cacheKey, data.content);
     return data.content;
 }
 
@@ -237,20 +319,15 @@ export type MessageTemplateType = 'post_new' | 'post_waterfall' | 'welcome';
  * @returns Template content or null if not found
  */
 export async function getMessageTemplate(type: MessageTemplateType): Promise<string | null> {
-    const supabase = getSupabase();
+    // getCustomMessage already handles caching
+    const content = await getCustomMessage(type);
 
-    const { data, error } = await supabase
-        .from('custom_messages')
-        .select('content')
-        .eq('type', type)
-        .single();
-
-    if (error || !data) {
+    if (!content) {
         console.warn(`⚠️ [DB] Could not find template for ${type}. Using default.`);
         return null;
     }
 
-    return data.content;
+    return content;
 }
 
 /**
@@ -274,6 +351,9 @@ export async function setMessageTemplate(type: string, newContent: string): Prom
         console.error(`❌ [DB] Failed to update ${type}:`, error);
         return false;
     }
+
+    // Update cache
+    setInCache(`message:${type}`, newContent);
 
     return true;
 }
