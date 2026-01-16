@@ -137,6 +137,9 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         }
 
         // Send alerts to ALL detected tiers
+        const dbTemplate = await getMessageTemplate('post_new');
+        const template = dbTemplate || "📢 New {tier} post: **{title}**\n{url}";
+
         for (const tierName of uniqueTiers) {
             try {
                 const tierMapping = await getTierMappingByName(tierName);
@@ -150,10 +153,6 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                 const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
 
                 if (channel && channel.isTextBased()) {
-                    // Fetch custom template from database
-                    const dbTemplate = await getMessageTemplate('post_new');
-                    const template = dbTemplate || "📢 New {tier} post: **{title}**\n{url}";
-
                     // Format message with actual values
                     const messageText = formatMessage(template, {
                         tier: tierName,
