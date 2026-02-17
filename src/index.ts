@@ -43,31 +43,31 @@ async function main() {
         // Register event handlers
         registerEventHandlers();
 
-        // Add raw error listeners BEFORE login to catch gateway errors
+        // Add raw error/debug listeners BEFORE login
         client.on('error', (err) => {
-            console.error('🔴 [RAW CLIENT ERROR]:', err.message);
+            console.error('🔴 [CLIENT ERROR]:', err.message);
         });
         client.on('shardError', (err, shardId) => {
             console.error(`🔴 [SHARD ${shardId} ERROR]:`, err.message);
         });
         client.on('shardDisconnect', (event: any, shardId) => {
             console.error(`🔴 [SHARD ${shardId} DISCONNECT]: Code ${event.code}`);
-            if (event.code === 4014) {
-                console.error('🔴 ❗ DISALLOWED INTENTS — Enable "Server Members Intent" in Discord Developer Portal → Bot → Privileged Gateway Intents');
-            }
+        });
+        client.on('shardReconnecting', (shardId) => {
+            console.log(`🔄 [SHARD ${shardId} RECONNECTING]`);
+        });
+
+        // DEBUG: trace every internal discord.js step
+        client.on('debug', (info) => {
+            console.log(`[DEBUG] ${info}`);
         });
 
         // Login to Discord with timeout
         console.log('🔑 Attempting Discord login...');
         console.log(`🔑 Token length: ${config.discordToken.length} chars`);
-        console.log(`🔑 Token prefix: ${config.discordToken.substring(0, 10)}...`);
 
         const loginTimeout = setTimeout(() => {
             console.error('❌ Discord login TIMED OUT after 30s!');
-            console.error('❌ Possible causes:');
-            console.error('   1. "Server Members Intent" NOT enabled in Discord Developer Portal');
-            console.error('   2. Invalid or revoked bot token');
-            console.error('   3. Network connectivity issue');
         }, 30000);
 
         await client.login(config.discordToken);
@@ -76,9 +76,7 @@ async function main() {
 
     } catch (error) {
         console.error('❌ Failed to start bot:', error);
-        console.error('❌ Error name:', (error as Error).name);
         console.error('❌ Error message:', (error as Error).message);
-        // Don't exit - keep webhook server alive so we can see logs on Render
         console.error('⚠️ Bot will stay alive for debugging (webhook server still running)');
     }
 }
@@ -98,10 +96,8 @@ function registerEventHandlers() {
         if (!interaction.isChatInputCommand()) return;
 
         try {
-            // Import command handlers dynamically
             const commandName = interaction.commandName;
 
-            // Admin commands
             if (commandName.startsWith('admin')) {
                 const { handleAdminCommand } = await import('./commands/admin/handler');
                 await handleAdminCommand(interaction);
@@ -150,7 +146,6 @@ process.on('SIGTERM', () => {
     process.exit(0);
 });
 
-// Catch unhandled rejections
 process.on('unhandledRejection', (reason) => {
     console.error('🔴 [UNHANDLED REJECTION]:', reason);
 });
