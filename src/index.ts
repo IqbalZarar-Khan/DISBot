@@ -4,6 +4,25 @@ import { initSupabase } from './database/supabase';
 import { initDatabase } from './database/db';
 import { initLogger, logger } from './utils/logger';
 import { startWebhookServer } from './webhooks/server';
+import https from 'https';
+
+/**
+ * Quick connectivity test to Discord API
+ */
+function testDiscordAPI(token: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const req = https.get('https://discord.com/api/v10/gateway/bot', {
+            headers: { 'Authorization': `Bot ${token}` },
+            timeout: 10000
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => resolve(`Status ${res.statusCode}: ${data}`));
+        });
+        req.on('error', (err) => reject(err));
+        req.on('timeout', () => { req.destroy(); reject(new Error('Request timed out after 10s')); });
+    });
+}
 
 // Create Discord client
 const client = new Client({
@@ -43,7 +62,17 @@ async function main() {
         // Register event handlers
         registerEventHandlers();
 
-        // Add raw error/debug listeners BEFORE login
+        // Test Discord API connectivity BEFORE login
+        console.log('🔍 Testing Discord API connectivity...');
+        try {
+            const result = await testDiscordAPI(config.discordToken);
+            console.log(`✅ Discord API test: ${result}`);
+        } catch (err) {
+            console.error('❌ Discord API connectivity test FAILED:', (err as Error).message);
+            console.error('❌ Cannot reach Discord from Render runtime. This is a network issue.');
+        }
+
+        // Raw event listeners for debugging
         client.on('error', (err) => {
             console.error('🔴 [CLIENT ERROR]:', err.message);
         });
@@ -56,15 +85,12 @@ async function main() {
         client.on('shardReconnecting', (shardId) => {
             console.log(`🔄 [SHARD ${shardId} RECONNECTING]`);
         });
-
-        // DEBUG: trace every internal discord.js step
         client.on('debug', (info) => {
             console.log(`[DEBUG] ${info}`);
         });
 
         // Login to Discord with timeout
         console.log('🔑 Attempting Discord login...');
-        console.log(`🔑 Token length: ${config.discordToken.length} chars`);
 
         const loginTimeout = setTimeout(() => {
             console.error('❌ Discord login TIMED OUT after 30s!');
@@ -120,13 +146,11 @@ function registerEventHandlers() {
         }
     });
 
-    // Error handling
     client.on(Events.Error, (error) => {
         console.error('❌ [Events.Error]:', error.message);
         logger.error('Discord client error', error);
     });
 
-    // Warning handling
     client.on(Events.Warn, (warning) => {
         console.warn('⚠️ [Events.Warn]:', warning);
         logger.warn(warning);
