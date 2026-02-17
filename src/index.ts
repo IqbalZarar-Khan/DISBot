@@ -43,12 +43,35 @@ async function main() {
         // Register event handlers
         registerEventHandlers();
 
-        // Login to Discord
+        // Add raw error listeners BEFORE login to catch gateway errors
+        client.on('error', (err) => {
+            console.error('🔴 [RAW CLIENT ERROR]:', err.message);
+        });
+        client.on('shardError', (err, shardId) => {
+            console.error(`🔴 [SHARD ${shardId} ERROR]:`, err.message);
+        });
+        client.on('shardDisconnect', (event: any, shardId) => {
+            console.error(`🔴 [SHARD ${shardId} DISCONNECT]: Code ${event.code}`);
+            if (event.code === 4014) {
+                console.error('🔴 ❗ DISALLOWED INTENTS — Enable "Server Members Intent" in Discord Developer Portal → Bot → Privileged Gateway Intents');
+            }
+        });
+
+        // Login to Discord with timeout
         console.log('🔑 Attempting Discord login...');
         console.log(`🔑 Token length: ${config.discordToken.length} chars`);
         console.log(`🔑 Token prefix: ${config.discordToken.substring(0, 10)}...`);
 
+        const loginTimeout = setTimeout(() => {
+            console.error('❌ Discord login TIMED OUT after 30s!');
+            console.error('❌ Possible causes:');
+            console.error('   1. "Server Members Intent" NOT enabled in Discord Developer Portal');
+            console.error('   2. Invalid or revoked bot token');
+            console.error('   3. Network connectivity issue');
+        }, 30000);
+
         await client.login(config.discordToken);
+        clearTimeout(loginTimeout);
         console.log('✅ Discord login successful (gateway connected)');
 
     } catch (error) {
@@ -103,11 +126,13 @@ function registerEventHandlers() {
 
     // Error handling
     client.on(Events.Error, (error) => {
+        console.error('❌ [Events.Error]:', error.message);
         logger.error('Discord client error', error);
     });
 
     // Warning handling
     client.on(Events.Warn, (warning) => {
+        console.warn('⚠️ [Events.Warn]:', warning);
         logger.warn(warning);
     });
 }
@@ -123,6 +148,11 @@ process.on('SIGTERM', () => {
     console.log('\n👋 Shutting down bot...');
     client.destroy();
     process.exit(0);
+});
+
+// Catch unhandled rejections
+process.on('unhandledRejection', (reason) => {
+    console.error('🔴 [UNHANDLED REJECTION]:', reason);
 });
 
 // Start the bot
