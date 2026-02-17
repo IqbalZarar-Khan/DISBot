@@ -3,6 +3,7 @@ import { handleSetOwner } from './set-owner';
 import { handleStatus } from './status';
 import { handleSetChannel } from './set-channel';
 import { handleTestAlert } from './test-alert';
+import { execute as handleSetMessage } from './set-message';
 import { logger } from '../../utils/logger';
 
 /**
@@ -27,6 +28,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'test-alert':
                 await handleTestAlert(interaction);
+                break;
+
+            case 'set-message':
+                await handleSetMessage(interaction);
                 break;
 
             default:
