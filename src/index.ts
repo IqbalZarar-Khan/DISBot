@@ -32,6 +32,15 @@ async function main() {
         // Initialize logger
         initLogger(client, config.logChannelId);
 
+        // Start webhook server EARLY so Render detects the open port
+        try {
+            await startWebhookServer(config.webhookPort, config.webhookSecret);
+            console.log(`✅ Webhook server listening on port ${config.webhookPort}`);
+        } catch (error) {
+            console.error('❌ Failed to start webhook server:', error);
+            process.exit(1);
+        }
+
         // Register event handlers
         registerEventHandlers();
 
@@ -52,14 +61,6 @@ function registerEventHandlers() {
     client.once(Events.ClientReady, async (readyClient) => {
         console.log(`✅ Bot logged in as ${readyClient.user.tag}`);
         logger.info(`Bot started successfully as ${readyClient.user.tag}`);
-
-        // Start webhook server
-        try {
-            await startWebhookServer(config.webhookPort, config.webhookSecret);
-            logger.info(`Webhook server started on port ${config.webhookPort}`);
-        } catch (error) {
-            logger.error('Failed to start webhook server', error as Error);
-        }
     });
 
     // Interaction create event (for slash commands)
