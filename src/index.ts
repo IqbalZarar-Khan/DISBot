@@ -35,7 +35,6 @@ async function main() {
         // Start webhook server EARLY so Render detects the open port
         try {
             await startWebhookServer(config.webhookPort, config.webhookSecret);
-            console.log(`✅ Webhook server listening on port ${config.webhookPort}`);
         } catch (error) {
             console.error('❌ Failed to start webhook server:', error);
             process.exit(1);
@@ -45,11 +44,19 @@ async function main() {
         registerEventHandlers();
 
         // Login to Discord
+        console.log('🔑 Attempting Discord login...');
+        console.log(`🔑 Token length: ${config.discordToken.length} chars`);
+        console.log(`🔑 Token prefix: ${config.discordToken.substring(0, 10)}...`);
+
         await client.login(config.discordToken);
+        console.log('✅ Discord login successful (gateway connected)');
 
     } catch (error) {
         console.error('❌ Failed to start bot:', error);
-        process.exit(1);
+        console.error('❌ Error name:', (error as Error).name);
+        console.error('❌ Error message:', (error as Error).message);
+        // Don't exit - keep webhook server alive so we can see logs on Render
+        console.error('⚠️ Bot will stay alive for debugging (webhook server still running)');
     }
 }
 
