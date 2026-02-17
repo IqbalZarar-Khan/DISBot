@@ -4,25 +4,6 @@ import { initSupabase } from './database/supabase';
 import { initDatabase } from './database/db';
 import { initLogger, logger } from './utils/logger';
 import { startWebhookServer } from './webhooks/server';
-import https from 'https';
-
-/**
- * Quick connectivity test to Discord API
- */
-function testDiscordAPI(token: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const req = https.get('https://discord.com/api/v10/gateway/bot', {
-            headers: { 'Authorization': `Bot ${token}` },
-            timeout: 10000
-        }, (res) => {
-            let data = '';
-            res.on('data', (chunk) => data += chunk);
-            res.on('end', () => resolve(`Status ${res.statusCode}: ${data}`));
-        });
-        req.on('error', (err) => reject(err));
-        req.on('timeout', () => { req.destroy(); reject(new Error('Request timed out after 10s')); });
-    });
-}
 
 // Create Discord client
 const client = new Client({
@@ -51,7 +32,7 @@ async function main() {
         // Initialize logger
         initLogger(client, config.logChannelId);
 
-        // Start webhook server EARLY so Render detects the open port
+        // Start webhook server EARLY so Render/hosting detects the open port
         try {
             await startWebhookServer(config.webhookPort, config.webhookSecret);
         } catch (error) {
@@ -62,48 +43,14 @@ async function main() {
         // Register event handlers
         registerEventHandlers();
 
-        // Test Discord API connectivity BEFORE login
-        console.log('🔍 Testing Discord API connectivity...');
-        try {
-            const result = await testDiscordAPI(config.discordToken);
-            console.log(`✅ Discord API test: ${result}`);
-        } catch (err) {
-            console.error('❌ Discord API connectivity test FAILED:', (err as Error).message);
-            console.error('❌ Cannot reach Discord from Render runtime. This is a network issue.');
-        }
-
-        // Raw event listeners for debugging
-        client.on('error', (err) => {
-            console.error('🔴 [CLIENT ERROR]:', err.message);
-        });
-        client.on('shardError', (err, shardId) => {
-            console.error(`🔴 [SHARD ${shardId} ERROR]:`, err.message);
-        });
-        client.on('shardDisconnect', (event: any, shardId) => {
-            console.error(`🔴 [SHARD ${shardId} DISCONNECT]: Code ${event.code}`);
-        });
-        client.on('shardReconnecting', (shardId) => {
-            console.log(`🔄 [SHARD ${shardId} RECONNECTING]`);
-        });
-        client.on('debug', (info) => {
-            console.log(`[DEBUG] ${info}`);
-        });
-
-        // Login to Discord with timeout
+        // Login to Discord
         console.log('🔑 Attempting Discord login...');
-
-        const loginTimeout = setTimeout(() => {
-            console.error('❌ Discord login TIMED OUT after 30s!');
-        }, 30000);
-
         await client.login(config.discordToken);
-        clearTimeout(loginTimeout);
-        console.log('✅ Discord login successful (gateway connected)');
+        console.log('✅ Discord login successful');
 
     } catch (error) {
         console.error('❌ Failed to start bot:', error);
-        console.error('❌ Error message:', (error as Error).message);
-        console.error('⚠️ Bot will stay alive for debugging (webhook server still running)');
+        process.exit(1);
     }
 }
 
@@ -146,13 +93,13 @@ function registerEventHandlers() {
         }
     });
 
+    // Error handling
     client.on(Events.Error, (error) => {
-        console.error('❌ [Events.Error]:', error.message);
         logger.error('Discord client error', error);
     });
 
+    // Warning handling
     client.on(Events.Warn, (warning) => {
-        console.warn('⚠️ [Events.Warn]:', warning);
         logger.warn(warning);
     });
 }
@@ -168,10 +115,6 @@ process.on('SIGTERM', () => {
     console.log('\n👋 Shutting down bot...');
     client.destroy();
     process.exit(0);
-});
-
-process.on('unhandledRejection', (reason) => {
-    console.error('🔴 [UNHANDLED REJECTION]:', reason);
 });
 
 // Start the bot
