@@ -17,7 +17,7 @@ A Discord bot that automates content distribution from Patreon to Discord using 
 ### Advanced Features
 - **💬 Custom Message Templates**: Fully customizable bot messages with placeholder support (`{tier}`, `{title}`, `{url}`, `{user}`)
 - **🗑️ Silent Post Deletion**: Automatically removes deleted posts from database without Discord notifications
-- **🔧 Automated Setup**: One-command Patreon tier configuration fetcher (`npm run setup:patreon`)
+- **🔧 Automated Setup**: One-command Patreon tier fetcher using your Creator Access Token (`npm run setup:patreon`)
 - **⚙️ Configuration-Driven**: 100% configurable via environment variables (no code changes needed!)
 - **🔄 Dynamic Tier System**: Support for any number of custom tiers via JSON configuration
 - **🕵️ Debug Logging**: Comprehensive X-Ray debugging for troubleshooting tier detection
@@ -65,24 +65,19 @@ A Discord bot that automates content distribution from Patreon to Discord using 
 
 5. **Configure your tiers (Automated Method)**
    
-   Run the automated setup tool to fetch your tier configuration:
+   Set your Creator Access Token in `.env`, then run:
    ```bash
    npm run setup:patreon
    ```
    
-   This will output:
-   - Your `PATREON_CAMPAIGN_ID`
-   - A ready-to-use `TIER_CONFIG` JSON string with all tier IDs and prices
+   > **How to get the Creator Access Token:** Go to the [Patreon Clients Portal](https://www.patreon.com/portal/registration/register-clients) → click your app → copy the **"Creator's Access Token"** value.
    
-   Copy the output into your `.env` file and update the `rank` values:
-   ```bash
-   TIER_CONFIG='[{"name":"Diamond","id":"12345678","rank":100,"cents":2500},{"name":"Gold","id":"87654321","rank":75,"cents":1500}]'
-   ```
+   The script will:
+   - Fetch your `PATREON_CAMPAIGN_ID` automatically
+   - Display a formatted table of all your tiers with prices and patron counts
+   - Generate a ready-to-paste `TIER_CONFIG` with **auto-assigned ranks** (highest-priced = 100)
    
-   **Rank Guidelines:**
-   - Higher rank = Higher tier (e.g., 100 for Diamond)
-   - Lower rank = Lower tier (e.g., 25 for Bronze)
-   - Free tier = 0
+   Just copy the output into your `.env` file. Adjust ranks if needed.
 
 6. **Build the project**
    ```bash

@@ -160,32 +160,30 @@ The bot uses a dynamic tier system configured via the `TIER_CONFIG` environment 
 
 ### Automated Setup (Recommended)
 
-The easiest way to configure your tiers is using the automated setup script:
+The easiest way to configure your tiers is using the setup script. It uses your **Creator Access Token** to fetch everything from the Patreon API.
 
-1. **Set your Patreon Access Token** in `.env`:
+1. **Get your Creator Access Token**:
+   - Go to [Patreon Clients Portal](https://www.patreon.com/portal/registration/register-clients)
+   - Click on your client (or create one)
+   - Copy the **"Creator's Access Token"** value
+
+2. **Set your token** in `.env`:
    ```bash
-   PATREON_ACCESS_TOKEN=your_access_token_from_step_2
+   PATREON_ACCESS_TOKEN=your_creator_access_token
    ```
 
-2. **Run the setup script**:
+3. **Run the setup script**:
    ```bash
    npm run setup:patreon
    ```
 
-3. **Copy the output** to your `.env` file:
-   ```
-   ✅ Found Campaign ID: 12345678
-   ✅ Found 4 tiers
-   
-   📋 Add these to your .env file:
-   
-   PATREON_CAMPAIGN_ID=12345678
-   TIER_CONFIG='[{"name":"Diamond","id":"123","rank":100,"cents":2500},...]'
-   ```
+4. **Copy the output** to your `.env` file. The script will display:
+   - A formatted table of all your tiers (names, prices, patron counts, IDs)
+   - Ready-to-paste `PATREON_CAMPAIGN_ID` and `TIER_CONFIG` values
+   - **Auto-assigned ranks** based on price (highest-priced tier = rank 100)
 
-4. **Adjust ranks** (optional):
-   - The script assigns placeholder ranks (100, 75, 50, 25, 0)
-   - You can manually adjust these in your `.env` if needed
+5. **Adjust ranks** (optional):
+   - Ranks are auto-assigned but you can tweak them in `.env` if needed
    - Higher rank = higher tier priority
 
 ### Manual Setup (Alternative)
