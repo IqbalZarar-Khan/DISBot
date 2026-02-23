@@ -4,57 +4,49 @@ Complete guide for deploying your Patreon-Discord Bot to various hosting platfor
 
 ## 📋 Table of Contents
 
-- [Render.com (Recommended)](#rendercom-recommended)
-- [Railway.app](#railwayapp)
+- [Railway.app (Recommended)](#railwayapp-recommended)
+- [Render.com](#rendercom)
 - [Heroku](#heroku)
 - [Local Hosting](#local-hosting-with-ngrok)
 - [VPS Deployment](#vps-deployment)
 
 ---
 
-## Render.com (Recommended)
+## Railway.app (Recommended)
 
-Deploy in ~10 minutes with automatic HTTPS!
+Railway is the **recommended** hosting platform for this bot. It provides dedicated IPs, fast deploys, and no Discord rate-limiting issues.
 
-### Why Render.com?
+### Why Railway?
 
-✅ **Free tier**: 750 hours/month (enough for 24/7 operation)  
-✅ **Automatic HTTPS**: Get `https://yourbot.onrender.com` instantly  
-✅ **No credit card required** for free tier  
-✅ **Auto-deploy from GitHub**: Push code → Auto-deploy  
-✅ **Built-in environment variables**  
+✅ **No Discord rate-limiting** — dedicated IPs, no shared IP blocking  
+✅ **$5 free credit/month** (enough for 24/7 operation)  
+✅ **Automatic HTTPS** with free SSL  
+✅ **GitHub integration** — push code → auto-deploy  
+✅ **Fast deploys** (~2-3 minutes)  
+✅ **Dynamic `PORT` handling** — the bot auto-detects Railway's assigned port  
 
 ### Prerequisites
 
-- GitHub account
-- Your bot code pushed to GitHub
+- GitHub account with your bot code pushed
 - Discord bot token
 - Patreon OAuth credentials
 - Supabase account
 
-### Step 1: Create Render Account
+### Step 1: Create Railway Account
 
-1. Go to [render.com](https://render.com)
-2. Click **Sign Up**
-3. Sign up with GitHub (recommended)
+1. Go to [railway.app](https://railway.app)
+2. Sign up with GitHub (recommended)
 
-### Step 2: Create New Web Service
+### Step 2: Create New Project
 
-1. Click **New +** → **Web Service**
-2. Connect your GitHub repository
-3. Select your `DISBot` repository
-4. Configure:
-   - **Name**: `disbot` (or your choice)
-   - **Region**: Choose closest to you
-   - **Branch**: `main`
-   - **Runtime**: `Node`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
-   - **Instance Type**: `Free`
+1. Click **New Project**
+2. Select **Deploy from GitHub repo**
+3. Choose your `DISBot` repository
+4. Railway auto-detects the `railway.json` config file
 
 ### Step 3: Add Environment Variables
 
-Click **Environment** tab and add all variables from your `.env` file:
+Click on your service → **Variables** tab → add all variables:
 
 ```
 DISCORD_TOKEN=your_discord_bot_token
@@ -66,80 +58,62 @@ PATREON_ACCESS_TOKEN=your_patreon_access_token
 PATREON_REFRESH_TOKEN=your_patreon_refresh_token
 PATREON_CAMPAIGN_ID=your_campaign_id
 WEBHOOK_SECRET=your_webhook_secret
-WEBHOOK_PORT=10000
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_supabase_key
 TIER_CONFIG='[{"name":"Diamond","id":"123","rank":100,"cents":2500}]'
+NODE_ENV=production
 ```
 
-**Important**: Set `WEBHOOK_PORT=10000` (Render's default port)
+> **Note**: Do NOT set `PORT` or `WEBHOOK_PORT` — Railway dynamically assigns a port via the `PORT` environment variable, and the bot auto-detects it.
 
-### Step 4: Deploy
+### Step 4: Generate a Domain
 
-1. Click **Create Web Service**
-2. Wait for deployment (2-5 minutes)
-3. Copy your webhook URL: `https://yourbot.onrender.com`
+1. Go to **Settings** → **Networking**
+2. Click **Generate Domain**
+3. Copy your URL: `https://your-app.up.railway.app`
 
 ### Step 5: Configure Patreon Webhook
 
 1. Go to [Patreon Webhooks](https://www.patreon.com/portal/registration/register-webhooks)
-2. Add webhook: `https://yourbot.onrender.com/webhook`
-3. Select events: `members:create`, `members:update`, `posts:publish`, `posts:update`, `posts:delete`
-4. Save
+2. Add webhook: `https://your-app.up.railway.app/webhooks/patreon`
+3. Select events: `members:create`, `members:update`, `members:delete`, `posts:publish`, `posts:update`, `posts:delete`
+4. Set the secret to the same value as your `WEBHOOK_SECRET`
+5. Save
 
 ### Step 6: Deploy Slash Commands
 
-Use Render's **Shell** feature:
-1. Go to your service → **Shell** tab
-2. Run: `npm run deploy-commands`
+Use Railway's terminal or run locally:
+```bash
+npm run deploy-commands
+```
 
 ✅ **Done!** Your bot is now live 24/7!
 
 ---
 
-## Railway.app
+## Render.com
 
-Modern platform with excellent developer experience.
+> ⚠️ **Important**: Render's **free tier does NOT work** for Discord bots. The free tier uses shared IP addresses that get rate-limited by Discord's Cloudflare protection (HTTP 429, error code 1015), causing the bot's gateway connection to hang indefinitely. **You must use a paid Render plan** ($7/month+) or choose another platform.
 
-### Why Railway?
+### Why Render (Paid Plan)?
 
-✅ **$5 free credit/month** (enough for small bots)  
-✅ **Automatic HTTPS**  
-✅ **GitHub integration**  
-✅ **Simple configuration**  
+✅ **Automatic HTTPS**: Get `https://yourbot.onrender.com` instantly  
+✅ **Auto-deploy from GitHub**: Push code → Auto-deploy  
+✅ **Built-in environment variables**  
+⚠️ **Free tier**: Does NOT work for Discord bots (shared IP rate-limiting)  
 
 ### Deployment Steps
 
-1. **Create Account**
-   - Go to [railway.app](https://railway.app)
-   - Sign up with GitHub
-
-2. **Create New Project**
-   - Click **New Project**
-   - Select **Deploy from GitHub repo**
-   - Choose your `DISBot` repository
-
-3. **Configure Environment Variables**
-   - Click on your service
-   - Go to **Variables** tab
-   - Add all environment variables from `.env`
-   - Set `PORT=3000` (Railway auto-assigns, but we use 3000)
-
-4. **Configure Build**
-   - Railway auto-detects Node.js
-   - Build command: `npm install && npm run build`
-   - Start command: `npm start`
-
-5. **Generate Domain**
-   - Go to **Settings** → **Networking**
-   - Click **Generate Domain**
-   - Copy your URL: `https://yourbot.up.railway.app`
-
-6. **Configure Patreon Webhook**
-   - Use your Railway URL: `https://yourbot.up.railway.app/webhook`
-
-7. **Deploy Commands**
-   - Use Railway's terminal or deploy locally with `npm run deploy-commands`
+1. Go to [render.com](https://render.com) → Sign up with GitHub
+2. Click **New +** → **Web Service** → Connect your repo
+3. Configure:
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+   - **Instance Type**: **Starter** ($7/mo) or higher — ⚠️ do NOT use Free
+4. Add environment variables (set `WEBHOOK_PORT=10000` for Render)
+5. Deploy and copy your webhook URL
+6. Configure Patreon webhook: `https://yourbot.onrender.com/webhooks/patreon`
+7. Deploy slash commands via Render's Shell tab: `npm run deploy-commands`
 
 ---
 
@@ -238,7 +212,7 @@ Perfect for development and testing.
 
 ### Prerequisites
 
-- Node.js 18+ installed
+- Node.js 20+ installed
 - ngrok account (free)
 
 ### Step 1: Install ngrok
@@ -330,11 +304,11 @@ Full control with your own server.
    apt update && apt upgrade -y
    ```
 
-4. **Install Node.js 18+**
+4. **Install Node.js 20+**
    ```bash
-   curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
    apt install -y nodejs
-   node --version  # Should show v18.x or higher
+   node --version  # Should show v20.x or higher
    ```
 
 5. **Install PM2 (Process Manager)**
@@ -502,7 +476,7 @@ After deploying to any platform:
 - Check logs for errors
 - Verify all environment variables are set
 - Ensure `WEBHOOK_PORT` matches platform requirements
-- Check Node.js version (must be 18+)
+- Check Node.js version (must be 20+)
 
 ### Webhooks Not Working
 
@@ -522,26 +496,27 @@ After deploying to any platform:
 
 ## 📊 Platform Comparison
 
-| Platform | Free Tier | HTTPS | Ease | Best For |
-|----------|-----------|-------|------|----------|
-| **Render** | 750h/mo | ✅ Auto | ⭐⭐⭐⭐⭐ | Production |
-| **Railway** | $5 credit | ✅ Auto | ⭐⭐⭐⭐⭐ | Production |
-| **Heroku** | 550-1000h | ✅ Auto | ⭐⭐⭐⭐ | Production |
-| **Local + ngrok** | Limited | ✅ Auto | ⭐⭐⭐ | Development |
-| **VPS + Domain** | Varies | ✅ Manual | ⭐⭐ | Full Control |
-| **VPS + ngrok** | Varies | ✅ Auto | ⭐⭐⭐ | Budget VPS |
+| Platform | Discord Compatible | Free Tier | HTTPS | Ease | Best For |
+|----------|-------------------|-----------|-------|------|----------|
+| **Railway** | ✅ Yes | $5 credit/mo | ✅ Auto | ⭐⭐⭐⭐⭐ | **Recommended** |
+| **Render (Paid)** | ✅ Yes | ❌ $7/mo+ | ✅ Auto | ⭐⭐⭐⭐⭐ | Production |
+| **Render (Free)** | ❌ **No** | Free | ✅ Auto | — | ⚠️ Blocked by Discord |
+| **Heroku** | ✅ Yes | 550-1000h | ✅ Auto | ⭐⭐⭐⭐ | Production |
+| **Local + ngrok** | ✅ Yes | Limited | ✅ Auto | ⭐⭐⭐ | Development |
+| **VPS + Domain** | ✅ Yes | Varies | ✅ Manual | ⭐⭐ | Full Control |
+| **VPS + ngrok** | ✅ Yes | Varies | ✅ Auto | ⭐⭐⭐ | Budget VPS |
 
 ---
 
 ## 💡 Recommendations
 
-**For Beginners**: Start with **Render.com** - easiest setup, free tier, automatic HTTPS.
+**For Everyone**: Start with **Railway.app** — best developer experience, no Discord rate-limiting, generous free tier.
 
-**For Developers**: **Railway.app** - best developer experience, generous free tier.
+**For Production**: **VPS with Domain** — full control, best performance, professional setup.
 
-**For Production**: **VPS with Domain** - full control, best performance, professional setup.
+**For Testing**: **Local + ngrok** — instant setup, perfect for development.
 
-**For Testing**: **Local + ngrok** - instant setup, perfect for development.
+> ⚠️ **Avoid Render's free tier** for Discord bots. The shared IPs are rate-limited by Discord/Cloudflare.
 
 ---
 

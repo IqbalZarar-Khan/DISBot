@@ -25,7 +25,7 @@ A Discord bot that automates content distribution from Patreon to Discord using 
 ## 📚 Documentation
 
 - **[Setup Guide](SETUP.md)** - Detailed setup instructions for Discord, Patreon, and Supabase
-- **[Deployment Guide](DEPLOYMENT.md)** - Deploy to Render, Railway, Heroku, VPS, or run locally
+- **[Deployment Guide](DEPLOYMENT.md)** - Deploy to Railway, Render, Heroku, VPS, or run locally
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to this project
 - **[Code of Conduct](CPDSC.md)** - Community guidelines and standards
 
@@ -33,11 +33,11 @@ A Discord bot that automates content distribution from Patreon to Discord using 
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 20+ and npm
 - A Discord bot token ([Create one here](https://discord.com/developers/applications))
 - A Patreon Creator account with OAuth app ([Setup guide](https://www.patreon.com/portal/registration/register-clients))
 - A Supabase account ([Sign up here](https://supabase.com))
-- A server with HTTPS support for webhooks (Render, Railway, ngrok, etc.)
+- A server with HTTPS support for webhooks (Railway, Render, ngrok, etc.)
 
 ### Installation
 
@@ -176,13 +176,17 @@ TIER_CONFIG='[{"name":"Captain","id":"123","rank":100},{"name":"Crew","id":"456"
    - Embed Links
    - Use Slash Commands
 
-2. **Configure tier mappings** using `/admin set-channel`:
+2. **Enable Privileged Gateway Intents** in the [Discord Developer Portal](https://discord.com/developers/applications):
+   - ✅ **Server Members Intent** (required)
+   - ✅ Message Content Intent (optional)
+
+3. **Configure tier mappings** using `/admin set-channel`:
    ```
    /admin set-channel tier_name:Tier1 channel:#tier1-alerts
    /admin set-channel tier_name:Tier2 channel:#tier2-alerts
    ```
 
-3. **Test the setup**:
+4. **Test the setup**:
    ```
    /admin status
    /admin test-alert tier_name:Tier1
@@ -276,22 +280,53 @@ Customize all bot messages using the `/admin set-message` command:
 src/
 ├── commands/           # Slash command handlers
 │   ├── admin/         # Admin-only commands
+│   │   ├── handler.ts    # Command router
+│   │   ├── set-channel.ts
+│   │   ├── set-message.ts
+│   │   ├── set-owner.ts
+│   │   ├── status.ts
+│   │   └── test-alert.ts
 │   └── deploy-commands.ts
 ├── database/          # Database layer (Supabase)
 │   ├── db.ts         # Database operations
-│   └── schema.ts     # TypeScript interfaces
+│   ├── schema.ts     # TypeScript interfaces
+│   └── supabase.ts   # Supabase client
 ├── middleware/        # Authorization middleware
+│   └── adminCheck.ts
 ├── utils/            # Utility functions
-│   ├── embedBuilder.ts
-│   ├── logger.ts
-│   └── tierRanking.ts  # Dynamic tier system
+│   ├── embedBuilder.ts   # Discord embed creation
+│   ├── errorHandler.ts   # Error handling
+│   ├── formatter.ts      # Message template formatting
+│   ├── logger.ts         # Logging (console + Discord)
+│   ├── testHelpers.ts    # Webhook test utilities
+│   └── tierRanking.ts    # Dynamic tier system
 ├── webhooks/         # Webhook server and handlers
 │   ├── handlers/     # Event-specific handlers
-│   ├── server.ts
-│   └── verify.ts
+│   │   ├── members-create.ts
+│   │   ├── members-update.ts
+│   │   ├── members-delete.ts
+│   │   ├── members-pledge-create.ts
+│   │   ├── members-pledge-update.ts
+│   │   ├── members-pledge-delete.ts
+│   │   ├── posts-publish.ts
+│   │   ├── posts-update.ts
+│   │   └── posts-delete.ts
+│   ├── server.ts     # Express webhook server
+│   └── verify.ts     # HMAC signature verification
 ├── config.ts         # Configuration management
 └── index.ts          # Main entry point
 ```
+
+### Architecture
+
+The bot follows an **early port-binding** architecture to work correctly on cloud platforms:
+
+1. **Supabase initialization** → Database connection test
+2. **Webhook server starts** → Binds to `PORT` immediately (required by Railway/Render)
+3. **Discord client login** → Connects to Discord gateway
+4. **Ready** → Bot is online and listening for commands + webhooks
+
+This startup order ensures cloud platforms detect the open port before the Discord gateway connection completes.
 
 ### Scripts
 
@@ -300,17 +335,33 @@ src/
 - `npm start` - Run production build
 - `npm run deploy-commands` - Register slash commands
 - `npm test` - Run tests
+- `npm run setup:patreon` - Auto-fetch Patreon tier configuration
 
 ## 🚢 Deployment
 
-### Render Deployment
+### ⚠️ Important: Hosting Compatibility
 
-1. Create a new Web Service on Render
-2. Connect your GitHub repository
-3. Set environment variables in Render dashboard
-4. Deploy!
+> **Render.com free tier does NOT work for Discord bots.** Render's free tier uses shared IP addresses that are rate-limited by Discord's Cloudflare protection (HTTP 429, error code 1015). The bot's gateway connection will hang indefinitely. Use Railway, a paid Render plan, or another platform instead.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+### Railway (Recommended)
+
+Railway is the recommended hosting platform for this bot.
+
+1. Go to [railway.app](https://railway.app) → Sign in with GitHub
+2. **New Project** → **Deploy from GitHub repo** → select your repo
+3. Add environment variables in the **Variables** tab
+4. Railway auto-detects the `railway.json` config and deploys
+5. Generate a domain in **Settings** → **Networking**
+6. Update your Patreon webhook URL to `https://your-app.up.railway.app/webhooks/patreon`
+
+**Why Railway?**
+- ✅ Automatic HTTPS with free SSL
+- ✅ No shared IP rate-limiting issues with Discord
+- ✅ $5 free credit/month
+- ✅ Fast deploys (~2-3 minutes)
+- ✅ Auto-deploy from GitHub pushes
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for all deployment options.
 
 ### Docker Deployment
 
@@ -318,6 +369,8 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
 docker build -t patreon-bot .
 docker run -d --env-file .env patreon-bot
 ```
+
+The Dockerfile uses a multi-stage build with Node.js 20 Alpine for a lean production image.
 
 ## 🔐 Security
 
@@ -378,39 +431,53 @@ Sometimes, when you only change the "Who can access this post?" settings (e.g., 
 
 ### ☁️ Deployment
 
-**Q: Can I run this on cloud services like Render or Heroku?**
+**Q: Which hosting platform should I use?**
 
-A: Yes. The project follows "12-Factor App" principles, meaning all configuration is handled via Environment Variables, making it cloud-ready.
-- **Database**: The bot uses Supabase (PostgreSQL), which is a cloud database service. Your data persists across deployments and restarts automatically.
-- **Recommended**: See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step deployment instructions.
+A: **Railway** is recommended. Here's why:
+
+| Platform | Discord Compatible | Free Tier | HTTPS | Notes |
+|----------|-------------------|-----------|-------|-------|
+| **Railway** | ✅ Yes | $5 credit/mo | ✅ Auto | **Recommended** |
+| **Render (Paid)** | ✅ Yes | ❌ $7/mo+ | ✅ Auto | Works on paid plans |
+| **Render (Free)** | ❌ **No** | Free | ✅ Auto | ⚠️ Shared IPs are blocked by Discord |
+| **Heroku** | ✅ Yes | 550-1000h | ✅ Auto | Requires credit card |
+| **VPS** | ✅ Yes | Varies | Manual | Full control |
+| **Local + ngrok** | ✅ Yes | Limited | ✅ Auto | Development only |
+
+> ⚠️ **Render's free tier does NOT work** — Discord/Cloudflare rate-limits the shared IP addresses (HTTP 429, error 1015), causing the bot's gateway connection to hang indefinitely.
 
 **Q: What do I need to get started?**
 
 A: You need:
-- Node.js 18+
+- Node.js 20+
 - A Discord Bot Token ([Create one here](https://discord.com/developers/applications))
 - A Patreon Creator account with OAuth app
 - A Supabase account (free tier available)
-- A server with HTTPS support for webhooks (Render, Railway, VPS, etc.)
+- A server with HTTPS support for webhooks (Railway, VPS, etc.)
 
 See [SETUP.md](SETUP.md) for detailed setup instructions.
 
 ## 🆕 Recent Updates
 
-### Latest Features (2026)
+### Latest (Feb 2026)
+- ✅ **Railway Deployment**: Railway is now the recommended hosting platform
+- ✅ **Node.js 20**: Upgraded from Node 18 to Node 20 (required by Supabase SDK)
+- ✅ **Dockerfile Upgrade**: Multi-stage build with Node 20 Alpine, proper dev/prod dependency separation
+- ✅ **Early Port Binding**: Webhook server starts before Discord login to prevent cloud platform timeouts
+- ✅ **`set-message` Command**: Added missing handler for customizing bot message templates
+- ✅ **Render Compatibility Note**: Documented that Render's free tier is blocked by Discord's Cloudflare
+
+### Core Features
 - ✅ **Hybrid Broadcast System**: Sends alerts to ALL channels when posts are released to multiple tiers simultaneously
 - ✅ **Custom Message Templates**: Fully customizable bot messages with placeholder support (`/admin set-message`)
 - ✅ **Silent Post Deletion**: Automatically removes deleted posts from database without Discord notifications
 - ✅ **Automated Patreon Setup**: One-command tier configuration fetcher (`npm run setup:patreon`)
 - ✅ **X-Ray Debug Logging**: Comprehensive debugging for database operations and tier detection
 - ✅ **Edit and Republish Fix**: Correctly handles Patreon's "Edit and Republish" workflow
-
-### Core Features
 - ✅ **Dynamic Tier Configuration**: Configure tiers via `TIER_CONFIG` environment variable
 - ✅ **Tier ID Translation**: Automatic conversion of Patreon tier IDs to tier names
-- ✅ **Supabase Integration**: Migrated from SQLite to Supabase for persistent storage
-- ✅ **Enhanced Logging**: Comprehensive debug logging for tier detection
-- ✅ **Fallback Mechanisms**: Multiple methods to detect post tiers
+- ✅ **Supabase Integration**: Persistent PostgreSQL storage via Supabase
+- ✅ **Fallback Mechanisms**: Multiple methods to detect post tiers (ID → Cents → Title)
 
 ## 📝 License
 

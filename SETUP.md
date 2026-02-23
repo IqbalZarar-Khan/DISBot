@@ -31,7 +31,7 @@ This guide will walk you through setting up the Patreon-Discord Content Distribu
 3. Under **"Token"**, click **"Reset Token"** and copy it
    - ⚠️ **Save this token** - you'll need it for `DISCORD_TOKEN`
 4. Enable these **Privileged Gateway Intents**:
-   - ✅ Server Members Intent
+   - ✅ **Server Members Intent** (required — bot will fail to connect without this)
    - ✅ Message Content Intent (optional)
 
 ### Invite Bot to Your Server
@@ -306,9 +306,9 @@ openssl rand -hex 32
    ```
 4. Copy the HTTPS URL (e.g., `https://abc123.ngrok.io`)
 
-### Option B: Production (Render.com)
+### Option B: Production (Railway or Render)
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions. **Railway** is the recommended platform.
 
 ### Register Webhook with Patreon
 
@@ -462,3 +462,5 @@ Your bot is now ready to automatically distribute content based on Patreon tiers
 - **Report Issues**: Open an issue on GitHub
 
 For more help, check the [README.md](README.md) or open an issue on GitHub.
+
+> **Note**: This bot requires **Node.js 20+** and the **Server Members Intent** enabled in the Discord Developer Portal.
