@@ -226,8 +226,55 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                 logger.info(`Post tier increased (${oldTierName} → ${newTierName}): ${title}`);
             }
         } else {
-            // Post not tracked yet - treat as new post
-            logger.warn(`Post update received for untracked post: ${postId}`);
+            // Post not tracked yet — treat as a newly discovered update
+            logger.info(`📥 Untracked post update received — treating as new update: ${title} (${postId})`);
+
+            if (newTierRank > 0) {
+                // Extract tags
+                const tags: string[] = [];
+                if (attributes.tags && Array.isArray(attributes.tags)) {
+                    tags.push(...attributes.tags);
+                }
+
+                // Send "Update" alert to the detected tier channel
+                const tierMapping = await getTierMappingByName(newTierName);
+
+                if (tierMapping) {
+                    try {
+                        const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
+
+                        if (channel) {
+                            // Fetch custom template (fall back to update-style message)
+                            const dbTemplate = await getMessageTemplate('post_waterfall');
+                            const template = dbTemplate || "✨ **Updated:** {title} is now available for **{tier}** members!\n{url}";
+
+                            const messageText = formatMessage(template, {
+                                tier: newTierName,
+                                title: title,
+                                url: url
+                            });
+
+                            const embed = createPostEmbed({
+                                title,
+                                url,
+                                tierName: newTierName,
+                                tags: tags.length > 0 ? tags : undefined,
+                                isUpdate: true
+                            });
+                            embed.setDescription(messageText);
+
+                            await channel.send({ embeds: [embed] });
+                            logger.info(`✅ Update alert sent to ${newTierName} channel for untracked post: ${title}`);
+                        }
+                    } catch (error) {
+                        logger.error(`Failed to send update alert to ${newTierName} channel`, error as Error);
+                    }
+                } else {
+                    logger.warn(`No channel mapping found for tier: ${newTierName}`);
+                }
+            } else {
+                logger.info(`Untracked post has no valid tier (rank 0) — skipping notification`);
+            }
         }
 
         // Update post in database
