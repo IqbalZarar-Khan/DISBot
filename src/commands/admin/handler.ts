@@ -7,6 +7,7 @@ import { execute as handleSetMessage } from './set-message';
 import { handleSyncTiers } from './sync-tiers';
 import { handleSetup } from './setup';
 import { handleStats } from './stats';
+import { handleSetEventChannel } from './set-event-channel';
 import { logger } from '../../utils/logger';
 
 /**
@@ -47,6 +48,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'stats':
                 await handleStats(interaction);
+                break;
+
+            case 'set-event-channel':
+                await handleSetEventChannel(interaction);
                 break;
 
             default:

@@ -4,7 +4,7 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createMemberEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { config } from '../../config';
+import { getEventChannel } from '../../commands/admin/set-event-channel';
 
 /**
  * Handle members:create webhook event
@@ -50,10 +50,11 @@ export async function handleMembersCreate(payload: WebhookPayload): Promise<void
 
         await upsertTrackedMember(trackedMember);
 
-        // Send welcome alert to log channel (if configured)
-        if (config.logChannelId) {
+        // Send welcome alert to event-routed channel
+        const eventChannelId = await getEventChannel('member_join');
+        if (eventChannelId) {
             try {
-                const channel = await client.channels.fetch(config.logChannelId) as TextChannel;
+                const channel = await client.channels.fetch(eventChannelId) as TextChannel;
                 if (channel) {
                     const embed = createMemberEmbed({
                         fullName,

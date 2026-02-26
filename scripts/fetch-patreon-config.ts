@@ -4,23 +4,21 @@
  * Patreon Setup Script
  *
  * Fetches your Campaign ID and Tier configuration from the Patreon API
- * using your Creator Access Token.
+ * using your Creator Access Token, and writes them directly to Supabase.
  *
  * Usage:
  *   npm run setup:patreon
  *
  * Prerequisites:
- *   Set PATREON_ACCESS_TOKEN in your .env file.
- *
- *   How to get it:
- *     1. Go to https://www.patreon.com/portal/registration/register-clients
- *     2. Click on your existing client (or create one first)
- *     3. Copy the "Creator's Access Token" value
- *     4. Paste it into your .env: PATREON_ACCESS_TOKEN=<your_token>
+ *   Set these in your .env file:
+ *     - PATREON_ACCESS_TOKEN (from Patreon Developer Portal)
+ *     - SUPABASE_URL (your Supabase project URL)
+ *     - SUPABASE_KEY (your Supabase service role key)
  */
 
 import * as dotenv from 'dotenv';
 import axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
@@ -46,7 +44,7 @@ async function main(): Promise<void> {
 
     console.log('');
     console.log('═══════════════════════════════════════════════');
-    console.log('   🔧  Patreon Setup — Fetch Tier Config');
+    console.log('   🔧  Patreon Setup — Fetch & Sync Tiers');
     console.log('═══════════════════════════════════════════════');
     console.log('');
 
@@ -121,7 +119,6 @@ async function main(): Promise<void> {
     console.log('   └───┴──────────────────────┴──────────┴─────────┴────────────────┘');
 
     // ── 3. Generate TIER_CONFIG with auto-assigned ranks ─────────────
-    // Highest-priced tier = rank 100, then evenly spaced down
     const step = tiers.length > 1 ? Math.floor(100 / (tiers.length - 1)) : 0;
 
     const tierConfig = tiers.map((tier: any, i: number) => ({
@@ -133,25 +130,69 @@ async function main(): Promise<void> {
 
     const json = JSON.stringify(tierConfig);
 
-    // ── 4. Output ready-to-copy .env values ──────────────────────────
+    // ── 4. Write to Supabase (if configured) ─────────────────────────
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+        console.log('');
+        console.log('📦 Writing tier config to Supabase...');
+
+        try {
+            const supabase = createClient(supabaseUrl, supabaseKey);
+
+            // Save TIER_CONFIG and CAMPAIGN_ID to bot_config
+            await supabase.from('bot_config').upsert([
+                { key: 'TIER_CONFIG', value: json },
+                { key: 'PATREON_CAMPAIGN_ID', value: campaignId },
+            ], { onConflict: 'key' });
+
+            // Save each tier to tier_mappings (preserve existing channel_id)
+            for (const tier of tierConfig) {
+                const { data: existing } = await supabase
+                    .from('tier_mappings')
+                    .select('channel_id')
+                    .eq('tier_id', tier.id)
+                    .single();
+
+                await supabase.from('tier_mappings').upsert({
+                    tier_id: tier.id,
+                    tier_name: tier.name,
+                    tier_rank: tier.rank,
+                    channel_id: existing?.channel_id || '',
+                }, { onConflict: 'tier_id' });
+            }
+
+            console.log(`✅ Wrote ${tierConfig.length} tier(s) to Supabase tier_mappings table`);
+            console.log(`✅ Saved TIER_CONFIG and CAMPAIGN_ID to bot_config table`);
+            console.log('');
+            console.log('   🎉 Database is fully configured — no .env edits needed for tiers!');
+            console.log('   💡 Use /admin sync-tiers in Discord to refresh tiers later.');
+
+        } catch (err: any) {
+            console.error(`⚠️  Failed to write to Supabase: ${err.message}`);
+            console.error('   Falling back to manual .env output below.');
+        }
+    } else {
+        console.log('');
+        console.log('⚠️  SUPABASE_URL / SUPABASE_KEY not set — skipping database write.');
+        console.log('   Set them in .env to auto-sync tiers to Supabase.');
+    }
+
+    // ── 5. Always print .env values (for reference or fallback) ──────
     console.log('');
     console.log('═══════════════════════════════════════════════');
-    console.log('   📋  Copy these into your .env file:');
+    console.log('   📋  .env Reference (add PATREON_CAMPAIGN_ID):');
     console.log('═══════════════════════════════════════════════');
     console.log('');
     console.log(`PATREON_CAMPAIGN_ID=${campaignId}`);
     console.log('');
     console.log(`TIER_CONFIG='${json}'`);
     console.log('');
-    console.log('═══════════════════════════════════════════════');
-    console.log('');
     console.log('   Auto-assigned ranks (highest price = 100):');
     tierConfig.forEach((t: any) => {
         console.log(`     ${t.name}: rank ${t.rank}  ($${(t.cents / 100).toFixed(2)})`);
     });
-    console.log('');
-    console.log('   💡 Adjust ranks in .env if the order isn\'t right.');
-    console.log('   💡 After updating .env, restart the bot.');
     console.log('');
 }
 

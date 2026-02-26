@@ -4,8 +4,8 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createMemberEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { config } from '../../config';
 import { getTierRank } from '../../utils/tierRanking';
+import { getEventChannel } from '../../commands/admin/set-event-channel';
 
 /**
  * Handle members:pledge:update webhook event
@@ -72,20 +72,24 @@ export async function handleMembersPledgeUpdate(payload: WebhookPayload): Promis
         await upsertTrackedMember(trackedMember);
 
         // Send tier change notification if tier changed
-        if (tierChanged && config.logChannelId) {
-            try {
-                const channel = await client.channels.fetch(config.logChannelId) as TextChannel;
-                if (channel) {
-                    const embed = createMemberEmbed({
-                        fullName,
-                        tierName,
-                        isUpgrade
-                    });
+        if (tierChanged) {
+            const eventType = isUpgrade ? 'pledge_upgrade' : 'pledge_downgrade';
+            const eventChannelId = await getEventChannel(eventType);
+            if (eventChannelId) {
+                try {
+                    const channel = await client.channels.fetch(eventChannelId) as TextChannel;
+                    if (channel) {
+                        const embed = createMemberEmbed({
+                            fullName,
+                            tierName,
+                            isUpgrade
+                        });
 
-                    await channel.send({ embeds: [embed] });
+                        await channel.send({ embeds: [embed] });
+                    }
+                } catch (error) {
+                    logger.warn('Failed to send pledge update alert', error as Error);
                 }
-            } catch (error) {
-                logger.warn('Failed to send pledge update alert', error as Error);
             }
         }
 

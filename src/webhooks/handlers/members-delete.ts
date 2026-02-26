@@ -3,7 +3,7 @@ import { getTrackedMember } from '../../database/db';
 import { logger } from '../../utils/logger';
 import { client } from '../../index';
 import { TextChannel, EmbedBuilder } from 'discord.js';
-import { config } from '../../config';
+import { getEventChannel } from '../../commands/admin/set-event-channel';
 
 /**
  * Handle members:delete webhook event
@@ -19,10 +19,11 @@ export async function handleMembersDelete(payload: WebhookPayload): Promise<void
         if (trackedMember) {
             logger.info(`Member departed: ${trackedMember.full_name}`);
 
-            // Send departure log to admin channel
-            if (config.logChannelId) {
+            // Send departure log to event-routed channel
+            const eventChannelId = await getEventChannel('member_leave');
+            if (eventChannelId) {
                 try {
-                    const channel = await client.channels.fetch(config.logChannelId) as TextChannel;
+                    const channel = await client.channels.fetch(eventChannelId) as TextChannel;
                     if (channel) {
                         const embed = new EmbedBuilder()
                             .setTitle('👋 Member Departed')

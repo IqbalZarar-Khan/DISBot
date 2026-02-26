@@ -43,6 +43,31 @@ const commands = [
         )
         .addSubcommand(subcommand =>
             subcommand
+                .setName('set-event-channel')
+                .setDescription('Route member events (joins, departures, upgrades) to specific channels')
+                .addStringOption(option =>
+                    option
+                        .setName('event')
+                        .setDescription('The event type to route')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: '👋 New Patron Joins', value: 'member_join' },
+                            { name: '🚪 Patron Departures', value: 'member_leave' },
+                            { name: '⬆️ Tier Upgrades', value: 'pledge_upgrade' },
+                            { name: '⬇️ Tier Downgrades', value: 'pledge_downgrade' },
+                            { name: '💳 New Pledges', value: 'pledge_create' },
+                            { name: '❌ Pledge Cancellations', value: 'pledge_delete' }
+                        )
+                )
+                .addChannelOption(option =>
+                    option
+                        .setName('channel')
+                        .setDescription('The Discord channel for this event type')
+                        .setRequired(true)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
                 .setName('set-channel')
                 .setDescription('Map a Patreon tier to a Discord channel')
                 .addStringOption(option =>
