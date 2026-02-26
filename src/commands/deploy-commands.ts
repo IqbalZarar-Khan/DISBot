@@ -28,20 +28,23 @@ const commands = [
         )
         .addSubcommand(subcommand =>
             subcommand
+                .setName('sync-tiers')
+                .setDescription('Fetch tiers from Patreon and sync to database (no restart needed)')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('setup')
+                .setDescription('Interactive tier-to-channel mapping with dropdown menus')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
                 .setName('set-channel')
                 .setDescription('Map a Patreon tier to a Discord channel')
                 .addStringOption(option =>
                     option
                         .setName('tier_name')
-                        .setDescription('Tier name (e.g., Diamond, Gold, Silver, Bronze, Free)')
+                        .setDescription('Tier name (must match your TIER_CONFIG or synced tiers)')
                         .setRequired(true)
-                        .addChoices(
-                            { name: 'Diamond', value: 'Diamond' },
-                            { name: 'Gold', value: 'Gold' },
-                            { name: 'Silver', value: 'Silver' },
-                            { name: 'Bronze', value: 'Bronze' },
-                            { name: 'Free', value: 'Free' }
-                        )
                 )
                 .addChannelOption(option =>
                     option
@@ -59,13 +62,6 @@ const commands = [
                         .setName('tier_name')
                         .setDescription('Tier name to test')
                         .setRequired(true)
-                        .addChoices(
-                            { name: 'Diamond', value: 'Diamond' },
-                            { name: 'Gold', value: 'Gold' },
-                            { name: 'Silver', value: 'Silver' },
-                            { name: 'Bronze', value: 'Bronze' },
-                            { name: 'Free', value: 'Free' }
-                        )
                 )
         )
         .addSubcommand(subcommand =>
@@ -86,7 +82,7 @@ const commands = [
                 .addStringOption(option =>
                     option
                         .setName('content')
-                        .setDescription('Message template. Use {tier}, {title}, {url}, {user}')
+                        .setDescription('Use {tier} {title} {url} {user} {pledge_amount} {post_snippet} {patron_count}')
                         .setRequired(true)
                 )
         )

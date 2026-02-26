@@ -17,7 +17,7 @@ export const data = new SlashCommandBuilder()
     )
     .addStringOption(option =>
         option.setName('content')
-            .setDescription('Variables: {user}, {tier}, {title}, {url}')
+            .setDescription('Variables: {user}, {tier}, {title}, {url}, {pledge_amount}, {post_snippet}, {patron_count}')
             .setRequired(true)
     );
 
@@ -41,7 +41,7 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
         await setCustomMessage(type, content);
 
         await interaction.editReply({
-            content: `✅ **Updated ${type} message!**\n\n**Preview:**\n${content}\n\n**Available Variables:**\n- \`{user}\` - Mention the user\n- \`{tier}\` - Tier name\n- \`{title}\` - Post title\n- \`{url}\` - Post URL`
+            content: `✅ **Updated ${type} message!**\n\n**Preview:**\n${content}\n\n**Available Variables:**\n- \`{user}\` - Mention the user\n- \`{tier}\` - Tier name\n- \`{title}\` - Post title\n- \`{url}\` - Post URL\n- \`{pledge_amount}\` - Pledge amount (e.g., $25.00)\n- \`{post_snippet}\` - First 200 chars of post content\n- \`{patron_count}\` - Number of patrons on the tier`
         });
     } catch (error) {
         console.error('Error saving custom message:', error);

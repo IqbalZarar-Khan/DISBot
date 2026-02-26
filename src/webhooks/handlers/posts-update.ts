@@ -196,7 +196,10 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                             const messageText = formatMessage(template, {
                                 tier: newTierName,
                                 title: title,
-                                url: url
+                                url: url,
+                                post_snippet: (attributes.content || attributes.teaser_text || '').replace(/<[^>]*>/g, '').substring(0, 200) || 'No preview available',
+                                pledge_amount: attributes.min_cents_pledged_to_view ? `$${(attributes.min_cents_pledged_to_view / 100).toFixed(2)}` : 'Free',
+                                patron_count: 'N/A',
                             });
 
                             const embed = createPostEmbed({
@@ -251,7 +254,10 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                             const messageText = formatMessage(template, {
                                 tier: newTierName,
                                 title: title,
-                                url: url
+                                url: url,
+                                post_snippet: (attributes.content || attributes.teaser_text || '').replace(/<[^>]*>/g, '').substring(0, 200) || 'No preview available',
+                                pledge_amount: 'N/A',
+                                patron_count: 'N/A',
                             });
 
                             const embed = createPostEmbed({
