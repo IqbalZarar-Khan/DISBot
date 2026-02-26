@@ -49,26 +49,31 @@ if (config.tierConfig && config.tierConfig.length > 0) {
 }
 
 /**
- * Get tier rank by tier name
- * Handles tier names with or without trailing dots (e.g., "Tier1" or "Tier1.")
+ * Get tier rank by tier name.
+ * Checks the dynamic tierRankings map (from TIER_CONFIG) first,
+ * then falls back to well-known defaults.
  */
 export function getTierRank(tierName: string): number {
-    // Normalize: lowercase and remove trailing dots/spaces
-    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
+    // Normalize: remove trailing dots/spaces
+    const cleaned = tierName.trim().replace(/\.+$/, '');
 
-    switch (normalizedName) {
-        case 'diamond':
-            return TierRank.Diamond;
-        case 'gold':
-            return TierRank.Gold;
-        case 'silver':
-            return TierRank.Silver;
-        case 'bronze':
-            return TierRank.Bronze;
-        case 'free':
-            return TierRank.Free;
-        default:
-            return TierRank.Free;
+    // 1. Exact match in dynamic config (case-sensitive, fastest)
+    if (tierRankings[cleaned] !== undefined) return tierRankings[cleaned];
+
+    // 2. Case-insensitive match in dynamic config
+    const lower = cleaned.toLowerCase();
+    for (const [name, rank] of Object.entries(tierRankings)) {
+        if (name.toLowerCase() === lower) return rank;
+    }
+
+    // 3. Hardcoded fallback for well-known tier names
+    switch (lower) {
+        case 'diamond': return TierRank.Diamond;
+        case 'gold': return TierRank.Gold;
+        case 'silver': return TierRank.Silver;
+        case 'bronze': return TierRank.Bronze;
+        case 'free': return TierRank.Free;
+        default: return TierRank.Free;
     }
 }
 
@@ -95,48 +100,67 @@ export function isWaterfall(oldTierRank: number, newTierRank: number): boolean {
     return newTierRank < oldTierRank;
 }
 
+// ── Color palette for dynamic tiers (cycles for unlimited tiers) ───
+const TIER_COLORS = [
+    0x00ffff, // Cyan
+    0xffd700, // Gold
+    0xc0c0c0, // Silver
+    0xcd7f32, // Bronze
+    0xe91e63, // Pink
+    0x9b59b6, // Purple
+    0x3498db, // Blue
+    0x2ecc71, // Green
+];
+
 /**
- * Get tier color for Discord embeds
+ * Get tier color for Discord embeds.
+ * Assigns colors based on rank position in the config, with well-known fallbacks.
  */
 export function getTierColor(tierName: string): number {
-    // Normalize: lowercase and remove trailing dots/spaces
-    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
+    const lower = tierName.toLowerCase().trim().replace(/\.+$/, '');
 
-    switch (normalizedName) {
-        case 'diamond':
-            return 0x00ffff; // Cyan
-        case 'gold':
-            return 0xffd700; // Gold
-        case 'silver':
-            return 0xc0c0c0; // Silver
-        case 'bronze':
-            return 0xcd7f32; // Bronze
-        case 'free':
-            return 0x808080; // Gray
-        default:
-            return 0x5865f2; // Discord Blurple
+    // Well-known tier colors
+    const knownColors: Record<string, number> = {
+        diamond: 0x00ffff, gold: 0xffd700, silver: 0xc0c0c0,
+        bronze: 0xcd7f32, free: 0x808080,
+    };
+    if (knownColors[lower]) return knownColors[lower];
+
+    // Dynamic: find position in sorted config and assign from palette
+    if (config.tierConfig.length > 0) {
+        const idx = config.tierConfig.findIndex(
+            t => t.name.toLowerCase() === lower
+        );
+        if (idx >= 0) return TIER_COLORS[idx % TIER_COLORS.length];
     }
+
+    return 0x5865f2; // Discord Blurple fallback
 }
 
+// ── Emoji set for dynamic tiers ────────────────────────────────────
+const TIER_EMOJIS = ['💎', '🥇', '🥈', '🥉', '🏅', '⭐', '✨', '🎖️'];
+
 /**
- * Get tier emoji
+ * Get tier emoji.
+ * Assigns emojis based on rank position in the config, with well-known fallbacks.
  */
 export function getTierEmoji(tierName: string): string {
-    // Normalize: lowercase and remove trailing dots/spaces
-    const normalizedName = tierName.toLowerCase().trim().replace(/\.+$/, '');
+    const lower = tierName.toLowerCase().trim().replace(/\.+$/, '');
 
-    switch (normalizedName) {
-        case 'diamond':
-            return '💎';
-        case 'gold':
-            return '🥇';
-        case 'silver':
-            return '🥈';
-        case 'bronze':
-            return '🥉';
-        case 'free':
-            return '🆓';
-        default:
-            return '⭐';
+    // Well-known tier emojis
+    const knownEmojis: Record<string, string> = {
+        diamond: '💎', gold: '🥇', silver: '🥈',
+        bronze: '🥉', free: '🆓',
+    };
+    if (knownEmojis[lower]) return knownEmojis[lower];
+
+    // Dynamic: find position in sorted config and assign from palette
+    if (config.tierConfig.length > 0) {
+        const idx = config.tierConfig.findIndex(
+            t => t.name.toLowerCase() === lower
+        );
+        if (idx >= 0) return TIER_EMOJIS[idx % TIER_EMOJIS.length];
     }
+
+    return '⭐';
 }

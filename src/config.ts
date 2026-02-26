@@ -47,23 +47,55 @@ function getEnvVar(key: string, required: boolean = true): string {
     return value || '';
 }
 
-// Helper to safely parse the tier configuration JSON from .env
+// Helper to safely parse and validate the tier configuration JSON from .env
 function parseTierConfig(): TierDefinition[] {
-    try {
-        const rawConfig = process.env.TIER_CONFIG;
-        if (!rawConfig) {
-            console.warn("⚠️ TIER_CONFIG not set in .env. Using empty tier configuration.");
-            return [];
-        }
-        const parsed = JSON.parse(rawConfig);
-        console.log(`✅ Loaded ${parsed.length} tier(s) from TIER_CONFIG`);
-        return parsed;
-    } catch (error) {
-        console.error("❌ FATAL ERROR: TIER_CONFIG in .env is not valid JSON.");
-        console.error("Please format it like: [{'name':'Diamond','id':'123','rank':100}]");
-        console.error("Error:", error);
+    const rawConfig = process.env.TIER_CONFIG;
+
+    if (!rawConfig) {
+        console.warn("⚠️ TIER_CONFIG not set in .env. Using empty tier configuration.");
         return [];
     }
+
+    // Parse JSON
+    let parsed: any;
+    try {
+        parsed = JSON.parse(rawConfig);
+    } catch (error) {
+        console.error("❌ FATAL: TIER_CONFIG is not valid JSON.");
+        console.error("   Expected format: [{\"name\":\"Tier1\",\"id\":\"123\",\"rank\":100}]");
+        console.error("   Parse error:", (error as Error).message);
+        process.exit(1);
+    }
+
+    // Must be an array
+    if (!Array.isArray(parsed)) {
+        console.error("❌ FATAL: TIER_CONFIG must be a JSON array, got:", typeof parsed);
+        process.exit(1);
+    }
+
+    // Validate each tier entry
+    const errors: string[] = [];
+    parsed.forEach((tier: any, index: number) => {
+        if (!tier.name || typeof tier.name !== 'string') {
+            errors.push(`  Tier ${index}: missing or invalid "name" (expected string)`);
+        }
+        if (!tier.id || typeof tier.id !== 'string') {
+            errors.push(`  Tier ${index}: missing or invalid "id" (expected string)`);
+        }
+        if (tier.rank === undefined || typeof tier.rank !== 'number') {
+            errors.push(`  Tier ${index}: missing or invalid "rank" (expected number)`);
+        }
+    });
+
+    if (errors.length > 0) {
+        console.error("❌ FATAL: TIER_CONFIG has invalid tier entries:");
+        errors.forEach(e => console.error(e));
+        console.error("   Each tier needs: {\"name\":\"...\", \"id\":\"...\", \"rank\":N}");
+        process.exit(1);
+    }
+
+    console.log(`✅ Loaded ${parsed.length} tier(s) from TIER_CONFIG`);
+    return parsed;
 }
 
 export const config: Config = {

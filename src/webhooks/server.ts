@@ -1,7 +1,30 @@
 import express, { Request, Response } from 'express';
+import * as crypto from 'crypto';
 import { verifyWebhookSignature } from './verify';
 import { logger } from '../utils/logger';
 import { WebhookEventType } from '../database/schema';
+
+// ── Webhook idempotency guard ──────────────────────────────────────
+// Prevents duplicate notifications when Patreon retries the same webhook.
+const DEDUP_TTL_MS = 60_000; // 60 seconds
+const recentWebhooks = new Map<string, number>(); // hash → timestamp
+
+// Clean expired entries every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [hash, ts] of recentWebhooks) {
+        if (now - ts > DEDUP_TTL_MS) recentWebhooks.delete(hash);
+    }
+}, 5 * 60_000);
+
+function isDuplicate(body: string, eventType: string): boolean {
+    const hash = crypto.createHash('md5').update(eventType + body).digest('hex');
+    const now = Date.now();
+    const lastSeen = recentWebhooks.get(hash);
+    if (lastSeen && now - lastSeen < DEDUP_TTL_MS) return true;
+    recentWebhooks.set(hash, now);
+    return false;
+}
 
 let server: any = null;
 
@@ -53,6 +76,13 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
             }
 
             logger.info('✅ [SECURITY PASS] Signature verified successfully');
+
+            // Idempotency guard: skip duplicate webhooks
+            if (isDuplicate(rawBody, eventType || '')) {
+                logger.warn('🔁 [DEDUP] Duplicate webhook detected — skipping');
+                res.status(200).json({ received: true, duplicate: true });
+                return;
+            }
 
             if (!eventType) {
                 logger.warn('⚠️ [MISSING HEADER] x-patreon-event header not found');
