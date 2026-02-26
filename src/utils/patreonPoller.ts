@@ -52,13 +52,12 @@ async function pollPatreonPosts(): Promise<void> {
     try {
         logger.info('🔄 [POLLER] Checking Patreon for silent tier changes...');
 
-        const res = await axios.get(`${PATREON_API}/campaigns/${config.patreonCampaignId}/posts`, {
+        const url = `${PATREON_API}/campaigns/${config.patreonCampaignId}/posts`;
+        const res = await axios.get(url, {
             headers: { Authorization: `Bearer ${config.patreonAccessToken}` },
             params: {
-                'include': 'access_rules,tiers',
-                'fields[post]': 'title,url,published_at,min_cents_pledged_to_view',
-                'fields[access_rule]': 'tier_count,amount_cents',
-                'page[count]': 20,   // check 20 most recent posts
+                'fields[post]': 'title,url,published_at,is_paid,is_public,min_cents_pledged_to_view,tiers',
+                'page[count]': 20,
                 'sort': '-published_at',
             },
         });
@@ -124,6 +123,8 @@ async function pollPatreonPosts(): Promise<void> {
     } catch (error: any) {
         if (error.response?.status === 401) {
             logger.error('🔄 [POLLER] Patreon API 401 — access token may be expired');
+        } else if (error.response?.status === 400) {
+            logger.error(`🔄 [POLLER] Patreon API 400 — bad request: ${JSON.stringify(error.response?.data)}`);
         } else {
             logger.error('🔄 [POLLER] Failed to poll Patreon API', error as Error);
         }
