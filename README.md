@@ -2,6 +2,8 @@
 
 A Discord bot that automates content distribution from Patreon to Discord using a tiered "waterfall" release strategy. The bot tracks when content becomes available to different patron tiers and notifies the appropriate Discord channels in real-time.
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/new?referralCode=&repo=IqbalZarar-Khan%2FDISBot)
+
 ![DISBot Waterfall System](docs/waterfall-diagram.png)
 
 ## ✨ Features
@@ -340,8 +342,11 @@ This startup order ensures cloud platforms detect the open port before the Disco
 
 ### Railway (Recommended)
 
-Railway is the recommended hosting platform for this bot.
+One-click deploy — click the button below or follow the manual steps.
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/new?referralCode=&repo=IqbalZarar-Khan%2FDISBot)
+
+**Manual steps:**
 1. Go to [railway.app](https://railway.app) → Sign in with GitHub
 2. **New Project** → **Deploy from GitHub repo** → select your repo
 3. Add environment variables in the **Variables** tab
@@ -358,7 +363,30 @@ Railway is the recommended hosting platform for this bot.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for all deployment options.
 
-### Docker Deployment
+### Docker Compose (Self-Hosted)
+
+Run everything locally or on your own VPS — **no Supabase Cloud account required**.
+
+Docker Compose bundles PostgreSQL, PostgREST (REST API), and the bot together:
+
+```bash
+# 1. Configure
+cp .env.example .env        # fill in Discord/Patreon credentials
+
+# 2. Start all services
+docker compose up -d
+
+# 3. Register slash commands
+docker compose exec bot npm run deploy-commands
+```
+
+The database is automatically initialized with all required tables on first start (`docker/init.sql`).
+
+> **Note**: When using Docker Compose, `SUPABASE_URL` and `SUPABASE_KEY` are automatically overridden to point at the local PostgREST instance — you don't need a Supabase Cloud account.
+
+### Docker Only (Bring Your Own Database)
+
+If you already have a Supabase project or external PostgreSQL + PostgREST:
 
 ```bash
 docker build -t patreon-bot .
