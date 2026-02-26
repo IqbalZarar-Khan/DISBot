@@ -62,6 +62,19 @@ export async function deleteTrackedPost(postId: string): Promise<void> {
     if (error) throw error;
 }
 
+export async function getAllTrackedPosts(): Promise<TrackedPost[]> {
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+        .from('tracked_posts')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data as TrackedPost[]) || [];
+}
+
 // ===== BOT CONFIG OPERATIONS =====
 
 export async function getConfig(key: string): Promise<string | null> {

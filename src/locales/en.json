@@ -1,0 +1,76 @@
+{
+    "bot": {
+        "starting": "🚀 Starting Patreon Tier-Waterfall Bot...",
+        "login_attempt": "🔑 Discord login attempt {{attempt}}/{{max}}...",
+        "login_success": "✅ Discord login successful",
+        "login_failed": "⚠️ Login failed: {{reason}}",
+        "login_retry": "   Retrying in {{delay}}s...",
+        "login_exhausted": "❌ All login attempts failed. The bot cannot connect to Discord.",
+        "shutdown": "👋 Shutting down bot...",
+        "ready": "✅ Bot logged in as {{tag}}"
+    },
+    "commands": {
+        "admin_only": "⛔ Only the Root Admin can use this command.",
+        "unknown": "❌ Unknown admin command.",
+        "error": "❌ An error occurred while executing this command.",
+        "error_check_logs": "❌ An error occurred while executing this command. Please check the logs."
+    },
+    "setup": {
+        "no_tiers": "❌ No tiers configured. Run `/admin sync-tiers` first to fetch tiers from Patreon.",
+        "step1_title": "🔧 Interactive Tier Setup",
+        "step1_desc": "**Step 1/2** — Select a tier to map to a Discord channel.",
+        "step2_desc": "**Step 2/2** — Select a Discord channel for **{{tier}}**",
+        "success_title": "✅ Tier Mapped Successfully",
+        "timeout": "⏰ Setup timed out. Run `/admin setup` again when ready.",
+        "select_tier": "Select a Patreon tier to map...",
+        "select_channel": "Select a channel for {{tier}}...",
+        "current_mappings": "Current Mappings",
+        "unmapped": "⚠️ *unmapped*"
+    },
+    "sync": {
+        "title": "✅ Tiers Synchronized",
+        "description": "Fetched **{{count}}** tier(s) from Patreon and updated the database.",
+        "no_tiers": "⚠️ No published tiers found on your Patreon campaign.",
+        "missing_creds": "❌ Missing `PATREON_ACCESS_TOKEN` or `PATREON_CAMPAIGN_ID` in environment.",
+        "expired_token": "❌ Patreon API returned 401 — your access token may be expired.",
+        "synced_tiers": "Synced Tiers",
+        "unmapped_tiers": "⚠️ Unmapped Tiers"
+    },
+    "stats": {
+        "title": "📊 Patron Analytics Dashboard",
+        "total_patrons": "👥 Total Patrons",
+        "active_tiers": "🏷️ Active Tiers",
+        "tracked_posts": "📝 Tracked Posts",
+        "growth_30d": "📈 Growth (Last 30 Days)",
+        "tier_distribution": "🎯 Tier Distribution",
+        "recent_activity": "🕐 Recent Activity",
+        "new_patrons": "New patrons: **{{count}}**",
+        "active_changes": "Active changes: **{{count}}** upgrades/changes",
+        "new_this_week": "New this week: **{{count}}**"
+    },
+    "webhook": {
+        "signature_failed": "⛔ [SECURITY BLOCK] Signature verification FAILED",
+        "signature_passed": "✅ [SECURITY PASS] Signature verified successfully",
+        "duplicate": "🔁 [DEDUP] Duplicate webhook detected — skipping",
+        "incoming": "📡 [INCOMING WEBHOOK TRAFFIC]"
+    },
+    "poller": {
+        "starting": "🔄 [POLLER] Starting — checking every {{interval}} minutes",
+        "stopped": "🔄 [POLLER] Stopped",
+        "checking": "🔄 [POLLER] Checking Patreon for silent tier changes...",
+        "no_changes": "🔄 [POLLER] No silent tier changes detected",
+        "detected": "🔄 [POLLER] Detected {{count}} silent tier change(s)",
+        "silent_change": "🔄 [POLLER] Silent tier change: \"{{title}}\" ({{old}} → {{new}})"
+    },
+    "errors": {
+        "failed_start": "❌ Failed to start bot:",
+        "webhook_server_fail": "❌ Failed to start webhook server:",
+        "config_invalid_json": "❌ FATAL: TIER_CONFIG is not valid JSON.",
+        "config_not_array": "❌ FATAL: TIER_CONFIG must be a JSON array",
+        "config_invalid_entry": "❌ FATAL: TIER_CONFIG has invalid tier entries:"
+    },
+    "messages": {
+        "set_channel": "✅ **Tier Mapping Updated**\n\n**{{tier}}** tier is now mapped to {{channel}}.",
+        "channel_text_only": "❌ Please select a text channel."
+    }
+}

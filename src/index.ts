@@ -5,6 +5,7 @@ import { initDatabase } from './database/db';
 import { initLogger, logger } from './utils/logger';
 import { startWebhookServer } from './webhooks/server';
 import { startPolling, stopPolling } from './utils/patreonPoller';
+import { initI18n } from './utils/i18n';
 
 // Create Discord client
 const client = new Client({
@@ -68,6 +69,9 @@ async function loginWithRetry(maxAttempts: number = 5): Promise<void> {
 async function main() {
     try {
         console.log('🚀 Starting Patreon Tier-Waterfall Bot...');
+
+        // Initialize i18n
+        initI18n(process.env.BOT_LOCALE || 'en');
 
         // Validate configuration
         validateConfig();

@@ -38,6 +38,11 @@ const commands = [
         )
         .addSubcommand(subcommand =>
             subcommand
+                .setName('stats')
+                .setDescription('View patron analytics: growth, tier distribution, and activity')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
                 .setName('set-channel')
                 .setDescription('Map a Patreon tier to a Discord channel')
                 .addStringOption(option =>

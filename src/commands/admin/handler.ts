@@ -6,6 +6,7 @@ import { handleTestAlert } from './test-alert';
 import { execute as handleSetMessage } from './set-message';
 import { handleSyncTiers } from './sync-tiers';
 import { handleSetup } from './setup';
+import { handleStats } from './stats';
 import { logger } from '../../utils/logger';
 
 /**
@@ -42,6 +43,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'setup':
                 await handleSetup(interaction);
+                break;
+
+            case 'stats':
+                await handleStats(interaction);
                 break;
 
             default:
