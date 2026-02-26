@@ -2,7 +2,7 @@
 
 A Discord bot that automates content distribution from Patreon to Discord using a tiered "waterfall" release strategy. The bot tracks when content becomes available to different patron tiers and notifies the appropriate Discord channels in real-time.
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/new?referralCode=&repo=IqbalZarar-Khan%2FDISBot)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/bha7GE?referralCode=nLfB6T&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 ![DISBot Waterfall System](docs/waterfall-diagram.png)
 
