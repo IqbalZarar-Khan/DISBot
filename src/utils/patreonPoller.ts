@@ -56,7 +56,7 @@ async function pollPatreonPosts(): Promise<void> {
         const res = await axios.get(url, {
             headers: { Authorization: `Bearer ${config.patreonAccessToken}` },
             params: {
-                'fields[post]': 'title,url,published_at,is_paid,is_public,min_cents_pledged_to_view,tiers',
+                'fields[post]': 'title,url,published_at,is_paid,is_public',
                 'page[count]': 20,
                 'sort': '-published_at',
             },
