@@ -174,7 +174,11 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                     });
                     embed.setDescription(messageText);
 
-                    await channel.send({ embeds: [embed] });
+                    await channel.send({ embeds: [embed] }).then(async (msg) => {
+                        // Auto-create discussion thread if enabled
+                        const { createPostThread } = await import('../../utils/threadHelper');
+                        await createPostThread(channel, msg.id, title);
+                    });
                     logger.info(`✅ Broadcast alert sent to ${tierName} channel: ${title}`);
                 }
             } catch (error) {

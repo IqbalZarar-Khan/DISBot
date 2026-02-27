@@ -117,6 +117,11 @@ const commands = [
         )
         .addSubcommand(subcommand =>
             subcommand
+                .setName('bulk-map')
+                .setDescription('Map all unmapped tiers to channels in a guided wizard')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
                 .setName('set-message')
                 .setDescription('Customize automated bot messages')
                 .addStringOption(option =>

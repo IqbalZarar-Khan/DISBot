@@ -10,6 +10,7 @@ import { handleStats } from './stats';
 import { handleSetEventChannel } from './set-event-channel';
 import { handleDebugLogs } from './debug-logs';
 import { handleExportData } from './export-data';
+import { handleBulkMap } from './bulk-map';
 import { logger } from '../../utils/logger';
 
 /**
@@ -62,6 +63,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'export-data':
                 await handleExportData(interaction);
+                break;
+
+            case 'bulk-map':
+                await handleBulkMap(interaction);
                 break;
 
             default:

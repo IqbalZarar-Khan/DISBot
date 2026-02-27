@@ -1,28 +1,63 @@
-# 🤖 Patreon Tier-Waterfall Discord Bot
+# 🤖 DISBot — Intelligent Content Distribution
 
-A Discord bot that automates content distribution from Patreon to Discord using a tiered "waterfall" release strategy. The bot tracks when content becomes available to different patron tiers and notifies the appropriate Discord channels in real-time.
+<p align="center">
+  <img src="screenshots/1.png" alt="DISBot Hero — Intelligent Content Distribution" width="100%" />
+</p>
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/u9kFYv?referralCode=nLfB6T&utm_medium=integration&utm_source=template&utm_campaign=generic)
+<p align="center">
+  <strong>Automate your Patreon-to-Discord workflow.</strong> Open Source · Secure · Self-Hosted.
+</p>
 
-![DISBot Waterfall System](docs/waterfall-diagram.png)
+<p align="center">
+  <a href="https://railway.com/deploy/u9kFYv?referralCode=nLfB6T&utm_medium=integration&utm_source=template&utm_campaign=generic">
+    <img src="https://railway.com/button.svg" alt="Deploy on Railway" />
+  </a>
+</p>
+
+---
+
+<p align="center">
+  <img src="screenshots/2.png" alt="The Creator's Dilemma — Manual Chaos vs Automated Order" width="100%" />
+</p>
 
 ## ✨ Features
 
+### 🏗️ Architecture
+
+<p align="center">
+  <img src="screenshots/3.png" alt="Architecture — Patreon Webhooks → DISBot Core → Discord API" width="100%" />
+</p>
+
 ### Core Features
-- **🎯 Waterfall Release System**: Automatically alerts Discord channels when content becomes available to their tier
-- **⚡ Hybrid Broadcast System**: Sends alerts to ALL channels when posts are released to multiple tiers simultaneously
-- **👥 Member Tracking**: Monitors new pledges, upgrades, and departures
-- **🔒 Secure Admin Panel**: User ID-based authentication for admin commands
-- **📊 Real-time Webhooks**: Instant notifications via Patreon webhooks
-- **💎 Tier Management**: Easy mapping of Patreon tiers to Discord channels
+- **🎯 Waterfall Release System**: Smart, tiered content distribution that prevents spam
+- **⚡ Hybrid Broadcast System**: Detects multi-tier releases and alerts all relevant channels simultaneously
+- **👥 Member Tracking**: Logs new pledges, upgrades, and departures to Supabase
+- **🔒 Zero-Trust Security**: HMAC webhook verification, Row-Level Security, whitelist-protected admin commands
+- **📊 Real-time Webhooks**: Instant notifications via Patreon webhook events
+- **💎 Dynamic Tier System**: Configurable via JSON or live-synced from the Patreon API
+
+<p align="center">
+  <img src="screenshots/4.png" alt="The Waterfall Release System — Day 1 Diamond, Day 7 Gold, Day 14 Public" width="100%" />
+</p>
 
 ### Advanced Features
-- **💬 Custom Message Templates**: Fully customizable bot messages with placeholder support (`{tier}`, `{title}`, `{url}`, `{user}`)
-- **🗑️ Silent Post Deletion**: Automatically removes deleted posts from database without Discord notifications
-- **🔧 Automated Setup**: One-command Patreon tier fetcher using your Creator Access Token (`npm run setup:patreon`)
-- **⚙️ Configuration-Driven**: 100% configurable via environment variables (no code changes needed!)
-- **🔄 Dynamic Tier System**: Support for any number of custom tiers via JSON configuration
-- **🕵️ Debug Logging**: Comprehensive X-Ray debugging for troubleshooting tier detection
+- **💬 Custom Message Templates**: Fully customizable with placeholders (`{tier}`, `{title}`, `{url}`, `{user}`, `{post_snippet}`, `{pledge_amount}`, `{patron_count}`)
+- **🧵 Auto-Thread Creation**: Optionally creates discussion threads under post alerts to keep channels clean
+- **🗑️ Silent Post Deletion**: Automatically removes deleted posts without spammy notifications
+- **🔧 Automated DB Setup**: `npm run setup:patreon` writes tiers directly to Supabase (no manual .env editing)
+- **🔄 Live Tier Sync**: `/admin sync-tiers` fetches tiers from Patreon API without restarting
+- **📋 Interactive Setup**: `/admin setup` with dropdown menus for tier→channel mapping
+- **🔧 Bulk Mapping Wizard**: `/admin bulk-map` maps all unmapped tiers in a guided sequence
+- **🔀 Event Routing**: Route member events (joins, departures, upgrades) to specific Discord channels
+- **📊 Patron Analytics**: `/admin stats` shows growth, tier distribution, and recent activity
+- **🔍 In-Discord Debug Logs**: `/admin debug-logs` shows the last 50 X-Ray log entries without leaving Discord
+- **� Data Export**: `/admin export-data` generates CSV files of all patron data and DMs them to the admin
+- **🧪 Template Preview**: `/admin test-alert <tier> <template_type>` previews custom templates with sample data
+- **🕵️ Enhanced Diagnostics**: `/admin status` shows API latency, uptime, webhook stats, and tier detection accuracy
+
+<p align="center">
+  <img src="screenshots/5.png" alt="A Complete Community Toolkit" width="100%" />
+</p>
 
 ## 📚 Documentation
 
@@ -501,6 +536,90 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - ✅ **Tier ID Translation**: Automatic conversion of Patreon tier IDs to tier names
 - ✅ **Supabase Integration**: Persistent PostgreSQL storage via Supabase
 - ✅ **Fallback Mechanisms**: Multiple methods to detect post tiers (ID → Cents → Title)
+
+---
+
+## 🖼️ Visual Documentation
+
+<details>
+<summary><strong>📐 Architecture & Stack</strong></summary>
+
+<p align="center">
+  <img src="screenshots/6.png" alt="Built on a Modern Stack — Node.js 20+, RLS, Supabase" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🎯 Intelligent Tier Detection</strong></summary>
+
+<p align="center">
+  <img src="screenshots/7.png" alt="3-Step Tier Detection Funnel — ID Match → Pledge Amount → Title Match" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🔒 Zero-Trust Security Model</strong></summary>
+
+<p align="center">
+  <img src="screenshots/8.png" alt="HMAC Verification, Data Sovereignty, Row-Level Security" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🖥️ In-Chat Administration</strong></summary>
+
+<p align="center">
+  <img src="screenshots/12.png" alt="Admin commands in Discord — set-channel, set-message, status" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>⚙️ Automated Configuration</strong></summary>
+
+<p align="center">
+  <img src="screenshots/10.png" alt="npm run setup:patreon — auto-generates TIER_CONFIG and writes to Supabase" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🏠 Hosting Strategy</strong></summary>
+
+<p align="center">
+  <img src="screenshots/9.png" alt="Railway (Recommended) vs Render Free Tier (Avoid)" width="100%" />
+</p>
+
+<p align="center">
+  <img src="screenshots/14.png" alt="Platform Compatibility Matrix — Railway, Render, Heroku, Local" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🚀 Deployment Roadmap</strong></summary>
+
+<p align="center">
+  <img src="screenshots/11.png" alt="4-Step Roadmap — Clone, Fetch Config, Deploy, Connect" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>💡 Pro Tip: The Invisible Space Trick</strong></summary>
+
+<p align="center">
+  <img src="screenshots/13.png" alt="Add a space to trick Patreon into sending a webhook for tier-only changes" width="100%" />
+</p>
+
+</details>
+
+<p align="center">
+  <img src="screenshots/15.png" alt="Reclaim Your Time — Automate your community, own your data, focus on your craft" width="100%" />
+</p>
 
 ## 📝 License
 
