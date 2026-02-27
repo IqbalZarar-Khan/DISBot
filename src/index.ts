@@ -114,6 +114,23 @@ function registerEventHandlers() {
         console.log(`✅ Bot logged in as ${readyClient.user.tag}`);
         logger.info(`Bot started successfully as ${readyClient.user.tag}`);
 
+        // Auto-deploy slash commands on startup
+        try {
+            console.log('🔄 Auto-deploying slash commands...');
+            const { REST, Routes } = await import('discord.js');
+            const { getCommandData } = await import('./commands/commandData');
+            const rest = new REST({ version: '10' }).setToken(config.discordToken);
+            const applicationId = Buffer.from(config.discordToken.split('.')[0], 'base64').toString('utf-8');
+            const commands = getCommandData();
+            const data = await rest.put(
+                Routes.applicationGuildCommands(applicationId, config.guildId),
+                { body: commands }
+            ) as any[];
+            console.log(`✅ Auto-deployed ${data.length} slash commands`);
+        } catch (err) {
+            console.warn('⚠️ Auto-deploy commands failed (non-fatal):', (err as Error).message);
+        }
+
         // Start Patreon post poller (checks for silent tier changes)
         startPolling();
     });
