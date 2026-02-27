@@ -524,6 +524,18 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - ✅ **Early Port Binding**: Webhook server starts before Discord login to prevent cloud platform timeouts
 - ✅ **`set-message` Command**: Added missing handler for customizing bot message templates
 - ✅ **Render Compatibility Note**: Documented that Render's free tier is blocked by Discord's Cloudflare
+- ✅ **🧵 Discord Thread Integration**: Auto-creates discussion threads under post alerts (opt-in via `enable_threads`)
+- ✅ **🔒 Strict RLS Policies**: `service_role`-only database access via migration `006`
+- ✅ **🕵️ Enhanced Status Diagnostics**: `/admin status` shows API latency, uptime, webhook stats, tier detection accuracy, recent errors
+- ✅ **🔧 Bulk Channel Mapping**: `/admin bulk-map` wizard for mapping all unmapped tiers at once
+- ✅ **🔍 In-Discord Debug Logs**: `/admin debug-logs` shows last 50 X-Ray log entries as ephemeral embeds
+- ✅ **📦 Data Export**: `/admin export-data` generates CSV files and DMs them to root admin
+- ✅ **🧪 Template Preview**: `/admin test-alert <tier> <template_type>` previews custom templates with sample data
+- ✅ **🔀 Granular Event Routing**: `/admin set-event-channel` routes member events to specific Discord channels
+- ✅ **📡 Legacy Webhook Support**: Bot now handles both `members:pledge:*` and `pledges:*` event formats
+- ✅ **🔄 Auto-Ngrok Updater**: `npm run dev:ngrok` auto-detects ngrok URL and patches Patreon webhook
+- ✅ **🖼️ Visual Documentation**: README with 15 embedded screenshots covering architecture, security, workflows
+- ✅ **⚙️ Automated DB Setup**: `npm run setup:patreon` writes tiers directly to Supabase
 
 ### Core Features
 - ✅ **Hybrid Broadcast System**: Sends alerts to ALL channels when posts are released to multiple tiers simultaneously

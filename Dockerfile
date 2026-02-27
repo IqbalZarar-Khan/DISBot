@@ -9,7 +9,7 @@ COPY package*.json ./
 # Install ALL dependencies (including devDependencies for tsc)
 RUN npm ci
 
-# Copy source code
+# Copy source code and scripts
 COPY . .
 
 # Build TypeScript
@@ -26,6 +26,12 @@ RUN npm ci --omit=dev
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
+
+# Copy Supabase migrations (needed for DB setup reference)
+COPY --from=builder /app/supabase ./supabase
+
+# Copy screenshots for README rendering (optional, keeps image small)
+# COPY --from=builder /app/screenshots ./screenshots
 
 # Create data directory for any local storage
 RUN mkdir -p /app/data

@@ -59,10 +59,12 @@ PATREON_REFRESH_TOKEN=your_patreon_refresh_token
 PATREON_CAMPAIGN_ID=your_campaign_id
 WEBHOOK_SECRET=your_webhook_secret
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_supabase_key
+SUPABASE_KEY=your_supabase_service_role_key
 TIER_CONFIG='[{"name":"Diamond","id":"123","rank":100,"cents":2500}]'
 NODE_ENV=production
 ```
+
+> **⚠️ Important**: Use the Supabase **service_role** key (not the anon key). The strict RLS policies restrict database access to `service_role` connections only.
 
 > **Note**: Do NOT set `PORT` or `WEBHOOK_PORT` — Railway dynamically assigns a port via the `PORT` environment variable, and the bot auto-detects it.
 
@@ -76,9 +78,11 @@ NODE_ENV=production
 
 1. Go to [Patreon Webhooks](https://www.patreon.com/portal/registration/register-webhooks)
 2. Add webhook: `https://your-app.up.railway.app/webhooks/patreon`
-3. Select events: `members:create`, `members:update`, `members:delete`, `posts:publish`, `posts:update`, `posts:delete`
+3. Select events: `members:create`, `members:update`, `members:delete`, `members:pledge:create`, `members:pledge:update`, `members:pledge:delete`, `posts:publish`, `posts:update`, `posts:delete`
 4. Set the secret to the same value as your `WEBHOOK_SECRET`
 5. Save
+
+> **Note**: The bot also handles legacy `pledges:create/update/delete` events automatically.
 
 ### Step 6: Deploy Slash Commands
 
@@ -260,6 +264,28 @@ Forwarding  https://abc123.ngrok.io -> http://localhost:3000
 
 - Use your ngrok URL: `https://abc123.ngrok.io/webhook`
 - **Note**: Free ngrok URLs change on restart!
+
+### Auto-Update with `dev:ngrok` (Recommended)
+
+Instead of manually copying the ngrok URL to Patreon every time, use the automated script:
+
+**Terminal 1:**
+```bash
+ngrok http 3000
+```
+
+**Terminal 2:**
+```bash
+npm run dev:ngrok
+```
+
+This script will:
+1. 📡 Auto-detect the ngrok HTTPS URL
+2. 🔍 Find your Patreon webhook by campaign ID
+3. 📤 PATCH the webhook URI to the new ngrok address
+4. 🚀 Start the bot in dev mode with hot-reload
+
+> **First time?** You'll need to create a webhook manually in the Patreon portal first. After that, the script handles URL updates automatically.
 
 ### Step 6: Deploy Commands
 
@@ -464,8 +490,12 @@ After deploying to any platform:
 - [ ] Patreon webhook is configured
 - [ ] Test webhook with `/admin test-alert`
 - [ ] Environment variables are set correctly
-- [ ] Supabase connection works
-- [ ] Logs show no errors
+- [ ] Supabase connection works (using **service_role** key)
+- [ ] All migrations run (including `006_strict_rls_policies.sql`)
+- [ ] Logs show no errors (`/admin debug-logs`)
+- [ ] Tier mappings configured (`/admin set-channel` or `/admin bulk-map`)
+- [ ] Event routing set up (optional: `/admin set-event-channel`)
+- [ ] Discussion threads enabled if desired (`enable_threads` in config)
 
 ---
 

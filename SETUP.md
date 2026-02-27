@@ -44,6 +44,9 @@ This guide will walk you through setting up the Patreon-Discord Content Distribu
    - ✅ Send Messages
    - ✅ Embed Links
    - ✅ Use Slash Commands
+   - ✅ Create Public Threads
+   - ✅ Send Messages in Threads
+   - ✅ Attach Files (for `/admin export-data`)
 4. Copy the generated URL and open it in your browser
 5. Select your server and authorize
 
@@ -145,12 +148,12 @@ The bot uses Supabase for persistent data storage.
 3. Copy and paste the migration SQL from `supabase/migrations/`
 4. Click **"Run"**
 
-### Get Supabase Credentials
-
 1. Go to **Project Settings** → **API**
 2. Copy:
    - **Project URL** → Save for `SUPABASE_URL`
-   - **anon public** key → Save for `SUPABASE_KEY`
+   - **service_role** key → Save for `SUPABASE_KEY`
+
+> ⚠️ **Important**: Use the **service_role** key (not the anon key). The strict RLS policies (migration `006`) restrict access to `service_role` only, protecting your patron data from unauthorized access.
 
 ---
 
@@ -276,11 +279,13 @@ WEBHOOK_PORT=3000
 
 # Supabase Configuration
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_supabase_anon_key
+SUPABASE_KEY=your_supabase_service_role_key
 
 # Tier Configuration (JSON array - see Step 4)
 TIER_CONFIG='[{"name":"Diamond","id":"YOUR_TIER_ID","rank":100,"cents":2500}]'
 ```
+
+> ⚠️ **`SUPABASE_KEY`** must be the **service_role** key for strict RLS policies to work correctly.
 
 **Generate a webhook secret:**
 ```bash
@@ -318,10 +323,16 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions. **Railw
      - ✅ members:create
      - ✅ members:update
      - ✅ members:delete
+     - ✅ members:pledge:create
+     - ✅ members:pledge:update
+     - ✅ members:pledge:delete
      - ✅ posts:publish
      - ✅ posts:update
+     - ✅ posts:delete
    - **Secret**: Use the same value as `WEBHOOK_SECRET` in your `.env`
 4. Click **"Create"**
+
+> **Note**: Patreon may also send legacy `pledges:create/update/delete` events — the bot handles both formats automatically.
 
 ---
 
@@ -372,6 +383,32 @@ In Discord, use the `/admin set-channel` command to map tiers to channels.
 /admin set-channel tier_name:Free channel:#free-content
 ```
 
+Or use the **Bulk Mapping Wizard** to map all tiers at once:
+```
+/admin bulk-map
+```
+This walks you through each unmapped tier with a channel dropdown.
+
+### Configure Event Routing (Optional)
+
+Route member events to specific channels:
+```
+/admin set-event-channel event_type:member_join channel:#welcome
+/admin set-event-channel event_type:member_leave channel:#audit-log
+/admin set-event-channel event_type:pledge_upgrade channel:#celebrations
+```
+
+If not configured, all events fall back to the `LOG_CHANNEL_ID`.
+
+### Enable Discussion Threads (Optional)
+
+To auto-create discussion threads under post alerts:
+```
+/admin set-config key:enable_threads value:true
+```
+
+Threads will be named after the post title (e.g., "💬 My New Chapter") and auto-archive after 1 week.
+
 ---
 
 ## 8. Testing
@@ -383,10 +420,12 @@ In Discord, use the `/admin set-channel` command to map tiers to channels.
 ```
 
 Should show:
-- ✅ Patreon API: Connected
-- ✅ Webhooks: Listening
-- ✅ Database: Connected (Supabase)
+- ✅ Patreon API: Connected (with latency in ms)
+- ✅ Database: Connected (member count, post count)
+- ✅ Uptime, last webhook timestamp
+- ✅ Webhook success rate, tier detection accuracy
 - ✅ Your tier mappings
+- ⚠️ Recent errors (last 3)
 
 ### Test Alerts
 
@@ -395,6 +434,32 @@ Should show:
 ```
 
 Check if the test message appears in your #diamond-alerts channel.
+
+### Preview Custom Templates
+
+```
+/admin test-alert tier_name:Diamond template_type:post_new
+/admin test-alert tier_name:Gold template_type:post_waterfall
+/admin test-alert tier_name:Silver template_type:welcome
+```
+
+This previews your custom message templates with sample data.
+
+### View Debug Logs (In-Discord)
+
+```
+/admin debug-logs
+```
+
+Shows the last 50 log entries as an ephemeral message — no need to SSH into your host.
+
+### Export Patron Data
+
+```
+/admin export-data
+```
+
+Generates CSV files (patrons, posts, tier mappings) and DMs them to the root admin.
 
 ### Test Tier Detection
 
@@ -448,8 +513,9 @@ Your bot is now ready to automatically distribute content based on Patreon tiers
 
 ### Database connection errors
 - Verify `SUPABASE_URL` and `SUPABASE_KEY` are correct
+- Ensure you are using the **service_role** key (not anon key)
 - Check Supabase project is active
-- Ensure migration was run successfully
+- Ensure all migrations (including `006_strict_rls_policies.sql`) were run
 
 ---
 
