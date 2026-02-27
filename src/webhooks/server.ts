@@ -187,9 +187,28 @@ async function routeWebhookEvent(eventType: WebhookEventType, payload: any): Pro
                 await handlePostsDelete(payload);
                 break;
 
+            // ── Legacy pledge events (Patreon sends both members:pledge:* AND pledges:*) ──
+            case 'pledges:create':
+                logger.info(`📥 [HANDLER] Legacy pledges:create → routing to members:pledge:create...`);
+                const { handleMembersPledgeCreate: legacyPledgeCreate } = await import('./handlers/members-pledge-create');
+                await legacyPledgeCreate(payload);
+                break;
+
+            case 'pledges:update':
+                logger.info(`📥 [HANDLER] Legacy pledges:update → routing to members:pledge:update...`);
+                const { handleMembersPledgeUpdate: legacyPledgeUpdate } = await import('./handlers/members-pledge-update');
+                await legacyPledgeUpdate(payload);
+                break;
+
+            case 'pledges:delete':
+                logger.info(`📥 [HANDLER] Legacy pledges:delete → routing to members:pledge:delete...`);
+                const { handleMembersPledgeDelete: legacyPledgeDelete } = await import('./handlers/members-pledge-delete');
+                await legacyPledgeDelete(payload);
+                break;
+
             default:
                 logger.warn(`⚠️ [IGNORED] No handler registered for event type: ${eventType}`);
-                logger.warn(`⚠️ [IGNORED] Available handlers: members:*, members:pledge:*, posts:*`);
+                logger.warn(`⚠️ [IGNORED] Available handlers: members:*, members:pledge:*, pledges:*, posts:*`);
         }
     } catch (error) {
         logger.error(`❌ [HANDLER ERROR] Error in webhook handler for ${eventType}`, error as Error);

@@ -45,6 +45,9 @@ export type WebhookEventType =
     | 'members:pledge:create'
     | 'members:pledge:update'
     | 'members:pledge:delete'
+    | 'pledges:create'
+    | 'pledges:update'
+    | 'pledges:delete'
     | 'posts:publish'
     | 'posts:update'
     | 'posts:delete';
