@@ -94,10 +94,13 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         // Remove duplicates
         const uniqueTiers = [...new Set(detectedTierNames)];
 
-        // 3. Fallback: Check Cents if no tiers detected via ID
+        // 3. Fallback: Check Cents if no tiers detected via ID (currency-aware)
         if (uniqueTiers.length === 0 && attributes.min_cents_pledged_to_view) {
-            const cents = parseInt(attributes.min_cents_pledged_to_view);
-            logger.info(`📝 Trying cents fallback: ${cents}`);
+            const { normalizeCents, extractCurrency } = await import('../../utils/currencyHelper');
+            const currency = extractCurrency(attributes);
+            const rawCents = parseInt(attributes.min_cents_pledged_to_view);
+            const cents = normalizeCents(rawCents, currency);
+            logger.info(`📝 Trying cents fallback: ${rawCents}${currency && currency !== 'USD' ? ` (${currency} → ${cents} USD cents)` : ''}`);
 
             if (centsMap[cents]) {
                 uniqueTiers.push(centsMap[cents]);

@@ -79,6 +79,14 @@ async function main() {
         // Initialize Supabase
         initSupabase();
 
+        // Run database migrations automatically
+        try {
+            const { runAutoMigrations } = await import('./database/autoMigrate');
+            await runAutoMigrations();
+        } catch (err) {
+            console.warn('⚠️ Auto-migration check failed (non-fatal):', (err as Error).message);
+        }
+
         // Initialize database (test connection)
         await initDatabase();
 

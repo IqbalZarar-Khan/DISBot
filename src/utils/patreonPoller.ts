@@ -74,7 +74,7 @@ async function pollPatreonPosts(): Promise<void> {
             const url = attributes.url || `https://www.patreon.com/posts/${postId}`;
 
             // Detect the current tier for this post
-            const currentTier = detectPostTier(post, included, attributes);
+            const currentTier = await detectPostTier(post, included, attributes);
             if (!currentTier) continue;
 
             // Compare with what we have in the database
@@ -134,7 +134,7 @@ async function pollPatreonPosts(): Promise<void> {
 /**
  * Detect the lowest tier (widest audience) for a post from API data.
  */
-function detectPostTier(post: any, included: any[], attributes: any): string | null {
+async function detectPostTier(post: any, included: any[], attributes: any): Promise<string | null> {
     // 1. Check relationships → access_rules or tiers
     const relationships = post.relationships || {};
     const tierRefs = relationships.access_rules?.data || relationships.tiers?.data || [];
@@ -157,9 +157,13 @@ function detectPostTier(post: any, included: any[], attributes: any): string | n
         if (tierIdMap[id]) return tierIdMap[id];
     }
 
-    // 3. Fallback to min_cents_pledged_to_view
-    const minCents = attributes.min_cents_pledged_to_view;
-    if (minCents !== undefined && minCents !== null) {
+    // 3. Fallback to min_cents_pledged_to_view (currency-aware)
+    const rawMinCents = attributes.min_cents_pledged_to_view;
+    if (rawMinCents !== undefined && rawMinCents !== null) {
+        const { normalizeCents, extractCurrency } = await import('./currencyHelper');
+        const currency = extractCurrency(attributes);
+        const minCents = normalizeCents(Number(rawMinCents), currency);
+
         if (centsMap[minCents]) return centsMap[minCents];
 
         // Find closest tier by cents

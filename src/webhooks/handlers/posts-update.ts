@@ -134,12 +134,15 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
             logger.warn(`⚠️ No valid tier found in waterfall logic`);
         }
 
-        // Fallback: If no tiers found, check minimum pledge amount using centsMap
+        // Fallback: If no tiers found, check minimum pledge amount using centsMap (currency-aware)
         if (newTierRank === 0 && attributes.min_cents_pledged_to_view) {
-            const minCents = parseInt(attributes.min_cents_pledged_to_view);
+            const { normalizeCents, extractCurrency } = await import('../../utils/currencyHelper');
+            const currency = extractCurrency(attributes);
+            const rawCents = parseInt(attributes.min_cents_pledged_to_view);
+            const minCents = normalizeCents(rawCents, currency);
 
             logger.info(`\n🐛 [STRATEGY 2: CENTS FALLBACK]`);
-            logger.info(`🐛 No tier data found, trying min_cents_pledged_to_view: ${minCents}`);
+            logger.info(`🐛 No tier data found, trying min_cents_pledged_to_view: ${rawCents}${currency && currency !== 'USD' ? ` (${currency} → ${minCents} USD cents)` : ''}`);
             logger.info(`🐛 Available Cents Map Keys: ${JSON.stringify(Object.keys(centsMap).map(Number))}`);
 
             // Check centsMap for exact match

@@ -46,6 +46,86 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
         res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
+    // ── OAuth Flow: Eliminates need for Postman/curl ─────────────────
+    // GET /oauth/start → redirects creator to Patreon authorization page
+    app.get('/oauth/start', (_req: Request, res: Response) => {
+        const clientId = process.env.PATREON_CLIENT_ID;
+        const port = process.env.PORT || process.env.WEBHOOK_PORT || '3000';
+        const host = process.env.PUBLIC_URL || `http://localhost:${port}`;
+        const redirectUri = `${host}/oauth/redirect`;
+
+        if (!clientId) {
+            res.status(500).send('❌ PATREON_CLIENT_ID not configured in environment.');
+            return;
+        }
+
+        const scopes = 'campaigns campaigns.members campaigns.posts w:campaigns.webhook';
+        const url = `https://www.patreon.com/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
+        res.redirect(url);
+    });
+
+    // GET /oauth/redirect → exchanges code for tokens, saves to DB
+    app.get('/oauth/redirect', async (req: Request, res: Response) => {
+        const code = req.query.code as string;
+        if (!code) {
+            res.status(400).send('❌ Missing authorization code. Please start the flow at /oauth/start');
+            return;
+        }
+
+        const clientId = process.env.PATREON_CLIENT_ID;
+        const clientSecret = process.env.PATREON_CLIENT_SECRET;
+        const port = process.env.PORT || process.env.WEBHOOK_PORT || '3000';
+        const host = process.env.PUBLIC_URL || `http://localhost:${port}`;
+        const redirectUri = `${host}/oauth/redirect`;
+
+        if (!clientId || !clientSecret) {
+            res.status(500).send('❌ PATREON_CLIENT_ID and PATREON_CLIENT_SECRET must be set.');
+            return;
+        }
+
+        try {
+            const axios = (await import('axios')).default;
+            const tokenRes = await axios.post('https://www.patreon.com/api/oauth2/token', null, {
+                params: {
+                    code,
+                    grant_type: 'authorization_code',
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    redirect_uri: redirectUri,
+                },
+            });
+
+            const { access_token, refresh_token } = tokenRes.data;
+
+            // Save tokens to the database
+            const { setConfig } = await import('../database/db');
+            await setConfig('patreon_access_token', access_token);
+            if (refresh_token) {
+                await setConfig('patreon_refresh_token', refresh_token);
+            }
+
+            logger.info('🔑 [OAUTH] Tokens exchanged and saved to database successfully');
+
+            res.send(`
+                <html>
+                <head><title>DISBot - OAuth Success</title></head>
+                <body style="font-family:system-ui;background:#1a1a2e;color:#eee;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+                    <div style="text-align:center;max-width:500px">
+                        <h1 style="color:#4ade80">✅ Authorization Successful!</h1>
+                        <p>Your Patreon tokens have been saved to the database.</p>
+                        <p style="color:#888">You can close this tab and return to your bot.</p>
+                        <p style="font-size:0.8em;color:#666;margin-top:2em">Access Token: ${access_token.substring(0, 8)}...${access_token.slice(-4)}</p>
+                    </div>
+                </body>
+                </html>
+            `);
+        } catch (err: any) {
+            const detail = err.response?.data?.error || err.message;
+            logger.error(`🔑 [OAUTH] Token exchange failed: ${detail}`);
+            res.status(500).send(`❌ Token exchange failed: ${detail}`);
+        }
+    });
+
     // Patreon webhook endpoint
     app.post('/webhooks/patreon', async (req: Request, res: Response) => {
         try {
