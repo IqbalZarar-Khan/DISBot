@@ -93,6 +93,27 @@ const commands = [
                         .setDescription('Tier name to test')
                         .setRequired(true)
                 )
+                .addStringOption(option =>
+                    option
+                        .setName('template_type')
+                        .setDescription('Preview a specific custom template')
+                        .setRequired(false)
+                        .addChoices(
+                            { name: '📢 New Post', value: 'post_new' },
+                            { name: '🌊 Waterfall', value: 'post_waterfall' },
+                            { name: '👋 Welcome', value: 'welcome' }
+                        )
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('debug-logs')
+                .setDescription('View the last 50 X-Ray debug log entries (ephemeral)')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('export-data')
+                .setDescription('Export patron data as CSV files to your DMs (Root Admin only)')
         )
         .addSubcommand(subcommand =>
             subcommand

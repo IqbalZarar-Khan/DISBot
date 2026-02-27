@@ -6,6 +6,16 @@ export enum LogLevel {
     ERROR = 'ERROR'
 }
 
+export interface LogEntry {
+    timestamp: string;
+    level: LogLevel;
+    message: string;
+    error?: string;
+}
+
+const LOG_BUFFER_SIZE = 200;
+const logBuffer: LogEntry[] = [];
+
 let discordClient: Client | null = null;
 let logChannelId: string | null = null;
 
@@ -30,6 +40,17 @@ export async function log(level: LogLevel, message: string, error?: Error): Prom
     console.log(`[${timestamp}] ${prefix} ${message}`);
     if (error) {
         console.error(error);
+    }
+
+    // Store in ring buffer
+    logBuffer.push({
+        timestamp,
+        level,
+        message,
+        error: error?.message,
+    });
+    if (logBuffer.length > LOG_BUFFER_SIZE) {
+        logBuffer.shift();
     }
 
     // Discord log (only for WARN and ERROR)
@@ -73,6 +94,14 @@ export const logger = {
     warn: (message: string, error?: Error) => log(LogLevel.WARN, message, error),
     error: (message: string, error?: Error) => log(LogLevel.ERROR, message, error)
 };
+
+/**
+ * Get recent log entries from the in-memory ring buffer.
+ * @param count - Number of recent entries to return (default 50)
+ */
+export function getRecentLogs(count: number = 50): LogEntry[] {
+    return logBuffer.slice(-count);
+}
 
 function getLogPrefix(level: LogLevel): string {
     switch (level) {
