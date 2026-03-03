@@ -38,16 +38,20 @@ export async function handleStatus(interaction: ChatInputCommandInteraction): Pr
             const start = Date.now();
             const patreon = await getPatreonClient();
             const response = await patreon.get(
-                `/campaigns/${config.patreonCampaignId}`,
+                '/campaigns',
                 {
                     timeout: 5000,
-                    params: { 'fields[campaign]': 'created_at' }
+                    params: { 'fields[campaign]': 'created_at,patron_count' }
                 }
             );
             const latency = Date.now() - start;
-            if (response.status === 200) {
+            const campaigns = response.data?.data || [];
+            if (response.status === 200 && campaigns.length > 0) {
+                const patronCount = campaigns[0]?.attributes?.patron_count;
                 patreonStatus = '🟢 Connected';
-                patreonLatency = ` (${latency}ms)`;
+                patreonLatency = ` (${latency}ms${patronCount ? `, ${patronCount} patrons` : ''})`;
+            } else if (response.status === 200) {
+                patreonStatus = '🟡 Connected but no campaigns found';
             }
         } catch (err: any) {
             const code = err.response?.status;
