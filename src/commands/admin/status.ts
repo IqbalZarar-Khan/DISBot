@@ -46,8 +46,16 @@ export async function handleStatus(interaction: ChatInputCommandInteraction): Pr
                 patreonStatus = '🟢 Connected';
                 patreonLatency = ` (${latency}ms)`;
             }
-        } catch {
-            patreonStatus = '🔴 Error - Check token';
+        } catch (err: any) {
+            const code = err.response?.status;
+            const detail = err.response?.data?.errors?.[0]?.detail || err.message || '';
+            if (code === 401) {
+                patreonStatus = '🔴 Token expired/invalid';
+            } else if (code === 404) {
+                patreonStatus = `🔴 Campaign not found (ID: ${config.patreonCampaignId || 'MISSING'})`;
+            } else {
+                patreonStatus = `🔴 Error (${code || 'network'}): ${detail.substring(0, 50)}`;
+            }
         }
 
         // ── Database health ──────────────────────────────────────
