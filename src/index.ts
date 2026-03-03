@@ -195,6 +195,14 @@ function registerEventHandlers() {
         } catch (err) {
             console.warn('⚠️ Keyword detection failed to register:', (err as Error).message);
         }
+
+        // Run pre-flight health checks (intents, webhooks)
+        try {
+            const { runHealthChecks } = await import('./utils/healthChecks');
+            await runHealthChecks(readyClient as any);
+        } catch (err) {
+            console.warn('⚠️ Health checks failed:', (err as Error).message);
+        }
     });
 
     // Interaction create event (for slash commands)
