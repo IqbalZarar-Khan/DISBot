@@ -80,6 +80,11 @@
 - **💾 SQLite Fallback Database**: Zero-config embedded DB when Supabase is not configured (Supabase still recommended)
 - **🩺 Startup Health Checks**: Verifies Server Members Intent + Patreon webhook registration on boot
 - **🚀 1-Click Railway Deploy**: Deploy button in README auto-provisions the entire app with env var form
+- **📝 Visual Template Editor**: Drag-and-drop placeholders with live Discord embed preview in wizard
+- **🔨 Auto-Capture IDs**: Type `!claim` in any channel — bot captures Guild ID, Admin ID, Channel ID automatically
+- **🎯 Drag-and-Drop Tier Ranker**: Visual tier priority cards in wizard — no JSON editing needed
+- **🚇 Zero-Auth Local Tunnels**: `npm run dev:tunnel` — no ngrok account required (uses localtunnel)
+- **🎉 First-Deploy Welcome DM**: Interactive onboarding DM with setup checklist on first deployment
 
 <p align="center">
   <img src="screenshots/5.png" alt="A Complete Community Toolkit" width="100%" />
@@ -395,6 +400,9 @@ src/
 │   ├── formatter.ts         # Message template formatting
 │   ├── keywordDetector.ts   # FAQ keyword auto-replies + prefix commands
 │   ├── logger.ts            # Logging (console + Discord)
+│   ├── firstDeploy.ts       # First-deployment welcome DM
+│   ├── healthChecks.ts      # Startup intent + webhook health checks
+│   ├── setupMode.ts         # Auto-capture Discord IDs (!claim)
 │   ├── patreonClient.ts     # Axios wrapper with auto token-refresh
 │   ├── patreonPoller.ts     # Background tier-change poller
 │   ├── testHelpers.ts       # Webhook test utilities
@@ -416,8 +424,9 @@ src/
 ├── config.ts         # Configuration + tier rank validation
 └── index.ts          # Main entry point + startup orchestration
 scripts/
-├── setup-wizard.ts   # Local HTML setup dashboard (npm run setup:wizard)
+├── setup-wizard.ts   # Local HTML setup dashboard (template editor + tier ranker)
 ├── test-webhook.ts   # HMAC-signed webhook tester (npm run test:webhook)
+├── dev-tunnel.ts     # Zero-auth local tunnel (npm run dev:tunnel)
 ├── fetch-patreon-config.ts  # Auto-fetch tiers + write .env
 └── dev-ngrok.ts      # Auto-tunnel for local development
 setup-vps.sh          # One-command VPS setup (Caddy + PM2 + Node.js)
@@ -631,6 +640,11 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - ✅ **💾 SQLite Fallback**: Zero-config embedded database when Supabase isn’t configured
 - ✅ **🩺 Startup Health Checks**: Verifies Server Members Intent + webhook registration on boot
 - ✅ **🚀 1-Click Railway Deploy**: Deploy button auto-provisions the app with env var form
+- ✅ **📝 Visual Template Editor**: Drag-and-drop message template builder with live preview
+- ✅ **🔨 Auto-Capture Discord IDs**: `!claim` command captures Guild/Admin/Channel IDs (no Developer Mode)
+- ✅ **🎯 Drag-and-Drop Tier Ranker**: Visual tier priority editor in wizard
+- ✅ **🚇 Zero-Auth Local Tunnels**: `npm run dev:tunnel` replaces ngrok (no sign-up needed)
+- ✅ **🎉 First-Deploy Welcome DM**: Interactive onboarding DM on first successful deployment
 
 ### Previous (Feb 2026)
 - ✅ Railway Deployment (recommended), Node.js 20, Dockerfile upgrade, Early Port Binding

@@ -11,7 +11,9 @@ import { initI18n } from './utils/i18n';
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
     ]
 });
 
@@ -202,6 +204,22 @@ function registerEventHandlers() {
             await runHealthChecks(readyClient as any);
         } catch (err) {
             console.warn('⚠️ Health checks failed:', (err as Error).message);
+        }
+
+        // Register setup mode (!claim command) if IDs aren't configured
+        try {
+            const { registerSetupMode } = await import('./utils/setupMode');
+            registerSetupMode(readyClient as any);
+        } catch (err) {
+            console.warn('⚠️ Setup mode failed to register:', (err as Error).message);
+        }
+
+        // Send first-deployment welcome DM
+        try {
+            const { sendFirstDeployDM } = await import('./utils/firstDeploy');
+            await sendFirstDeployDM(readyClient as any);
+        } catch (err) {
+            console.warn('⚠️ First deploy DM failed:', (err as Error).message);
         }
     });
 

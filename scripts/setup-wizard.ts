@@ -97,6 +97,12 @@ const HTML = `<!DOCTYPE html>
         .toggle-group { display: flex; gap: 1rem; margin-bottom: 1rem; }
         .toggle-btn { flex: 1; padding: 0.8rem; text-align: center; border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
         .toggle-btn.active { border-color: #5865F2; background: rgba(88,101,242,0.2); }
+        .placeholder-tag { display:inline-block; padding:0.3rem 0.6rem; background:rgba(88,101,242,0.3); border:1px solid #5865F2; border-radius:6px; cursor:grab; font-family:monospace; font-size:0.85rem; }
+        .placeholder-tag:active { cursor:grabbing; }
+        .tier-card { display:flex; align-items:center; gap:0.8rem; padding:0.8rem; margin-bottom:0.5rem; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; cursor:grab; }
+        .tier-card:active { cursor:grabbing; background:rgba(88,101,242,0.2); }
+        .tier-card .handle { font-size:1.2rem; color:#666; }
+        .tier-card .rank { background:#5865F2; color:#fff; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.8rem; font-weight:600; min-width:2rem; text-align:center; }
     </style>
 </head>
 <body>
@@ -167,9 +173,46 @@ const HTML = `<!DOCTYPE html>
         <div id="supabaseStatus"></div>
     </div>
 
-    <!-- Step 4: Save -->
+    <!-- Step 4: Template Editor -->
     <div class="card">
-        <h2>4️⃣ Save Configuration</h2>
+        <h2>📝 Message Template Editor</h2>
+        <p style="margin-bottom:1rem;color:#aaa">Drag placeholders into the template, then preview how it looks as a Discord embed.</p>
+        <label>Template Type</label>
+        <select id="templateType" onchange="loadTemplate()">
+            <option value="post_new">New Post Alert</option>
+            <option value="post_waterfall">Waterfall Release</option>
+            <option value="welcome">Welcome Message</option>
+        </select>
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1rem">
+            <span class="placeholder-tag" draggable="true" ondragstart="dragPlaceholder(event,'{title}')">{title}</span>
+            <span class="placeholder-tag" draggable="true" ondragstart="dragPlaceholder(event,'{url}')">{url}</span>
+            <span class="placeholder-tag" draggable="true" ondragstart="dragPlaceholder(event,'{tier}')">{tier}</span>
+            <span class="placeholder-tag" draggable="true" ondragstart="dragPlaceholder(event,'{post_snippet}')">{post_snippet}</span>
+            <span class="placeholder-tag" draggable="true" ondragstart="dragPlaceholder(event,'{author}')">{author}</span>
+            <span class="placeholder-tag" draggable="true" ondragstart="dragPlaceholder(event,'{date}')">{date}</span>
+        </div>
+        <textarea id="templateContent" rows="4" style="width:100%;padding:0.6rem;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-family:monospace;resize:vertical" ondrop="dropPlaceholder(event)" ondragover="event.preventDefault()" oninput="updatePreview()">🎉 New {tier} exclusive: **{title}**\\n\\n{post_snippet}\\n\\n🔗 [Read on Patreon]({url})</textarea>
+        <div style="margin-top:1rem;padding:1rem;background:rgba(88,101,242,0.15);border-left:3px solid #5865F2;border-radius:8px">
+            <div style="font-size:0.75rem;color:#5865F2;margin-bottom:0.5rem">PREVIEW</div>
+            <div id="templatePreview" style="color:#ddd"></div>
+        </div>
+        <button class="btn-primary" style="margin-top:1rem" onclick="saveTemplate()">💾 Save Template</button>
+        <div id="templateStatus"></div>
+    </div>
+
+    <!-- Step 5: Tier Ranker -->
+    <div class="card">
+        <h2>🎯 Tier Priority Ranker</h2>
+        <p style="margin-bottom:1rem;color:#aaa">Drag tiers to set priority order. Highest tier at top. Click "Load from .env" to start.</p>
+        <button class="btn-primary" onclick="loadTiers()">📥 Load from .env</button>
+        <div id="tierList" style="margin-top:1rem"></div>
+        <button class="btn-success" style="margin-top:1rem;display:none" id="saveTiersBtn" onclick="saveTiers()">💾 Save Tier Order</button>
+        <div id="tierStatus"></div>
+    </div>
+
+    <!-- Step 6: Save -->
+    <div class="card">
+        <h2>6️⃣ Save Configuration</h2>
         <p style="margin-bottom:1rem;color:#aaa">Writes settings to .env. WEBHOOK_SECRET is auto-generated if missing.</p>
         <button class="btn-success" onclick="saveAll()">💾 Save to .env</button>
         <div id="saveStatus"></div>
@@ -253,6 +296,95 @@ async function saveAll() {
         el.textContent = data.message;
     } catch(e) { el.className='status err'; el.textContent='Save failed'; }
 }
+
+// Template Editor
+function dragPlaceholder(e, text) { e.dataTransfer.setData('text/plain', text); }
+function dropPlaceholder(e) {
+    e.preventDefault();
+    const ta = document.getElementById('templateContent');
+    const pos = ta.selectionStart;
+    const txt = e.dataTransfer.getData('text/plain');
+    ta.value = ta.value.slice(0, pos) + txt + ta.value.slice(pos);
+    updatePreview();
+}
+function updatePreview() {
+    const content = document.getElementById('templateContent').value;
+    const preview = content
+        .replace(/{title}/g, 'My Awesome New Chapter')
+        .replace(/{url}/g, 'https://patreon.com/posts/12345')
+        .replace(/{tier}/g, 'Diamond')
+        .replace(/{post_snippet}/g, 'The adventure continues as our hero faces...')
+        .replace(/{author}/g, 'Iqbal Khan')
+        .replace(/{date}/g, new Date().toLocaleDateString())
+        .replace(/\\n/g, '<br>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:#5865F2">$1</a>');
+    document.getElementById('templatePreview').innerHTML = preview;
+}
+async function loadTemplate() {
+    const type = document.getElementById('templateType').value;
+    try {
+        const res = await fetch('/wizard/template?type=' + type);
+        const data = await res.json();
+        if (data.content) document.getElementById('templateContent').value = data.content;
+        updatePreview();
+    } catch(e) {}
+}
+async function saveTemplate() {
+    const type = document.getElementById('templateType').value;
+    const content = document.getElementById('templateContent').value;
+    const el = document.getElementById('templateStatus');
+    try {
+        const res = await fetch('/wizard/template', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type,content}) });
+        const data = await res.json();
+        el.className = 'status ' + (data.ok ? 'ok' : 'err');
+        el.textContent = data.message;
+    } catch(e) { el.className='status err'; el.textContent='Failed'; }
+}
+
+// Tier Ranker
+let tierData = [];
+function loadTiers() {
+    fetch('/wizard/tiers').then(r=>r.json()).then(data => {
+        tierData = data.tiers || [];
+        renderTiers();
+        document.getElementById('saveTiersBtn').style.display = 'inline-block';
+    });
+}
+function renderTiers() {
+    const el = document.getElementById('tierList');
+    el.innerHTML = tierData.map((t, i) => 
+        '<div class="tier-card" draggable="true" data-idx="'+i+'" ondragstart="tierDragStart(event)" ondragover="tierDragOver(event)" ondrop="tierDrop(event)">'+
+        '<span class="handle">☰</span>'+
+        '<span class="rank">#'+(i+1)+'</span>'+
+        '<strong>'+t.name+'</strong>'+
+        '<span style="color:#888;margin-left:auto">$'+(t.cents/100).toFixed(2)+'/mo</span>'+
+        '</div>'
+    ).join('');
+}
+let dragIdx = null;
+function tierDragStart(e) { dragIdx = parseInt(e.target.closest('.tier-card').dataset.idx); }
+function tierDragOver(e) { e.preventDefault(); }
+function tierDrop(e) {
+    e.preventDefault();
+    const dropIdx = parseInt(e.target.closest('.tier-card').dataset.idx);
+    if (dragIdx !== null && dragIdx !== dropIdx) {
+        const item = tierData.splice(dragIdx, 1)[0];
+        tierData.splice(dropIdx, 0, item);
+        renderTiers();
+    }
+}
+async function saveTiers() {
+    const ranked = tierData.map((t, i) => ({...t, rank: (tierData.length - i) * 10}));
+    const el = document.getElementById('tierStatus');
+    try {
+        const res = await fetch('/wizard/tiers', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({tiers: ranked}) });
+        const data = await res.json();
+        el.className = 'status ' + (data.ok ? 'ok' : 'err');
+        el.textContent = data.message;
+    } catch(e) { el.className='status err'; el.textContent='Failed'; }
+}
+updatePreview();
 </script>
 </body>
 </html>`;
@@ -392,6 +524,55 @@ app.post('/wizard/save', (req, res) => {
 
         writeEnv(filtered);
         res.json({ ok: true, message: `✅ Saved ${Object.keys(filtered).length} variables to .env` });
+    } catch (err: any) {
+        res.json({ ok: false, message: `❌ ${err.message}` });
+    }
+});
+
+// ── Template Editor ───────────────────────────────────────────────
+
+app.get('/wizard/template', (req, res) => {
+    const type = req.query.type as string || 'post_new';
+    const env = getExistingEnv();
+    const key = `MESSAGE_TEMPLATE_${type.toUpperCase()}`;
+    res.json({ content: env[key] || '' });
+});
+
+app.post('/wizard/template', (req, res) => {
+    const { type, content } = req.body;
+    const key = `MESSAGE_TEMPLATE_${type.toUpperCase()}`;
+    try {
+        writeEnv({ [key]: content });
+        res.json({ ok: true, message: `✅ Template "${type}" saved!` });
+    } catch (err: any) {
+        res.json({ ok: false, message: `❌ ${err.message}` });
+    }
+});
+
+// ── Tier Ranker ───────────────────────────────────────────────────
+
+app.get('/wizard/tiers', (req, res) => {
+    const env = getExistingEnv();
+    try {
+        const tierConfig = env.TIER_CONFIG ? JSON.parse(env.TIER_CONFIG.replace(/^'|'$/g, '')) : [];
+        const tiers = tierConfig.map((t: any) => ({
+            name: t.name,
+            id: t.id || '',
+            rank: t.rank || 0,
+            cents: t.cents || 0,
+        })).sort((a: any, b: any) => b.rank - a.rank);
+        res.json({ tiers });
+    } catch {
+        res.json({ tiers: [] });
+    }
+});
+
+app.post('/wizard/tiers', (req, res) => {
+    const { tiers } = req.body;
+    try {
+        const tierConfig = JSON.stringify(tiers);
+        writeEnv({ TIER_CONFIG: tierConfig });
+        res.json({ ok: true, message: `✅ Saved ${tiers.length} tiers with updated ranks!` });
     } catch (err: any) {
         res.json({ ok: false, message: `❌ ${err.message}` });
     }

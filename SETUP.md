@@ -245,9 +245,8 @@ The easiest way to configure your tiers is using the setup script. It uses your 
    - **Auto-write** `TIER_CONFIG`, `PATREON_CAMPAIGN_ID`, and `WEBHOOK_SECRET` to your `.env`
    - Auto-assign ranks based on price (highest = 100)
 
-5. **Adjust ranks** (optional):
-   - Ranks are auto-assigned but you can tweak them in `.env` if needed
-   - Higher rank = higher tier priority
+   - High ranks receive posts before low ranks (waterfall system)
+   - You can also visually drag-and-drop tiers in the **Setup Wizard** (`npm run setup:wizard`) under the "Tier Priority Ranker" tab to auto-generate the JSON.
 
 ### Manual Setup (Alternative)
 
@@ -362,6 +361,23 @@ openssl rand -hex 32
 ---
 
 ## 6. Webhook Configuration
+
+### Local Tunneling (Zero-Auth)
+
+For Patreon to send webhooks to your local machine, you need a public URL. The bot includes a zero-configuration localtunnel script that requires **no account sign-ups**.
+
+1. Run the auto-tunnel command:
+   ```bash
+   npm run dev:tunnel
+   ```
+2. The bot will print a public webhook URL (e.g., `https://localtunnel.me/.../webhooks/patreon`).
+3. Use this URL in the Patreon Webhooks portal.
+
+*(Note: If you already use ngrok, you can use `npm run dev:ngrok` instead)*
+
+---
+
+## Deployment (Railway)
 
 ### Option A: Local Development (ngrok)
 
