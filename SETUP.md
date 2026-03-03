@@ -4,14 +4,35 @@ This guide will walk you through setting up the Patreon-Discord Content Distribu
 
 ## Table of Contents
 
-1. [Discord Bot Setup](#1-discord-bot-setup)
-2. [Patreon OAuth Application](#2-patreon-oauth-application)
-3. [Supabase Database Setup](#3-supabase-database-setup)
-4. [Tier Configuration](#4-tier-configuration)
-5. [Environment Configuration](#5-environment-configuration)
-6. [Webhook Configuration](#6-webhook-configuration)
-7. [Initial Bot Configuration](#7-initial-bot-configuration)
-8. [Testing](#8-testing)
+1. [Quick Start (Setup Wizard)](#0-quick-start-setup-wizard)
+2. [Discord Bot Setup](#1-discord-bot-setup)
+3. [Patreon OAuth Application](#2-patreon-oauth-application)
+4. [Supabase Database Setup](#3-supabase-database-setup)
+5. [Tier Configuration](#4-tier-configuration)
+6. [Environment Configuration](#5-environment-configuration)
+7. [Webhook Configuration](#6-webhook-configuration)
+8. [Initial Bot Configuration](#7-initial-bot-configuration)
+9. [Testing](#8-testing)
+
+---
+
+## 0. Quick Start (Setup Wizard)
+
+The fastest way to get started — launch a local HTML dashboard that handles everything visually:
+
+```bash
+npm install
+npm run setup:wizard
+```
+
+Open `http://localhost:3456/wizard` in your browser. The wizard provides:
+- **"Connect Patreon"** button — handles the full OAuth flow, saves tokens to `.env`
+- **"Test Supabase"** button — verifies database connectivity
+- **"Save to .env"** — writes all config, auto-generates `WEBHOOK_SECRET`
+
+After the wizard saves your `.env`, skip to [Step 7: Initial Bot Configuration](#7-initial-bot-configuration).
+
+> If you prefer manual setup, continue below.
 
 ---
 
@@ -87,7 +108,21 @@ This guide will walk you through setting up the Patreon-Discord Content Distribu
 
 ### Get Access Token
 
-You'll need to perform an OAuth flow to get your access token. Here's a simple method:
+You have two options:
+
+**Option A: Automated (Recommended)**
+
+If the bot is already running, navigate to:
+```
+https://your-bot-url/oauth/start
+```
+The bot handles the entire OAuth flow automatically and saves the tokens to the database.
+
+**Option B: Setup Wizard**
+
+Run `npm run setup:wizard` and click the "Connect Patreon" button.
+
+**Option C: Manual (curl/Postman)**
 
 1. **Authorization URL** (replace `YOUR_CLIENT_ID`):
    ```
@@ -99,7 +134,7 @@ You'll need to perform an OAuth flow to get your access token. Here's a simple m
 3. You'll be redirected to `http://localhost:3000/oauth/redirect?code=XXXXX`
    - Copy the `code` parameter
 
-4. Exchange the code for tokens using curl or Postman:
+4. Exchange the code for tokens:
    ```bash
    curl -X POST https://www.patreon.com/api/oauth2/token \
      -d "code=YOUR_CODE" \
@@ -113,15 +148,17 @@ You'll need to perform an OAuth flow to get your access token. Here's a simple m
    - `access_token` → Save for `PATREON_ACCESS_TOKEN`
    - `refresh_token` → Save for `PATREON_REFRESH_TOKEN`
 
+> **Note**: The bot automatically refreshes expired tokens on 401 errors. You don't need to manually refresh tokens.
+
 ### Get Campaign ID
 
-1. Make a request to get your campaigns:
-   ```bash
-   curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-     https://www.patreon.com/api/oauth2/v2/campaigns
-   ```
+Run `npm run setup:patreon` to auto-fetch your campaign ID and tier config.
 
-2. Copy the `id` from the response → Save for `PATREON_CAMPAIGN_ID`
+Or manually:
+```bash
+curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  https://www.patreon.com/api/oauth2/v2/campaigns
+```
 
 ---
 
@@ -143,6 +180,9 @@ The bot uses Supabase for persistent data storage.
 
 ### Run Database Migration
 
+> **Automatic**: Database migrations run automatically on bot startup. No manual SQL needed!
+
+If you prefer to run migrations manually:
 1. Go to **SQL Editor** in Supabase dashboard
 2. Click **"New Query"**
 3. Copy and paste the migration SQL from `supabase/migrations/`
@@ -180,10 +220,11 @@ The easiest way to configure your tiers is using the setup script. It uses your 
    npm run setup:patreon
    ```
 
-4. **Copy the output** to your `.env` file. The script will display:
-   - A formatted table of all your tiers (names, prices, patron counts, IDs)
-   - Ready-to-paste `PATREON_CAMPAIGN_ID` and `TIER_CONFIG` values
-   - **Auto-assigned ranks** based on price (highest-priced tier = rank 100)
+4. The script will automatically:
+   - Fetch your `PATREON_CAMPAIGN_ID`
+   - Display a formatted table of all your tiers
+   - **Auto-write** `TIER_CONFIG`, `PATREON_CAMPAIGN_ID`, and `WEBHOOK_SECRET` to your `.env`
+   - Auto-assign ranks based on price (highest = 100)
 
 5. **Adjust ranks** (optional):
    - Ranks are auto-assigned but you can tweak them in `.env` if needed
@@ -288,6 +329,10 @@ TIER_CONFIG='[{"name":"Diamond","id":"YOUR_TIER_ID","rank":100,"cents":2500}]'
 > ⚠️ **`SUPABASE_KEY`** must be the **service_role** key for strict RLS policies to work correctly.
 
 **Generate a webhook secret:**
+
+> **Automatic**: `npm run setup:patreon` and `npm run setup:wizard` both auto-generate a `WEBHOOK_SECRET` if one doesn't exist.
+
+Manual alternative:
 ```bash
 # On Linux/Mac:
 openssl rand -hex 32
@@ -516,6 +561,17 @@ Your bot is now ready to automatically distribute content based on Patreon tiers
 - Ensure you are using the **service_role** key (not anon key)
 - Check Supabase project is active
 - Ensure all migrations (including `006_strict_rls_policies.sql`) were run
+- The bot uses an in-memory DB cache — it can continue routing posts even during brief Supabase outages
+
+### Token expiration
+- The bot automatically refreshes expired Patreon tokens using the refresh token
+- If the refresh token itself expires, run `npm run setup:wizard` or visit `/oauth/start` to re-authorize
+- On startup, the bot validates OAuth scopes and warns if they're missing
+
+### Ghost/duplicate webhooks
+- The bot automatically filters duplicate webhooks (exact body match within 60s)
+- "Ghost" webhooks (no meaningful state change) are silently discarded within a 5-minute window
+- Check logs for `👻 [GHOST]` entries to confirm filtering
 
 ---
 

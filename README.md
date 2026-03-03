@@ -35,6 +35,7 @@
 - **🔒 Zero-Trust Security**: HMAC webhook verification, Row-Level Security, whitelist-protected admin commands
 - **📊 Real-time Webhooks**: Instant notifications via Patreon webhook events
 - **💎 Dynamic Tier System**: Configurable via JSON or live-synced from the Patreon API
+- **🗄️ Graceful Degradation**: In-memory DB cache keeps the bot running if Supabase goes offline
 
 <p align="center">
   <img src="screenshots/4.png" alt="The Waterfall Release System — Day 1 Diamond, Day 7 Gold, Day 14 Public" width="100%" />
@@ -44,16 +45,30 @@
 - **💬 Custom Message Templates**: Fully customizable with placeholders (`{tier}`, `{title}`, `{url}`, `{user}`, `{post_snippet}`, `{pledge_amount}`, `{patron_count}`)
 - **🧵 Auto-Thread Creation**: Optionally creates discussion threads under post alerts to keep channels clean
 - **🗑️ Silent Post Deletion**: Automatically removes deleted posts without spammy notifications
-- **🔧 Automated DB Setup**: `npm run setup:patreon` writes tiers directly to Supabase (no manual .env editing)
+- **🔧 Automated DB Setup**: `npm run setup:patreon` auto-writes tiers + WEBHOOK_SECRET directly to `.env` and Supabase
 - **🔄 Live Tier Sync**: `/admin sync-tiers` fetches tiers from Patreon API without restarting
 - **📋 Interactive Setup**: `/admin setup` with dropdown menus for tier→channel mapping
 - **🔧 Bulk Mapping Wizard**: `/admin bulk-map` maps all unmapped tiers in a guided sequence
 - **🔀 Event Routing**: Route member events (joins, departures, upgrades) to specific Discord channels
 - **📊 Patron Analytics**: `/admin stats` shows growth, tier distribution, and recent activity
 - **🔍 In-Discord Debug Logs**: `/admin debug-logs` shows the last 50 X-Ray log entries without leaving Discord
-- **� Data Export**: `/admin export-data` generates CSV files of all patron data and DMs them to the admin
+- **📦 Data Export**: `/admin export-data` generates CSV files of all patron data and DMs them to the admin
 - **🧪 Template Preview**: `/admin test-alert <tier> <template_type>` previews custom templates with sample data
 - **🕵️ Enhanced Diagnostics**: `/admin status` shows API latency, uptime, webhook stats, and tier detection accuracy
+- **🔐 OAuth Token Exchange**: Built-in `/oauth/start` route eliminates curl/Postman for token setup
+- **🔄 Automatic Token Refresh**: `patreonClient.ts` auto-refreshes expired tokens on 401 errors
+- **🌍 Currency-Aware Pledges**: Normalizes international currencies to USD cents for accurate tier detection
+- **⚠️ Tier Rank Validation**: Warns on startup if cheaper tiers outrank expensive tiers in config
+- **👻 Ghost Webhook Filter**: Silently discards duplicate webhooks with no meaningful state change
+- **🔄 Poller Toggle**: `/admin poller` lets admins start/stop the background poller to save resources
+- **💌 Win-Back DMs**: Auto-DMs departing patrons with a customizable farewell message
+- **🎂 Anniversary Celebrations**: Daily checker posts celebratory messages for 1yr/2yr pledge milestones
+- **📊 Weekly Digest**: Every Sunday, DMs root admin a summary of the week's patron activity
+- **📖 Serialized Content Formatting**: Auto-detects "Chapter N" / "Part N" in titles for spoiler-tagged embeds
+- **🖥️ Server Monitoring**: `/admin server-stats` shows live CPU, memory, uptime, and PM2 info
+- **🧙 Setup Wizard GUI**: `npm run setup:wizard` launches a local HTML dashboard for frictionless first-time setup
+- **🔬 Startup Scope Validation**: Verifies Patreon OAuth token scopes on boot, warns if missing
+- **🏗️ Auto DB Migrations**: Runs pending SQL migrations automatically on startup
 
 <p align="center">
   <img src="screenshots/5.png" alt="A Complete Community Toolkit" width="100%" />
@@ -89,7 +104,15 @@
    npm install
    ```
 
-3. **Configure environment variables**
+3. **Configure environment** (choose one):
+
+   **Option A — Setup Wizard (Recommended for beginners)**:
+   ```bash
+   npm run setup:wizard
+   ```
+   Opens a local HTML dashboard at `http://localhost:3456/wizard` with buttons for Patreon OAuth, Supabase testing, and `.env` auto-writing.
+
+   **Option B — Manual `.env`**:
    ```bash
    cp .env.example .env
    # Edit .env with your credentials
@@ -97,8 +120,8 @@
 
 4. **Set up Supabase database**
    - Create a new Supabase project
-   - Run the SQL migration from `supabase/migrations/`
-   - Copy your Supabase URL and anon key to `.env`
+   - Database migrations run **automatically on first boot** — no manual SQL needed
+   - Copy your Supabase URL and service_role key to `.env`
 
 5. **Configure your tiers (Automated Method)**
    
@@ -112,9 +135,8 @@
    The script will:
    - Fetch your `PATREON_CAMPAIGN_ID` automatically
    - Display a formatted table of all your tiers with prices and patron counts
-   - Generate a ready-to-paste `TIER_CONFIG` with **auto-assigned ranks** (highest-priced = 100)
-   
-   Just copy the output into your `.env` file. Adjust ranks if needed.
+   - **Auto-write** `TIER_CONFIG`, `PATREON_CAMPAIGN_ID`, and `WEBHOOK_SECRET` directly to `.env`
+   - Auto-assign ranks (highest-priced = 100)
 
 6. **Build the project**
    ```bash
@@ -230,11 +252,20 @@ All admin commands are restricted to the user specified in `ROOT_ADMIN_ID`.
 
 | Command | Description |
 |---------|-------------|
-| `/admin status` | Display bot status and configuration |
+| `/admin status` | Display bot status, config, API latency, and tier accuracy |
 | `/admin set-channel <tier> <channel>` | Map a Patreon tier to a Discord channel |
 | `/admin set-message <type> <content>` | Customize bot message templates |
 | `/admin set-owner <user>` | Transfer bot control to another user |
 | `/admin test-alert <tier>` | Send a test alert to verify setup |
+| `/admin sync-tiers` | Live-sync tiers from Patreon API |
+| `/admin setup` | Interactive tier→channel mapping wizard |
+| `/admin bulk-map` | Map all unmapped tiers in a guided sequence |
+| `/admin stats` | View patron growth, tier distribution, recent activity |
+| `/admin set-event-channel <event> <channel>` | Route member events to specific channels |
+| `/admin debug-logs` | View last 50 X-Ray debug log entries |
+| `/admin export-data` | Export patron data as CSV files via DM |
+| `/admin poller <action>` | Start, stop, or check the Patreon post poller |
+| `/admin server-stats` | Live CPU, memory, uptime, and PM2 monitoring |
 
 ## 🔄 How It Works
 
@@ -286,16 +317,23 @@ Customize all bot messages using the `/admin set-message` command:
 - `post_new` - New post notifications
 - `post_waterfall` - Waterfall update alerts
 - `welcome` - Welcome messages for new patrons
+- `win_back` - Farewell DM for departing patrons (placeholders: `{user}`, `{name}`)
+- `anniversary` - Pledge anniversary celebrations (placeholders: `{user}`, `{years}`)
 
 **Placeholders:**
 - `{tier}` - Tier name (e.g., "Diamond", "Gold")
 - `{title}` - Post title
 - `{url}` - Post URL
-- `{user}` - User mention (for welcome messages)
+- `{user}` - User mention (for welcome/win-back messages)
+- `{post_snippet}` - First 200 chars of post content
+- `{pledge_amount}` - Pledge amount (e.g., "$25.00")
+- `{patron_count}` - Total patron count
+- `{years}` - Anniversary year count
 
 **Example:**
 ```
 /admin set-message type:post_new content:🎉 New {tier} exclusive: {title} - {url}
+/admin set-message type:win_back content:Hey {user}, thanks for your support! We'd love to have you back 💙
 ```
 
 ### Member Tracking
@@ -312,41 +350,68 @@ Customize all bot messages using the `/admin set-message` command:
 src/
 ├── commands/           # Slash command handlers
 │   ├── admin/         # Admin-only commands
-│   │   ├── handler.ts    # Command router
+│   │   ├── handler.ts        # Command router
 │   │   ├── set-channel.ts
 │   │   ├── set-message.ts
 │   │   ├── set-owner.ts
 │   │   ├── status.ts
-│   │   └── test-alert.ts
+│   │   ├── test-alert.ts
+│   │   ├── sync-tiers.ts
+│   │   ├── setup.ts          # Interactive mapping wizard
+│   │   ├── stats.ts          # Patron analytics
+│   │   ├── bulk-map.ts
+│   │   ├── set-event-channel.ts
+│   │   ├── debug-logs.ts
+│   │   ├── export-data.ts
+│   │   ├── poller.ts         # Poller toggle command
+│   │   └── server-stats.ts   # Server monitoring
+│   ├── commandData.ts        # Shared command definitions
 │   └── deploy-commands.ts
 ├── database/          # Database layer (Supabase)
 │   ├── db.ts         # Database operations
+│   ├── dbCache.ts    # In-memory cache for graceful degradation
+│   ├── autoMigrate.ts # Automatic SQL migrations on startup
 │   ├── schema.ts     # TypeScript interfaces
 │   └── supabase.ts   # Supabase client
 ├── middleware/        # Authorization middleware
 │   └── adminCheck.ts
 ├── utils/            # Utility functions
-│   ├── embedBuilder.ts   # Discord embed creation
-│   ├── errorHandler.ts   # Error handling
-│   ├── formatter.ts      # Message template formatting
-│   ├── logger.ts         # Logging (console + Discord)
-│   ├── testHelpers.ts    # Webhook test utilities
-│   └── tierRanking.ts    # Dynamic tier system
+│   ├── anniversaryChecker.ts # Daily pledge anniversary detector
+│   ├── chapterFormatter.ts  # Serialized content (Chapter/Part) formatting
+│   ├── currencyHelper.ts    # International currency normalization
+│   ├── embedBuilder.ts      # Discord embed creation
+│   ├── errorHandler.ts      # Error handling
+│   ├── formatter.ts         # Message template formatting
+│   ├── logger.ts            # Logging (console + Discord)
+│   ├── patreonClient.ts     # Axios wrapper with auto token-refresh
+│   ├── patreonPoller.ts     # Background tier-change poller
+│   ├── testHelpers.ts       # Webhook test utilities
+│   ├── tierRanking.ts       # Dynamic tier system
+│   └── weeklyDigest.ts      # Weekly patron digest scheduler
 ├── webhooks/         # Webhook server and handlers
 │   ├── handlers/     # Event-specific handlers
-│   │   ├── members-create.ts
+│   │   ├── members-create.ts    # + win-back DMs on departure
 │   │   ├── members-update.ts
 │   │   ├── members-delete.ts
 │   │   ├── members-pledge-create.ts
 │   │   ├── members-pledge-update.ts
 │   │   ├── members-pledge-delete.ts
-│   │   ├── posts-publish.ts
+│   │   ├── posts-publish.ts     # + chapter formatting
 │   │   ├── posts-update.ts
 │   │   └── posts-delete.ts
-│   ├── server.ts     # Express webhook server
+│   ├── server.ts     # Express server + OAuth routes + ghost filter
 │   └── verify.ts     # HMAC signature verification
-├── config.ts         # Configuration management
-└── index.ts          # Main entry point
+├── config.ts         # Configuration + tier rank validation
+└── index.ts          # Main entry point + startup orchestration
+scripts/
+├── setup-wizard.ts   # Local HTML setup dashboard (npm run setup:wizard)
+├── fetch-patreon-config.ts  # Auto-fetch tiers + write .env
+└── dev-ngrok.ts      # Auto-tunnel for local development
+.github/
+├── ISSUE_TEMPLATE/
+│   ├── bug_report.md
+│   └── feature_request.md
+└── PULL_REQUEST_TEMPLATE.md
 ```
 
 ### Architecture
@@ -354,20 +419,26 @@ src/
 The bot follows an **early port-binding** architecture to work correctly on cloud platforms:
 
 1. **Supabase initialization** → Database connection test
-2. **Webhook server starts** → Binds to `PORT` immediately (required by Railway/Render)
-3. **Discord client login** → Connects to Discord gateway
-4. **Ready** → Bot is online and listening for commands + webhooks
+2. **Auto-migrations** → Runs pending SQL migrations from `supabase/migrations/`
+3. **Webhook server starts** → Binds to `PORT` immediately (required by Railway/Render)
+4. **Discord client login** → Connects to Discord gateway
+5. **Ready** → Auto-deploys slash commands, validates OAuth scopes, initializes DB cache, starts poller + anniversary checker + weekly digest
 
 This startup order ensures cloud platforms detect the open port before the Discord gateway connection completes.
 
 ### Scripts
 
-- `npm run dev` - Start with hot reload
-- `npm run build` - Compile TypeScript
-- `npm start` - Run production build
-- `npm run deploy-commands` - Register slash commands
-- `npm test` - Run tests
-- `npm run setup:patreon` - Auto-fetch Patreon tier configuration
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start with hot reload (nodemon) |
+| `npm run dev:ngrok` | Auto-tunnel local dev with ngrok |
+| `npm run build` | Compile TypeScript |
+| `npm start` | Run production build |
+| `npm run deploy-commands` | Register slash commands (also auto-runs on startup) |
+| `npm run setup:patreon` | Fetch tiers from Patreon + auto-write `.env` |
+| `npm run setup:wizard` | Launch local HTML setup dashboard on port 3456 |
+| `npm test` | Run tests |
+| `npm run verify` | Run deployment verification script |
 
 ## 🚢 Deployment
 
@@ -517,37 +588,35 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 
 ## 🆕 Recent Updates
 
-### Latest (Feb 2026)
-- ✅ **Railway Deployment**: Railway is now the recommended hosting platform
-- ✅ **Node.js 20**: Upgraded from Node 18 to Node 20 (required by Supabase SDK)
-- ✅ **Dockerfile Upgrade**: Multi-stage build with Node 20 Alpine, proper dev/prod dependency separation
-- ✅ **Early Port Binding**: Webhook server starts before Discord login to prevent cloud platform timeouts
-- ✅ **`set-message` Command**: Added missing handler for customizing bot message templates
-- ✅ **Render Compatibility Note**: Documented that Render's free tier is blocked by Discord's Cloudflare
-- ✅ **🧵 Discord Thread Integration**: Auto-creates discussion threads under post alerts (opt-in via `enable_threads`)
-- ✅ **🔒 Strict RLS Policies**: `service_role`-only database access via migration `006`
-- ✅ **🕵️ Enhanced Status Diagnostics**: `/admin status` shows API latency, uptime, webhook stats, tier detection accuracy, recent errors
-- ✅ **🔧 Bulk Channel Mapping**: `/admin bulk-map` wizard for mapping all unmapped tiers at once
-- ✅ **🔍 In-Discord Debug Logs**: `/admin debug-logs` shows last 50 X-Ray log entries as ephemeral embeds
-- ✅ **📦 Data Export**: `/admin export-data` generates CSV files and DMs them to root admin
-- ✅ **🧪 Template Preview**: `/admin test-alert <tier> <template_type>` previews custom templates with sample data
-- ✅ **🔀 Granular Event Routing**: `/admin set-event-channel` routes member events to specific Discord channels
-- ✅ **📡 Legacy Webhook Support**: Bot now handles both `members:pledge:*` and `pledges:*` event formats
-- ✅ **🔄 Auto-Ngrok Updater**: `npm run dev:ngrok` auto-detects ngrok URL and patches Patreon webhook
-- ✅ **🖼️ Visual Documentation**: README with 15 embedded screenshots covering architecture, security, workflows
-- ✅ **⚙️ Automated DB Setup**: `npm run setup:patreon` writes tiers directly to Supabase
+### Latest (Mar 2026)
+- ✅ **🔐 OAuth Token Exchange Route**: Built-in `/oauth/start` + `/oauth/redirect` — no curl/Postman needed
+- ✅ **🔄 Auto Token Refresh**: `patreonClient.ts` automatically refreshes expired tokens on 401 errors
+- ✅ **🌍 Currency-Aware Pledges**: Normalizes international currencies (EUR, GBP, etc.) to USD cents
+- ✅ **🏗️ Auto DB Migrations**: Runs SQL migrations from `supabase/migrations/` automatically on startup
+- ✅ **⚠️ Tier Rank Validation**: Warns if cheaper tiers outrank expensive ones in TIER_CONFIG
+- ✅ **👻 Ghost Webhook Filter**: Discards duplicate webhooks with no meaningful state change
+- ✅ **🔄 Poller Toggle**: `/admin poller start|stop|status` to manage background polling
+- ✅ **💌 Win-Back DMs**: Auto-DMs departing patrons with customizable farewell template
+- ✅ **🎂 Anniversary Celebrations**: Daily checker for 1yr/2yr pledge milestones
+- ✅ **📊 Weekly Digest**: Sunday DM to admin with the week's patron activity summary
+- ✅ **🗄️ In-Memory DB Cache**: Graceful degradation if Supabase goes offline
+- ✅ **📖 Chapter Formatting**: Auto-detects "Chapter/Part/Episode N" → spoiler-tagged embeds
+- ✅ **🖥️ Server Monitoring**: `/admin server-stats` shows CPU, memory, uptime, PM2 info
+- ✅ **🧙 Setup Wizard GUI**: `npm run setup:wizard` → local HTML dashboard for first-time setup
+- ✅ **🔬 OAuth Scope Validation**: Verifies token scopes on startup, warns if missing
+- ✅ **📝 Enhanced setup:patreon**: Auto-writes TIER_CONFIG + WEBHOOK_SECRET to `.env` file
+- ✅ **📋 GitHub Templates**: Bug report, feature request, and PR templates in `.github/`
+
+### Previous (Feb 2026)
+- ✅ Railway Deployment (recommended), Node.js 20, Dockerfile upgrade, Early Port Binding
+- ✅ Discord Thread Integration, Strict RLS Policies, Enhanced Status Diagnostics
+- ✅ Bulk Channel Mapping, In-Discord Debug Logs, Data Export, Template Preview
+- ✅ Granular Event Routing, Legacy Webhook Support, Auto-Ngrok Updater
 
 ### Core Features
-- ✅ **Hybrid Broadcast System**: Sends alerts to ALL channels when posts are released to multiple tiers simultaneously
-- ✅ **Custom Message Templates**: Fully customizable bot messages with placeholder support (`/admin set-message`)
-- ✅ **Silent Post Deletion**: Automatically removes deleted posts from database without Discord notifications
-- ✅ **Automated Patreon Setup**: One-command tier configuration fetcher (`npm run setup:patreon`)
-- ✅ **X-Ray Debug Logging**: Comprehensive debugging for database operations and tier detection
-- ✅ **Edit and Republish Fix**: Correctly handles Patreon's "Edit and Republish" workflow
-- ✅ **Dynamic Tier Configuration**: Configure tiers via `TIER_CONFIG` environment variable
-- ✅ **Tier ID Translation**: Automatic conversion of Patreon tier IDs to tier names
-- ✅ **Supabase Integration**: Persistent PostgreSQL storage via Supabase
-- ✅ **Fallback Mechanisms**: Multiple methods to detect post tiers (ID → Cents → Title)
+- ✅ Hybrid Broadcast System, Custom Message Templates, Silent Post Deletion
+- ✅ Automated Patreon Setup, X-Ray Debug Logging, Edit and Republish Fix
+- ✅ Dynamic Tier Configuration, Tier ID Translation, Supabase Integration, Fallback Mechanisms
 
 ---
 
