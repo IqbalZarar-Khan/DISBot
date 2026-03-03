@@ -187,6 +187,14 @@ function registerEventHandlers() {
         } catch (err) {
             console.warn('⚠️ Weekly digest failed to start:', (err as Error).message);
         }
+
+        // Register keyword detection (if Message Content Intent is enabled)
+        try {
+            const { registerKeywordDetection } = await import('./utils/keywordDetector');
+            registerKeywordDetection(readyClient as any);
+        } catch (err) {
+            console.warn('⚠️ Keyword detection failed to register:', (err as Error).message);
+        }
     });
 
     // Interaction create event (for slash commands)

@@ -12,6 +12,7 @@
     "setup:patreon": "ts-node scripts/fetch-patreon-config.ts",
     "verify": "ts-node src/scripts/verify-deployment.ts",
     "test:webhooks": "ts-node src/tests/manual-webhook-test.ts",
+    "test:webhook": "ts-node scripts/test-webhook.ts",
     "setup:wizard": "ts-node scripts/setup-wizard.ts",
     "test": "jest",
     "test:integration": "jest --testPathPattern=integration"

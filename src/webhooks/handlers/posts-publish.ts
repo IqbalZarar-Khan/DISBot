@@ -5,6 +5,7 @@ import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
 import { tierIdMap, centsMap } from '../../utils/tierRanking';
+import { config } from '../../config';
 import { handlePostsUpdate } from './posts-update';
 import { formatMessage } from '../../utils/formatter';
 
@@ -105,6 +106,18 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             if (centsMap[cents]) {
                 uniqueTiers.push(centsMap[cents]);
                 logger.info(`✅ [CENTS MATCH] ${cents} cents -> ${centsMap[cents]}`);
+
+                // ── Proactive Fallback Warning to Admin ──
+                try {
+                    const admin = await client.users.fetch(config.rootAdminId);
+                    await admin.send(
+                        `⚠️ **Tier Detection Fallback Warning**\n\n` +
+                        `Post "${attributes.title || postId}" could not be matched by Tier ID.\n` +
+                        `Fell back to **cents matching** (${cents} cents → ${centsMap[cents]}).\n\n` +
+                        `Your \`TIER_CONFIG\` may be out of sync with Patreon.\n` +
+                        `Run \`/admin sync-tiers\` or \`npm run setup:patreon\` to refresh.`
+                    );
+                } catch { /* DM failed — non-critical */ }
             }
         }
 
@@ -115,6 +128,18 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                 if (includedTier && includedTier.attributes && includedTier.attributes.title) {
                     uniqueTiers.push(includedTier.attributes.title);
                     logger.info(`✅ [TITLE MATCH] Found in included data: ${includedTier.attributes.title}`);
+
+                    // ── Proactive Fallback Warning to Admin ──
+                    try {
+                        const admin = await client.users.fetch(config.rootAdminId);
+                        await admin.send(
+                            `⚠️ **Tier Detection Fallback Warning**\n\n` +
+                            `Post "${attributes.title || postId}" could not be matched by Tier ID or cents.\n` +
+                            `Fell back to **title matching** ("${includedTier.attributes.title}").\n\n` +
+                            `Your \`TIER_CONFIG\` is likely out of sync with Patreon.\n` +
+                            `Run \`/admin sync-tiers\` or \`npm run setup:patreon\` to refresh.`
+                        );
+                    } catch { /* DM failed — non-critical */ }
                 }
             }
         }

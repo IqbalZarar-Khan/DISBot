@@ -5,6 +5,7 @@ import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
 import { centsMap, tierRankings, tierIdMap, getTierRank, isWaterfall } from '../../utils/tierRanking';
+import { config } from '../../config';
 import { formatMessage } from '../../utils/formatter';
 
 /**
@@ -151,6 +152,17 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                 newTierRank = tierRankings[newTierName] || 0;
                 detectionStrategy = 'Cents Match';
                 logger.info(`✅ [CENTS MATCH FOUND] ${minCents} cents -> ${newTierName} (Rank: ${newTierRank})`);
+
+                // ── Proactive Fallback Warning to Admin ──
+                try {
+                    const admin = await client.users.fetch(config.rootAdminId);
+                    await admin.send(
+                        `⚠️ **Tier Detection Fallback Warning**\n\n` +
+                        `Post update used **cents fallback** (${minCents} cents → ${newTierName}).\n` +
+                        `Primary ID match failed. Your \`TIER_CONFIG\` may be out of sync.\n` +
+                        `Run \`/admin sync-tiers\` or \`npm run setup:patreon\` to refresh.`
+                    );
+                } catch { /* DM failed — non-critical */ }
             } else {
                 logger.warn(`❌ [CENTS NOT FOUND] No tier configured for ${minCents} cents in TIER_CONFIG`);
                 logger.warn(`💡 Add "cents":${minCents} to the appropriate tier in your TIER_CONFIG`);
