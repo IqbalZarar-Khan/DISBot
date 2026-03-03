@@ -39,7 +39,10 @@ export async function handleStatus(interaction: ChatInputCommandInteraction): Pr
             const patreon = await getPatreonClient();
             const response = await patreon.get(
                 `/campaigns/${config.patreonCampaignId}`,
-                { timeout: 5000 }
+                {
+                    timeout: 5000,
+                    params: { 'fields[campaign]': 'created_at' }
+                }
             );
             const latency = Date.now() - start;
             if (response.status === 200) {
