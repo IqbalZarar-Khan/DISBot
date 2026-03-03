@@ -75,6 +75,11 @@
 - **💥 HMAC Webhook Tester**: `npm run test:webhook` sends properly signed mock payloads to your endpoint
 - **🚀 One-Command VPS Setup**: `setup-vps.sh` installs Node.js, PM2, Caddy (auto-HTTPS) in a single script
 - **🐳 Self-Contained Docker Compose**: Full stack (bot + PostgreSQL + PostgREST) — no Supabase Cloud needed
+- **📡 Automated Webhook Creation**: Setup wizard auto-creates Patreon webhooks with all 9 triggers via API
+- **🎩 Interactive Discord Setup**: Wizard generates exact invite URL with all scopes/permissions pre-selected
+- **💾 SQLite Fallback Database**: Zero-config embedded DB when Supabase is not configured (Supabase still recommended)
+- **🩺 Startup Health Checks**: Verifies Server Members Intent + Patreon webhook registration on boot
+- **🚀 1-Click Railway Deploy**: Deploy button in README auto-provisions the entire app with env var form
 
 <p align="center">
   <img src="screenshots/5.png" alt="A Complete Community Toolkit" width="100%" />
@@ -621,6 +626,11 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - ✅ **🧪 HMAC Webhook Tester**: `npm run test:webhook` — mock payloads with valid signatures
 - ✅ **🚀 VPS Setup Script**: `setup-vps.sh` — one-command Caddy + PM2 + SSL provisioning
 - ✅ **🐳 Self-Contained Docker**: Full stack with PostgreSQL + PostgREST (no Supabase Cloud)
+- ✅ **📡 Automated Webhook Creation**: Setup wizard creates Patreon webhooks via API with all 9 triggers
+- ✅ **🎩 Discord Setup in Wizard**: Interactive checklist with auto-generated invite URL
+- ✅ **💾 SQLite Fallback**: Zero-config embedded database when Supabase isn’t configured
+- ✅ **🩺 Startup Health Checks**: Verifies Server Members Intent + webhook registration on boot
+- ✅ **🚀 1-Click Railway Deploy**: Deploy button auto-provisions the app with env var form
 
 ### Previous (Feb 2026)
 - ✅ Railway Deployment (recommended), Node.js 20, Dockerfile upgrade, Early Port Binding

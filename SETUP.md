@@ -162,9 +162,14 @@ curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 
 ---
 
-## 3. Supabase Database Setup
+## 3. Database Setup
 
-The bot uses Supabase for persistent data storage.
+The bot supports two database backends:
+
+- **☁️ Supabase (Recommended)** — Cloud-hosted PostgreSQL with RLS, recommended for production
+- **💾 SQLite (Zero-Config)** — Embedded local database, great for single-server setups
+
+### Option A: Supabase (Recommended)
 
 ### Create Supabase Project
 
@@ -194,6 +199,20 @@ If you prefer to run migrations manually:
    - **service_role** key → Save for `SUPABASE_KEY`
 
 > ⚠️ **Important**: Use the **service_role** key (not the anon key). The strict RLS policies (migration `006`) restrict access to `service_role` only, protecting your patron data from unauthorized access.
+
+### Option B: SQLite (Zero-Config)
+
+For simple setups or single-server deployments, you can skip Supabase entirely:
+
+1. Install the SQLite dependency:
+   ```bash
+   npm install better-sqlite3
+   ```
+2. Leave `SUPABASE_URL` and `SUPABASE_KEY` **blank** in your `.env` file (or select "SQLite" in the Setup Wizard)
+3. The bot will automatically create `./data/disbot.sqlite` on first start
+4. All tables are created automatically — no manual SQL needed
+
+> **Note**: SQLite stores data locally on your server. It doesn't support multi-instance deployments or cloud database features. Supabase is still recommended for production.
 
 ---
 
