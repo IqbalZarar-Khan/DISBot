@@ -132,7 +132,9 @@ export function getCommandData() {
                             .addChoices(
                                 { name: 'New Post', value: 'post_new' },
                                 { name: 'Waterfall Update', value: 'post_waterfall' },
-                                { name: 'Welcome Message', value: 'welcome' }
+                                { name: 'Welcome Message', value: 'welcome' },
+                                { name: '💌 Win-Back DM', value: 'win_back' },
+                                { name: '🎂 Anniversary', value: 'anniversary' }
                             )
                     )
                     .addStringOption(option =>
@@ -157,6 +159,11 @@ export function getCommandData() {
                                 { name: '📊 Status', value: 'status' }
                             )
                     )
+            )
+            .addSubcommand(subcommand =>
+                subcommand
+                    .setName('server-stats')
+                    .setDescription('View live server CPU, memory, uptime, and PM2 stats')
             )
     ].map(command => command.toJSON());
 }

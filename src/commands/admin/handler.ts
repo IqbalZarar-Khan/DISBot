@@ -12,6 +12,7 @@ import { handleDebugLogs } from './debug-logs';
 import { handleExportData } from './export-data';
 import { handleBulkMap } from './bulk-map';
 import { handlePoller } from './poller';
+import { handleServerStats } from './server-stats';
 import { logger } from '../../utils/logger';
 
 /**
@@ -72,6 +73,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'poller':
                 await handlePoller(interaction);
+                break;
+
+            case 'server-stats':
+                await handleServerStats(interaction);
                 break;
 
             default:

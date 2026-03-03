@@ -179,15 +179,51 @@ async function main(): Promise<void> {
         console.log('   Set them in .env to auto-sync tiers to Supabase.');
     }
 
-    // ── 5. Always print .env values (for reference or fallback) ──────
+    // ── 5. Auto-write to .env file ──────────────────────────────────
+    const fs = await import('fs');
+    const path = await import('path');
+    const crypto = await import('crypto');
+    const envPath = path.join(process.cwd(), '.env');
+
     console.log('');
     console.log('═══════════════════════════════════════════════');
-    console.log('   📋  .env Reference (add PATREON_CAMPAIGN_ID):');
+    console.log('   📝  Auto-Writing to .env');
     console.log('═══════════════════════════════════════════════');
     console.log('');
-    console.log(`PATREON_CAMPAIGN_ID=${campaignId}`);
-    console.log('');
-    console.log(`TIER_CONFIG='${json}'`);
+
+    // Read existing .env
+    let existingEnv: Record<string, string> = {};
+    if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, 'utf-8');
+        for (const line of envContent.split('\n')) {
+            const match = line.match(/^([^#=]+)=(.*)$/);
+            if (match) existingEnv[match[1].trim()] = match[2].trim().replace(/^['"]|['"]$/g, '');
+        }
+    }
+
+    // Set values
+    existingEnv['PATREON_CAMPAIGN_ID'] = campaignId;
+    existingEnv['TIER_CONFIG'] = json;
+
+    // Auto-generate WEBHOOK_SECRET if missing
+    if (!existingEnv['WEBHOOK_SECRET']) {
+        existingEnv['WEBHOOK_SECRET'] = crypto.randomBytes(32).toString('hex');
+        console.log('🔑 Auto-generated WEBHOOK_SECRET');
+    }
+
+    // Write .env
+    const newEnv = Object.entries(existingEnv)
+        .map(([k, v]) => {
+            if (v.includes(' ') || v.includes('{') || v.includes('[')) {
+                return `${k}='${v}'`;
+            }
+            return `${k}=${v}`;
+        })
+        .join('\n');
+    fs.writeFileSync(envPath, newEnv + '\n');
+
+    console.log(`✅ Written PATREON_CAMPAIGN_ID=${campaignId} to .env`);
+    console.log(`✅ Written TIER_CONFIG with ${tierConfig.length} tier(s) to .env`);
     console.log('');
     console.log('   Auto-assigned ranks (highest price = 100):');
     tierConfig.forEach((t: any) => {

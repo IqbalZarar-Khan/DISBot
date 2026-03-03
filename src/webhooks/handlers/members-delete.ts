@@ -40,6 +40,33 @@ export async function handleMembersDelete(payload: WebhookPayload): Promise<void
 
             // Note: We keep the member in the database for historical purposes
             // You could add a 'is_active' flag if you want to mark them as inactive
+
+            // ── Win-Back DM: politely reach out to departing patrons ──
+            try {
+                const { getCustomMessage } = await import('../../database/db');
+                const guild = await client.guilds.fetch(
+                    (await import('../../config')).config.guildId
+                );
+                // Try to find the member in the guild by searching
+                const members = await guild.members.fetch({ query: trackedMember.full_name, limit: 5 });
+                const discordMember = members.find(m =>
+                    m.displayName.toLowerCase() === trackedMember.full_name.toLowerCase() ||
+                    m.user.username.toLowerCase() === trackedMember.full_name.toLowerCase()
+                );
+
+                if (discordMember) {
+                    const template = await getCustomMessage('win_back');
+                    const defaultMsg = `Hey ${discordMember.displayName} 👋\n\nThank you so much for your past support — it truly meant a lot! If you ever want to come back, we'd love to have you. 💙\n\nFeel free to reach out if there's anything we can do better!`;
+                    const message = template
+                        ? template.replace('{user}', discordMember.displayName).replace('{name}', trackedMember.full_name)
+                        : defaultMsg;
+
+                    await discordMember.send(message);
+                    logger.info(`💌 [WIN-BACK] DM sent to ${discordMember.displayName}`);
+                }
+            } catch (dmErr) {
+                logger.warn(`💌 [WIN-BACK] Could not DM departing patron: ${(dmErr as Error).message}`);
+            }
         }
 
     } catch (error) {

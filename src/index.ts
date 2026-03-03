@@ -139,8 +139,54 @@ function registerEventHandlers() {
             console.warn('⚠️ Auto-deploy commands failed (non-fatal):', (err as Error).message);
         }
 
+        // Initialize in-memory DB cache for graceful degradation
+        try {
+            const { initDbCache } = await import('./database/dbCache');
+            await initDbCache();
+        } catch (err) {
+            console.warn('⚠️ DB cache init failed (non-fatal):', (err as Error).message);
+        }
+
+        // Validate OAuth scopes on startup
+        try {
+            const axios = (await import('axios')).default;
+            const res = await axios.get('https://www.patreon.com/api/oauth2/v2/campaigns', {
+                headers: { Authorization: `Bearer ${config.patreonAccessToken}` },
+                timeout: 10000,
+            });
+            if (res.status === 200) {
+                console.log('✅ Patreon OAuth scopes validated (campaigns accessible)');
+            }
+        } catch (scopeErr: any) {
+            if (scopeErr.response?.status === 401) {
+                console.error('❌ PATREON_ACCESS_TOKEN is invalid or expired!');
+                console.error('   → Run /oauth/start or refresh your token.');
+            } else if (scopeErr.response?.status === 403) {
+                console.error('❌ PATREON_ACCESS_TOKEN is missing required scopes!');
+                console.error('   → Ensure your OAuth app has: campaigns, campaigns.members, campaigns.posts');
+            } else {
+                console.warn('⚠️ Could not validate Patreon scopes:', scopeErr.message);
+            }
+        }
+
         // Start Patreon post poller (checks for silent tier changes)
         startPolling();
+
+        // Start anniversary checker (daily)
+        try {
+            const { startAnniversaryChecker } = await import('./utils/anniversaryChecker');
+            startAnniversaryChecker();
+        } catch (err) {
+            console.warn('⚠️ Anniversary checker failed to start:', (err as Error).message);
+        }
+
+        // Start weekly digest scheduler (Sundays)
+        try {
+            const { startWeeklyDigest } = await import('./utils/weeklyDigest');
+            startWeeklyDigest();
+        } catch (err) {
+            console.warn('⚠️ Weekly digest failed to start:', (err as Error).message);
+        }
     });
 
     // Interaction create event (for slash commands)

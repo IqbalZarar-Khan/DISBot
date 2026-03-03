@@ -177,6 +177,16 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                     });
                     embed.setDescription(messageText);
 
+                    // Serialized content formatting (Chapter/Part/Episode detection)
+                    const { detectChapter, formatSerialContent } = await import('../../utils/chapterFormatter');
+                    const chapterInfo = detectChapter(title);
+                    if (chapterInfo) {
+                        const snippet = (attributes.content || attributes.teaser_text || '').replace(/<[^>]*>/g, '').substring(0, 200);
+                        const { formattedTitle, formattedDescription } = formatSerialContent(title, snippet, chapterInfo);
+                        embed.setTitle(formattedTitle);
+                        embed.setDescription(messageText + '\n\n' + formattedDescription);
+                    }
+
                     await channel.send({ embeds: [embed] }).then(async (msg) => {
                         // Auto-create discussion thread if enabled
                         const { createPostThread } = await import('../../utils/threadHelper');
