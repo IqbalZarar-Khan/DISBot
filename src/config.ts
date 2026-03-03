@@ -145,5 +145,26 @@ export function validateConfig(): void {
         throw new Error(`Missing required configuration: ${missing.join(', ')}`);
     }
 
+    // ── Tier rank/cents mismatch validator ────────────────────────────
+    // Warns if a cheaper tier has a higher rank than an expensive tier,
+    // which would break waterfall logic.
+    const tiersWithCents = config.tierConfig.filter(t => t.cents !== undefined && t.cents > 0);
+    if (tiersWithCents.length >= 2) {
+        const sorted = [...tiersWithCents].sort((a, b) => (b.cents || 0) - (a.cents || 0));
+
+        for (let i = 0; i < sorted.length - 1; i++) {
+            const expensive = sorted[i];
+            const cheaper = sorted[i + 1];
+
+            if (cheaper.rank > expensive.rank) {
+                console.warn(`\n⚠️  TIER RANK MISMATCH DETECTED:`);
+                console.warn(`    "${cheaper.name}" costs ${cheaper.cents}¢ but has rank ${cheaper.rank}`);
+                console.warn(`    "${expensive.name}" costs ${expensive.cents}¢ but has rank ${expensive.rank}`);
+                console.warn(`    → The cheaper tier "${cheaper.name}" outranks the expensive tier "${expensive.name}".`);
+                console.warn(`    → This will break waterfall logic. Fix your TIER_CONFIG ranks.\n`);
+            }
+        }
+    }
+
     console.log('✅ Configuration validated');
 }

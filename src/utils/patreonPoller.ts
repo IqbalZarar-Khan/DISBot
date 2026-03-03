@@ -46,6 +46,13 @@ export function stopPolling(): void {
 }
 
 /**
+ * Check if the poller is currently active.
+ */
+export function isPollingActive(): boolean {
+    return pollTimer !== null;
+}
+
+/**
  * Fetch recent posts from Patreon API and compare tier access with database.
  */
 async function pollPatreonPosts(): Promise<void> {

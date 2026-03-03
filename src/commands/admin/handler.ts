@@ -11,6 +11,7 @@ import { handleSetEventChannel } from './set-event-channel';
 import { handleDebugLogs } from './debug-logs';
 import { handleExportData } from './export-data';
 import { handleBulkMap } from './bulk-map';
+import { handlePoller } from './poller';
 import { logger } from '../../utils/logger';
 
 /**
@@ -67,6 +68,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'bulk-map':
                 await handleBulkMap(interaction);
+                break;
+
+            case 'poller':
+                await handlePoller(interaction);
                 break;
 
             default:

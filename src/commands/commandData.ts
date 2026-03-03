@@ -142,5 +142,21 @@ export function getCommandData() {
                             .setRequired(true)
                     )
             )
+            .addSubcommand(subcommand =>
+                subcommand
+                    .setName('poller')
+                    .setDescription('Start, stop, or check the Patreon post poller')
+                    .addStringOption(option =>
+                        option
+                            .setName('action')
+                            .setDescription('What to do with the poller')
+                            .setRequired(true)
+                            .addChoices(
+                                { name: '▶️ Start', value: 'start' },
+                                { name: '⏸️ Stop', value: 'stop' },
+                                { name: '📊 Status', value: 'status' }
+                            )
+                    )
+            )
     ].map(command => command.toJSON());
 }
