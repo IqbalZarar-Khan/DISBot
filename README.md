@@ -69,6 +69,12 @@
 - **🧙 Setup Wizard GUI**: `npm run setup:wizard` launches a local HTML dashboard for frictionless first-time setup
 - **🔬 Startup Scope Validation**: Verifies Patreon OAuth token scopes on boot, warns if missing
 - **🏗️ Auto DB Migrations**: Runs pending SQL migrations automatically on startup
+- **🛡️ Proactive Fallback Warnings**: DMs admin when tier detection falls back to cents/title matching
+- **🔑 Keyword Detection**: Auto-replies to FAQ keywords ("next chapter?") when Message Content Intent is enabled
+- **⌨️ Prefix Commands**: `!status` and `!help` as slash-command fallbacks
+- **💥 HMAC Webhook Tester**: `npm run test:webhook` sends properly signed mock payloads to your endpoint
+- **🚀 One-Command VPS Setup**: `setup-vps.sh` installs Node.js, PM2, Caddy (auto-HTTPS) in a single script
+- **🐳 Self-Contained Docker Compose**: Full stack (bot + PostgreSQL + PostgREST) — no Supabase Cloud needed
 
 <p align="center">
   <img src="screenshots/5.png" alt="A Complete Community Toolkit" width="100%" />
@@ -382,6 +388,7 @@ src/
 │   ├── embedBuilder.ts      # Discord embed creation
 │   ├── errorHandler.ts      # Error handling
 │   ├── formatter.ts         # Message template formatting
+│   ├── keywordDetector.ts   # FAQ keyword auto-replies + prefix commands
 │   ├── logger.ts            # Logging (console + Discord)
 │   ├── patreonClient.ts     # Axios wrapper with auto token-refresh
 │   ├── patreonPoller.ts     # Background tier-change poller
@@ -405,8 +412,10 @@ src/
 └── index.ts          # Main entry point + startup orchestration
 scripts/
 ├── setup-wizard.ts   # Local HTML setup dashboard (npm run setup:wizard)
+├── test-webhook.ts   # HMAC-signed webhook tester (npm run test:webhook)
 ├── fetch-patreon-config.ts  # Auto-fetch tiers + write .env
 └── dev-ngrok.ts      # Auto-tunnel for local development
+setup-vps.sh          # One-command VPS setup (Caddy + PM2 + Node.js)
 .github/
 ├── ISSUE_TEMPLATE/
 │   ├── bug_report.md
@@ -437,6 +446,7 @@ This startup order ensures cloud platforms detect the open port before the Disco
 | `npm run deploy-commands` | Register slash commands (also auto-runs on startup) |
 | `npm run setup:patreon` | Fetch tiers from Patreon + auto-write `.env` |
 | `npm run setup:wizard` | Launch local HTML setup dashboard on port 3456 |
+| `npm run test:webhook` | Send HMAC-signed mock webhook to test your endpoint |
 | `npm test` | Run tests |
 | `npm run verify` | Run deployment verification script |
 
@@ -606,6 +616,11 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - ✅ **🔬 OAuth Scope Validation**: Verifies token scopes on startup, warns if missing
 - ✅ **📝 Enhanced setup:patreon**: Auto-writes TIER_CONFIG + WEBHOOK_SECRET to `.env` file
 - ✅ **📋 GitHub Templates**: Bug report, feature request, and PR templates in `.github/`
+- ✅ **🛡️ Proactive Fallback Warnings**: DMs admin when tier detection uses cents/title fallback
+- ✅ **🔑 Keyword Detection**: Auto-replies to FAQ keywords + `!status`/`!help` prefix commands
+- ✅ **🧪 HMAC Webhook Tester**: `npm run test:webhook` — mock payloads with valid signatures
+- ✅ **🚀 VPS Setup Script**: `setup-vps.sh` — one-command Caddy + PM2 + SSL provisioning
+- ✅ **🐳 Self-Contained Docker**: Full stack with PostgreSQL + PostgREST (no Supabase Cloud)
 
 ### Previous (Feb 2026)
 - ✅ Railway Deployment (recommended), Node.js 20, Dockerfile upgrade, Early Port Binding

@@ -358,6 +358,15 @@ openssl rand -hex 32
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions. **Railway** is the recommended platform.
 
+### Option C: VPS with Automatic HTTPS (Caddy)
+
+Run the included setup script for automatic Caddy + PM2 + SSL provisioning:
+```bash
+sudo ./setup-vps.sh your-domain.com
+```
+
+This single command installs Node.js 20, PM2, and Caddy (automatic HTTPS via Let's Encrypt), configures the reverse proxy, and starts the bot. Your webhook URL becomes `https://your-domain.com/webhooks/patreon`.
+
 ### Register Webhook with Patreon
 
 1. Go to [Patreon Webhooks](https://www.patreon.com/portal/registration/register-webhooks)
@@ -454,6 +463,15 @@ To auto-create discussion threads under post alerts:
 
 Threads will be named after the post title (e.g., "💬 My New Chapter") and auto-archive after 1 week.
 
+### Enable Keyword Detection (Optional)
+
+If you've enabled **Message Content Intent** in the Discord Developer Portal, you can activate FAQ auto-replies:
+```
+/admin set-config key:enable_keyword_detection value:true
+```
+
+The bot will auto-reply when users ask common questions like "when is the next chapter?" or "next release?". It also enables prefix commands (`!status`, `!help`) as slash-command fallbacks.
+
 ---
 
 ## 8. Testing
@@ -505,6 +523,24 @@ Shows the last 50 log entries as an ephemeral message — no need to SSH into yo
 ```
 
 Generates CSV files (patrons, posts, tier mappings) and DMs them to the root admin.
+
+### Test Webhook Security (HMAC)
+
+Test your webhook endpoint with a properly signed mock payload:
+```bash
+npm run test:webhook
+```
+
+Options:
+```bash
+# Test a specific event type
+npm run test:webhook -- --event members:create
+
+# Test against a custom URL
+npm run test:webhook -- --url https://your-domain.com/webhooks/patreon
+```
+
+Available event types: `posts:publish`, `posts:update`, `members:create`, `members:delete`
 
 ### Test Tier Detection
 
