@@ -304,11 +304,13 @@ app.post('/wizard/create-webhook', async (req, res) => {
     let webhookSecret = env.WEBHOOK_SECRET;
 
     if (!accessToken) {
-        return res.json({ ok: false, message: '❌ Connect to Patreon first (Step 2)' });
+        res.json({ ok: false, message: '❌ Connect to Patreon first (Step 2)' });
+        return;
     }
 
     if (!campaignId) {
-        return res.json({ ok: false, message: '❌ Run "npm run setup:patreon" first to get your Campaign ID' });
+        res.json({ ok: false, message: '❌ Run "npm run setup:patreon" first to get your Campaign ID' });
+        return;
     }
 
     if (!webhookSecret) {
@@ -320,7 +322,7 @@ app.post('/wizard/create-webhook', async (req, res) => {
 
     try {
         const axios = (await import('axios')).default;
-        const response = await axios.post(
+        await axios.post(
             `https://www.patreon.com/api/oauth2/v2/webhooks`,
             {
                 data: {

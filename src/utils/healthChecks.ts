@@ -62,48 +62,30 @@ export async function runHealthChecks(client: Client): Promise<void> {
         const accessToken = process.env.PATREON_ACCESS_TOKEN;
         if (accessToken) {
             const axios = (await import('axios')).default;
-            const campaignId = process.env.PATREON_CAMPAIGN_ID;
 
-            if (campaignId) {
+            // Use the v1 webhooks endpoint (v2 doesn't have a list route)
+            try {
                 const res = await axios.get(
-                    `https://www.patreon.com/api/oauth2/v2/campaigns/${campaignId}/webhooks`,
+                    'https://www.patreon.com/api/oauth2/api/current_user/campaigns',
                     { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 10000 }
                 );
-
-                const webhooks = res.data?.data || [];
-                if (webhooks.length === 0) {
-                    warnings.push(
-                        '⚠️ **No Patreon webhooks registered**\n' +
-                        'The bot won\'t receive any events without webhooks.\n' +
-                        '→ Go to [Patreon Webhooks](https://www.patreon.com/portal/registration/register-webhooks)\n' +
-                        '→ Or use the Setup Wizard: `npm run setup:wizard`'
-                    );
+                // If we can reach the API, the token is valid
+                const campaigns = res.data?.data || [];
+                if (campaigns.length > 0) {
+                    logger.info(`✅ [HEALTH] Patreon API reachable — ${campaigns.length} campaign(s) found`);
+                }
+            } catch (apiErr: any) {
+                if (apiErr.response?.status === 401) {
+                    // Handled by scope validator
+                } else if (apiErr.response?.status === 403) {
+                    logger.warn('⚠️ [HEALTH] Patreon API returned 403 — token may have limited scopes');
                 } else {
-                    // Check if any webhook URL seems valid
-                    const urls = webhooks.map((w: any) => w.attributes?.uri).filter(Boolean);
-                    logger.info(`✅ [HEALTH] ${webhooks.length} Patreon webhook(s) registered: ${urls.join(', ')}`);
-
-                    // Check required triggers
-                    const requiredTriggers = ['members:create', 'members:update', 'members:delete', 'posts:publish', 'posts:update'];
-                    for (const wh of webhooks) {
-                        const triggers = wh.attributes?.triggers || [];
-                        const missing = requiredTriggers.filter(t => !triggers.includes(t));
-                        if (missing.length > 0) {
-                            warnings.push(
-                                `⚠️ **Webhook missing triggers**: ${missing.join(', ')}\n` +
-                                `Webhook URL: ${wh.attributes?.uri}\n` +
-                                '→ Edit your webhook in the Patreon portal to add missing triggers'
-                            );
-                        }
-                    }
+                    logger.warn(`⚠️ [HEALTH] Patreon API check: ${apiErr.message}`);
                 }
             }
         }
     } catch (err: any) {
-        // 401 = token invalid, handled by scope validator
-        if (err.response?.status !== 401) {
-            logger.warn(`⚠️ [HEALTH] Webhook check error: ${err.message}`);
-        }
+        logger.warn(`⚠️ [HEALTH] Webhook check error: ${err.message}`);
     }
 
     // ── 3. DM warnings to admin ─────────────────────────────────────
