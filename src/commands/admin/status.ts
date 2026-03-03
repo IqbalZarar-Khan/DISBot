@@ -2,7 +2,6 @@ import { ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { checkAdminPermission } from '../../middleware/adminCheck';
 import { getAllTierMappings, getAllTrackedMembers, getAllTrackedPosts } from '../../database/db';
 import { config } from '../../config';
-import { getPatreonClient } from '../../utils/patreonClient';
 import { getRecentLogs, LogLevel } from '../../utils/logger';
 
 // ── In-memory diagnostic counters ────────────────────────────────
@@ -36,32 +35,32 @@ export async function handleStatus(interaction: ChatInputCommandInteraction): Pr
         let patreonLatency = '';
         try {
             const start = Date.now();
-            const patreon = await getPatreonClient();
-            const response = await patreon.get(
-                '/campaigns',
+            // Try the simplest v2 endpoint first
+            const axios = (await import('axios')).default;
+            const token = process.env.PATREON_ACCESS_TOKEN || config.patreonAccessToken;
+
+            // Try v1 API (more reliable, doesn't need specific scopes)
+            const response = await axios.get(
+                'https://www.patreon.com/api/oauth2/api/current_user',
                 {
-                    timeout: 5000,
-                    params: { 'fields[campaign]': 'created_at,patron_count' }
+                    headers: { Authorization: `Bearer ${token}` },
+                    timeout: 5000
                 }
             );
             const latency = Date.now() - start;
-            const campaigns = response.data?.data || [];
-            if (response.status === 200 && campaigns.length > 0) {
-                const patronCount = campaigns[0]?.attributes?.patron_count;
+            if (response.status === 200) {
+                const name = response.data?.data?.attributes?.full_name || 'Unknown';
                 patreonStatus = '🟢 Connected';
-                patreonLatency = ` (${latency}ms${patronCount ? `, ${patronCount} patrons` : ''})`;
-            } else if (response.status === 200) {
-                patreonStatus = '🟡 Connected but no campaigns found';
+                patreonLatency = ` (${latency}ms, ${name})`;
             }
         } catch (err: any) {
             const code = err.response?.status;
-            const detail = err.response?.data?.errors?.[0]?.detail || err.message || '';
             if (code === 401) {
                 patreonStatus = '🔴 Token expired/invalid';
-            } else if (code === 404) {
-                patreonStatus = `🔴 Campaign not found (ID: ${config.patreonCampaignId || 'MISSING'})`;
+            } else if (code === 403) {
+                patreonStatus = '🔴 Token missing required scopes';
             } else {
-                patreonStatus = `🔴 Error (${code || 'network'}): ${detail.substring(0, 50)}`;
+                patreonStatus = `🔴 Error (${code || 'network'}): ${(err.message || '').substring(0, 40)}`;
             }
         }
 
