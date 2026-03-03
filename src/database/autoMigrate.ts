@@ -25,17 +25,12 @@ export async function runAutoMigrations(): Promise<void> {
         `
     });
 
-    // If the exec_sql RPC doesn't exist, fall back to a direct approach
-    if (createErr) {
-        console.log('📦 [MIGRATE] exec_sql RPC not available, trying direct approach...');
-
-        // Try to query _migrations — if it fails, the table doesn't exist
-        const { error: checkErr } = await supabase.from('_migrations').select('id').limit(1);
-
-        if (checkErr && checkErr.code === '42P01') {
-            // Table doesn't exist — this is fine on first run, tables need manual creation from SQL editor
-            console.log('📦 [MIGRATE] No _migrations table found. Running all migration files...');
-        }
+    // If the exec_sql RPC doesn't exist, we can't auto-migrate
+    if (createErr && createErr.message.includes('exec_sql')) {
+        console.warn('⚠️ [MIGRATE] Auto-migrations require a one-time bootstrap.');
+        console.warn('   Run the contents of supabase/migrations/000_exec_sql_bootstrap.sql');
+        console.warn('   in the Supabase SQL Editor. After that, all future migrations will auto-apply.');
+        return;
     }
 
     // ── 2. Get list of already-applied migrations ─────────────────────
