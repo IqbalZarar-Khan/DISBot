@@ -1,8 +1,8 @@
 import { ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { checkAdminPermission } from '../../middleware/adminCheck';
 import { getAllTierMappings, getAllTrackedMembers, getAllTrackedPosts } from '../../database/db';
-import axios from 'axios';
 import { config } from '../../config';
+import { getPatreonClient } from '../../utils/patreonClient';
 import { getRecentLogs, LogLevel } from '../../utils/logger';
 
 // ── In-memory diagnostic counters ────────────────────────────────
@@ -36,12 +36,10 @@ export async function handleStatus(interaction: ChatInputCommandInteraction): Pr
         let patreonLatency = '';
         try {
             const start = Date.now();
-            const response = await axios.get(
-                `https://www.patreon.com/api/oauth2/v2/campaigns/${config.patreonCampaignId}`,
-                {
-                    headers: { 'Authorization': `Bearer ${config.patreonAccessToken}` },
-                    timeout: 5000
-                }
+            const patreon = await getPatreonClient();
+            const response = await patreon.get(
+                `/campaigns/${config.patreonCampaignId}`,
+                { timeout: 5000 }
             );
             const latency = Date.now() - start;
             if (response.status === 200) {
