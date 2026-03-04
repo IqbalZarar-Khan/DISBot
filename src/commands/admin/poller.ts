@@ -10,6 +10,9 @@ import { logger } from '../../utils/logger';
 export async function handlePoller(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!await checkAdminPermission(interaction)) return;
 
+    // Defer the reply to give the bot more time to process without Discord throwing an Unknown Interaction error
+    await interaction.deferReply({ ephemeral: true });
+
     const action = interaction.options.getString('action', true);
     const active = isPollingActive();
 
@@ -22,13 +25,13 @@ export async function handlePoller(interaction: ChatInputCommandInteraction): Pr
                 : '⏸️ **Stopped** — The poller is currently disabled.')
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.editReply({ embeds: [embed] });
         return;
     }
 
     if (action === 'start') {
         if (active) {
-            await interaction.reply({ content: '⚠️ Poller is already running.', ephemeral: true });
+            await interaction.editReply({ content: '⚠️ Poller is already running.' });
             return;
         }
 
@@ -41,13 +44,13 @@ export async function handlePoller(interaction: ChatInputCommandInteraction): Pr
             .setDescription('The Patreon post poller has been manually enabled.\nIt will now check for silent tier changes on the configured interval.')
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.editReply({ embeds: [embed] });
         return;
     }
 
     if (action === 'stop') {
         if (!active) {
-            await interaction.reply({ content: '⚠️ Poller is already stopped.', ephemeral: true });
+            await interaction.editReply({ content: '⚠️ Poller is already stopped.' });
             return;
         }
 
@@ -60,9 +63,9 @@ export async function handlePoller(interaction: ChatInputCommandInteraction): Pr
             .setDescription('The Patreon post poller has been disabled.\nSilent tier changes will not be detected until the poller is restarted.')
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.editReply({ embeds: [embed] });
         return;
     }
 
-    await interaction.reply({ content: '❌ Unknown action. Use `start`, `stop`, or `status`.', ephemeral: true });
+    await interaction.editReply({ content: '❌ Unknown action. Use `start`, `stop`, or `status`.' });
 }

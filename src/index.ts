@@ -250,19 +250,27 @@ function registerEventHandlers() {
                 await handleAdminCommand(interaction);
             }
 
-        } catch (error) {
+        } catch (error: any) {
+            if (error.code === 10062) return; // Ignore overlapping interactions during deployment
+
             logger.error(`Error handling command: ${interaction.commandName}`, error as Error);
 
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({
-                    content: '❌ An error occurred while executing this command.',
-                    ephemeral: true
-                });
-            } else {
-                await interaction.reply({
-                    content: '❌ An error occurred while executing this command.',
-                    ephemeral: true
-                });
+            try {
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp({
+                        content: '❌ An error occurred while executing this command.',
+                        ephemeral: true
+                    });
+                } else {
+                    await interaction.reply({
+                        content: '❌ An error occurred while executing this command.',
+                        ephemeral: true
+                    });
+                }
+            } catch (replyErr: any) {
+                if (replyErr.code !== 10062) {
+                    logger.error('Failed to send fallback error message', replyErr as Error);
+                }
             }
         }
     });

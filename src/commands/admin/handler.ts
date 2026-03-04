@@ -85,7 +85,14 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
                     ephemeral: true
                 });
         }
-    } catch (error) {
+    } catch (error: any) {
+        // Handle Unknown Interaction (10062) commonly caused by zero-downtime overlaps 
+        // on hosts like Railway or slow event loops.
+        if (error.code === 10062) {
+            logger.warn(`⚠️ Interaction expired or handled by another instance for: ${subcommand}`);
+            return;
+        }
+
         logger.error(`Error in admin command: ${subcommand}`, error as Error);
 
         // Try to send error message to user
@@ -100,8 +107,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
             } else {
                 await interaction.reply(errorMessage);
             }
-        } catch (replyError) {
-            logger.error('Failed to send error message to user', replyError as Error);
+        } catch (replyError: any) {
+            if (replyError.code !== 10062) {
+                logger.error('Failed to send error message to user', replyError as Error);
+            }
         }
     }
 }
