@@ -122,13 +122,20 @@
 
 3. **Configure environment** (choose one):
 
-   **Option A — Setup Wizard (Recommended for beginners)**:
+   **Option A — Cloud Setup Wizard (Recommended)**:
+   You don't need any terminal commands! Just add your Discord Bot Token to `.env` or your hosting provider's variables:
+   ```env
+   DISCORD_TOKEN=your_bot_token_here
+   ```
+   Start the bot (`npm start`). It will detect it's missing configuration and launch the Cloud Wizard. Visit `http://localhost:3000/setup` (or your Railway URL) to finish setup via the web UI!
+
+   **Option B — Local Setup Wizard**:
    ```bash
    npm run setup:wizard
    ```
    Opens a local HTML dashboard at `http://localhost:3456/wizard` with buttons for Patreon OAuth, Supabase testing, and `.env` auto-writing.
 
-   **Option B — Manual `.env`**:
+   **Option C — Manual `.env`**:
    ```bash
    cp .env.example .env
    # Edit .env with your credentials
@@ -137,7 +144,7 @@
 4. **Set up Supabase database**
    - Create a new Supabase project
    - Database migrations run **automatically on first boot** — no manual SQL needed
-   - Copy your Supabase URL and service_role key to `.env`
+   - Follow the Cloud Wizard steps to add your Supabase URL and service_role key.
 
 5. **Configure your tiers (Automated Method)**
    

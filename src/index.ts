@@ -77,6 +77,21 @@ async function main() {
 
         // Validate configuration
         validateConfig();
+        // Is the bot unconfigured? (Missing core tokens)
+        if ((config as any)._isSetupMode) {
+            console.log('🚧 CORE CONFIGURATION MISSING: Entering Cloud Setup Mode...');
+            console.log('   Starting web server only so you can run the Setup Wizard.');
+            try {
+                await startWebhookServer(config.webhookPort, config.webhookSecret);
+                console.log(`\n\n🧙 CLOUD SETUP READY: Open your domain at /setup to complete configuration (e.g. https://your-app.up.railway.app/setup)\n\n`);
+            } catch (error) {
+                console.error('❌ Failed to start webhook server for setup:', error);
+                process.exit(1);
+            }
+            return; // Exit early, DO NOT login to Discord or start DB
+        }
+
+        // --- NORMAL BOOT SEQUENCE ---
 
         // Initialize Supabase
         initSupabase();

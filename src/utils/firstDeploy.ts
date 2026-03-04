@@ -52,7 +52,6 @@ export async function sendFirstDeployDM(client: Client): Promise<void> {
         const row = new ActionRowBuilder<ButtonBuilder>()
             .addComponents(
                 new ButtonBuilder()
-                    .setCustomId('first_deploy_docs')
                     .setLabel('📖 Full Setup Guide')
                     .setStyle(ButtonStyle.Link)
                     .setURL('https://github.com/IqbalZarar-Khan/DISBot/blob/main/SETUP.md'),

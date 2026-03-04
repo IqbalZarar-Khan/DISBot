@@ -35,15 +35,13 @@ interface Config {
 
     // Tier Configuration
     tierConfig: TierDefinition[];
+
+    // Internal flag for setup mode
+    _isSetupMode?: boolean;
 }
 
-function getEnvVar(key: string, required: boolean = true): string {
+function getEnvVar(key: string, _required: boolean = true): string {
     const value = process.env[key];
-
-    if (!value && required) {
-        throw new Error(`Missing required environment variable: ${key}`);
-    }
-
     return value || '';
 }
 
@@ -64,7 +62,7 @@ function parseTierConfig(): TierDefinition[] {
         console.error("❌ FATAL: TIER_CONFIG is not valid JSON.");
         console.error("   Expected format: [{\"name\":\"Tier1\",\"id\":\"123\",\"rank\":100}]");
         console.error("   Parse error:", (error as Error).message);
-        process.exit(1);
+        return [];
     }
 
     // Must be an array
@@ -139,10 +137,14 @@ export function validateConfig(): void {
         'webhookSecret'
     ];
 
-    const missing = requiredFields.filter(field => !config[field]);
+    const missing = requiredFields.filter(field => !(config as any)[field]);
 
     if (missing.length > 0) {
-        throw new Error(`Missing required configuration: ${missing.join(', ')}`);
+        // If we're missing core config, signal to index.ts that we're in SETUP MODE,
+        // but don't hard crash here.
+        console.warn(`⚠️ Missing configuration: ${missing.join(', ')}`);
+        (config as any)._isSetupMode = true;
+        return;
     }
 
     // ── Tier rank/cents mismatch validator ────────────────────────────

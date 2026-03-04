@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { verifyWebhookSignature } from './verify';
 import { logger } from '../utils/logger';
 import { WebhookEventType } from '../database/schema';
+import { setupWizardRouter } from './wizard';
 
 // ── Webhook idempotency guard ──────────────────────────────────────
 // Prevents duplicate notifications when Patreon retries the same webhook.
@@ -101,8 +102,14 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
         }
     }));
 
-    // Health check endpoint
-    app.get('/health', (_req: Request, res: Response) => {
+    // Add a second JSON parser for routes that don't need rawBody (like /setup)
+    app.use(express.json());
+
+    // Mount the setup wizard router for cloud deployments
+    app.use('/setup', setupWizardRouter);
+
+    // Health check endpoint (now on root)
+    app.get('/', (_req: Request, res: Response) => {
         res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 

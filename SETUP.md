@@ -18,21 +18,27 @@ This guide will walk you through setting up the Patreon-Discord Content Distribu
 
 ## 0. Quick Start (Setup Wizard)
 
-The fastest way to get started — launch a local HTML dashboard that handles everything visually:
+The fastest way to get started is by using the built-in Setup Wizard.
 
+### Option A: Cloud Setup (Recommended)
+You don't need any terminal commands!
+1. Deploy the bot to your hosting provider (Railway, Render, VPS).
+2. Add your Discord Bot Token as an environment variable (`DISCORD_TOKEN`).
+3. Start the bot. It will detect that it is unconfigured and spin up the Cloud Wizard instead of crashing.
+4. Visit your deployment URL at `/setup` (e.g., `https://your-app.up.railway.app/setup`).
+5. Enter your `DISCORD_TOKEN` as the password to unlock the dashboard.
+6. Follow the visual steps to configure Patreon, Supabase, Message Templates, and Tier Rankings.
+7. Click "Save Configuration" at the end to get a copyable block of variables for your host.
+
+### Option B: Local Setup
+If you are running the bot on your own computer:
 ```bash
 npm install
 npm run setup:wizard
 ```
+Open `http://localhost:3456/wizard` in your browser.
 
-Open `http://localhost:3456/wizard` in your browser. The wizard provides:
-- **"Connect Patreon"** button — handles the full OAuth flow, saves tokens to `.env`
-- **"Test Supabase"** button — verifies database connectivity
-- **"Save to .env"** — writes all config, auto-generates `WEBHOOK_SECRET`
-
-After the wizard saves your `.env`, skip to [Step 7: Initial Bot Configuration](#7-initial-bot-configuration).
-
-> If you prefer manual setup, continue below.
+> If you prefer manual setup without the visual wizard, continue below.
 
 ---
 
