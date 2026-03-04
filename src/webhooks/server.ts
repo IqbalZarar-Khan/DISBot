@@ -113,6 +113,11 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
         res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
+    // Health check endpoint (restored for automated host healthchecks)
+    app.get('/health', (_req: Request, res: Response) => {
+        res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    });
+
     // ── OAuth Flow: Eliminates need for Postman/curl ─────────────────
     // GET /oauth/start → redirects creator to Patreon authorization page
     app.get('/oauth/start', (_req: Request, res: Response) => {
