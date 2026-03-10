@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://railway.com/deploy/u9kFYv?referralCode=nLfB6T&utm_medium=integration&utm_source=template&utm_campaign=generic">
+  <a href="https://railway.app/new/template/disbot?referralCode=nLfB6T">
     <img src="https://railway.com/button.svg" alt="Deploy on Railway" />
   </a>
 </p>
@@ -485,7 +485,7 @@ This startup order ensures cloud platforms detect the open port before the Disco
 
 One-click deploy — click the button below or follow the manual steps.
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/new?referralCode=&repo=IqbalZarar-Khan%2FDISBot)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.app/new/template/disbot?referralCode=nLfB6T)
 
 **Manual steps:**
 1. Go to [railway.app](https://railway.app) → Sign in with GitHub
