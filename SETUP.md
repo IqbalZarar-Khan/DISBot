@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="screenshots/icon.png" alt="DISBot Logo" width="120" />
+</p>
+
 # 📖 Setup Guide: Patreon-Discord Bot
 
 This guide will walk you through setting up the Patreon-Discord Content Distribution Bot from scratch.

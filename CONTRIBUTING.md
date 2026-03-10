@@ -1,4 +1,8 @@
-# Contributing to Patreon-Discord Bot
+<p align="center">
+  <img src="screenshots/icon.png" alt="DISBot Logo" width="120" />
+</p>
+
+# Contributing to DISBot
 
 Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
 

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="screenshots/icon.png" alt="DISBot Logo" width="120" />
+</p>
+
 # 🚀 Deployment Guide
 
 Complete guide for deploying your Patreon-Discord Bot to various hosting platforms.

@@ -1,4 +1,8 @@
-# 🤖 DISBot — Intelligent Content Distribution
+<p align="center">
+  <img src="screenshots/icon.png" alt="DISBot Logo" width="150" />
+</p>
+
+# DISBot — Intelligent Content Distribution
 
 <p align="center">
   <img src="screenshots/1.png" alt="DISBot Hero — Intelligent Content Distribution" width="100%" />
