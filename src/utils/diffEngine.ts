@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { config } from '../config';
 import { loadSnapshot, saveSnapshot } from '../database/db';
-import { tierIdMap } from './tierRanking';
 import { logger } from './logger';
 import { handlePostsUpdate } from '../webhooks/handlers/posts-update';
 import { WebhookPayload } from '../database/schema';
@@ -75,28 +74,23 @@ export async function executeDiffEngine(campaignId: string): Promise<void> {
         const droppedToFree: any[] = [];
 
         for (const post of livePosts) {
-            const relationships = post.relationships || {};
-            const tierRefs = relationships.access_rules?.data || relationships.tiers?.data || [];
             const attributes = post.attributes || {};
             const isPublic = attributes.is_public === true;
 
+            // With include=tiers, Patreon returns tier IDs as a flat array
+            // inside attributes.tiers (e.g., [25508381]), NOT relationships.tiers.data
+            const apiTiers: any[] = attributes.tiers || [];
+
             // Check if this post is currently in the Bronze tier
-            // Handle both flat strings/numbers ("25508381") and objects ({id: "25508381"})
-            const isBronze = tierRefs.some((ref: any) => {
-                const refId = String(typeof ref === 'object' && ref !== null ? ref.id : ref);
-                // Direct ID match
-                if (refId === bronze.id) return true;
-                // Translate via tierIdMap and check name
-                if (tierIdMap[refId] === bronze.name) return true;
-                return false;
-            });
+            // apiTiers is a flat array of IDs — compare as strings to avoid type mismatch
+            const isBronze = apiTiers.some((tierId: any) => String(tierId) === String(bronze.id));
 
             if (isBronze) {
                 currentBronzePostIds.push(post.id);
             }
 
             // Detect the silent drop: was in Bronze snapshot, now Free (empty tiers + public)
-            const isFree = tierRefs.length === 0 && isPublic;
+            const isFree = apiTiers.length === 0 && isPublic;
             if (isFree && previousBronzePostIds.includes(post.id)) {
                 droppedToFree.push(post);
             }
@@ -143,8 +137,7 @@ async function fetchLivePatreonPosts(campaignId: string): Promise<any[]> {
         const res = await axios.get(url, {
             headers: { Authorization: `Bearer ${config.patreonAccessToken}` },
             params: {
-                'fields[post]': 'title,url,published_at,is_paid,is_public',
-                'include': 'tiers', // CRITICAL: Patreon won't return tier data without this
+                'fields[post]': 'title,url,published_at,is_paid,is_public,tiers',
                 'page[count]': 50,
                 'sort': '-published_at',
             },
