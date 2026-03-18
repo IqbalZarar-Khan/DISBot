@@ -1,4 +1,5 @@
 import { WebhookPayload } from '../../database/schema';
+import { executeDiffEngine } from '../../utils/diffEngine';
 import { upsertTrackedPost, getTrackedPost, getTierMappingByName, getMessageTemplate } from '../../database/db';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
@@ -385,6 +386,20 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         };
 
         await upsertTrackedPost(trackedPost);
+
+        // ── PIGGYBACK TRIGGER ─────────────────────────────────────────
+        // Use this webhook as an "alarm clock" to check for silent
+        // Bronze→Free drops that Patreon doesn't send webhooks for.
+        const campaignId = post.relationships?.campaign?.data?.id || config.patreonCampaignId;
+        if (campaignId) {
+            setTimeout(async () => {
+                try {
+                    await executeDiffEngine(campaignId);
+                } catch (err) {
+                    logger.error('[Piggyback] Diff Engine failed:', err as Error);
+                }
+            }, 5000); // 5s delay: non-blocking + API propagation buffer
+        }
 
     } catch (error) {
         logger.error('Error handling posts:update webhook', error as Error);

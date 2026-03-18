@@ -362,3 +362,48 @@ export const db = {
      */
     getCustomMessage: getCustomMessage
 };
+
+// ===== TIER SNAPSHOT OPERATIONS (Diff Engine) =====
+
+/**
+ * Load the array of post IDs that were in a specific tier at last snapshot.
+ * Used by the Piggyback Diff Engine to detect silent Free tier drops.
+ */
+export async function loadSnapshot(tierName: string): Promise<string[]> {
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+        .from('tier_snapshots')
+        .select('post_ids')
+        .eq('tier_name', tierName)
+        .single();
+
+    // PGRST116 = row not found (first run) — not an error
+    if (error && error.code !== 'PGRST116') {
+        console.error(`[DB] Error loading snapshot for tier ${tierName}:`, error);
+        return [];
+    }
+
+    return data?.post_ids || [];
+}
+
+/**
+ * Overwrite the snapshot with the current live array of post IDs.
+ */
+export async function saveSnapshot(tierName: string, postIds: string[]): Promise<void> {
+    const supabase = getSupabase();
+
+    const { error } = await supabase
+        .from('tier_snapshots')
+        .upsert({
+            tier_name: tierName,
+            post_ids: postIds,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: 'tier_name'
+        });
+
+    if (error) {
+        console.error(`[DB] Error saving snapshot for tier ${tierName}:`, error);
+    }
+}
