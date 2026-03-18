@@ -81,8 +81,9 @@ export async function executeDiffEngine(campaignId: string): Promise<void> {
             const isPublic = attributes.is_public === true;
 
             // Check if this post is currently in the Bronze tier
+            // Handle both flat strings/numbers ("25508381") and objects ({id: "25508381"})
             const isBronze = tierRefs.some((ref: any) => {
-                const refId = String(ref.id);
+                const refId = String(typeof ref === 'object' && ref !== null ? ref.id : ref);
                 // Direct ID match
                 if (refId === bronze.id) return true;
                 // Translate via tierIdMap and check name
@@ -143,7 +144,8 @@ async function fetchLivePatreonPosts(campaignId: string): Promise<any[]> {
             headers: { Authorization: `Bearer ${config.patreonAccessToken}` },
             params: {
                 'fields[post]': 'title,url,published_at,is_paid,is_public',
-                'page[count]': 50, // Fetch a larger batch for diffing
+                'include': 'tiers', // CRITICAL: Patreon won't return tier data without this
+                'page[count]': 50,
                 'sort': '-published_at',
             },
         });
