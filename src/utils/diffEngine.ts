@@ -62,6 +62,14 @@ export async function executeDiffEngine(campaignId: string): Promise<void> {
 
         // 2. Fetch live posts from Patreon
         const livePosts = await fetchLivePatreonPosts(campaignId);
+
+        // --- TEMPORARY DEBUG LOG ---
+        if (livePosts.length > 0) {
+            console.log(`[Diff Engine] 🕵️ RAW API PAYLOAD FOR LATEST POST:`);
+            console.log(JSON.stringify(livePosts[0], null, 2));
+        }
+        // ---------------------------
+
         if (!livePosts || livePosts.length === 0) {
             logger.warn('[Diff Engine] No live posts fetched — skipping diff.');
             return;
