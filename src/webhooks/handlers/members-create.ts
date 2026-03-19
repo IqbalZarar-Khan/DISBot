@@ -1,13 +1,17 @@
 import { WebhookPayload } from '../../database/schema';
-import { upsertTrackedMember } from '../../database/db';
-import { client } from '../../index';
-import { TextChannel } from 'discord.js';
-import { createMemberEmbed } from '../../utils/embedBuilder';
+import { upsertTrackedMember, getTrackedMember } from '../../database/db';
 import { logger } from '../../utils/logger';
-import { getEventChannel } from '../../commands/admin/set-event-channel';
 
 /**
  * Handle members:create webhook event
+ * 
+ * DATA-ONLY handler: tracks the member in the database but does NOT send
+ * Discord notifications. The members:pledge:create handler is the single
+ * source of welcome / upgrade messages (Patreon fires both events together,
+ * so sending from both would cause duplicates).
+ * 
+ * Important: if the member already exists we preserve their current tier
+ * so the pledge handler can still detect upgrades.
  */
 export async function handleMembersCreate(payload: WebhookPayload): Promise<void> {
     try {
@@ -38,38 +42,24 @@ export async function handleMembersCreate(payload: WebhookPayload): Promise<void
             }
         }
 
+        // Check if member already exists — preserve old tier for upgrade detection
+        const existingMember = await getTrackedMember(memberId);
+
         // Store member in database
         const trackedMember = {
             member_id: memberId,
             full_name: fullName,
-            current_tier_id: tierId,
+            // Keep the old tier if member already exists so pledge:create can
+            // compare old vs new and detect upgrades correctly
+            current_tier_id: existingMember ? existingMember.current_tier_id : tierId,
             email: email,
-            joined_at: Date.now(),
+            joined_at: existingMember?.joined_at || Date.now(),
             updated_at: Date.now()
         };
 
         await upsertTrackedMember(trackedMember);
 
-        // Send welcome alert to event-routed channel
-        const eventChannelId = await getEventChannel('member_join');
-        if (eventChannelId) {
-            try {
-                const channel = await client.channels.fetch(eventChannelId) as TextChannel;
-                if (channel) {
-                    const embed = createMemberEmbed({
-                        fullName,
-                        tierName,
-                        isUpgrade: false
-                    });
-
-                    await channel.send({ embeds: [embed] });
-                }
-            } catch (error) {
-                logger.warn('Failed to send welcome alert', error as Error);
-            }
-        }
-
-        logger.info(`New member: ${fullName} (${tierName})`);
+        logger.info(`📋 [MEMBERS:CREATE] Tracked member: ${fullName} (${tierName}) — notifications deferred to pledge handler`);
 
     } catch (error) {
         logger.error('Error handling members:create webhook', error as Error);

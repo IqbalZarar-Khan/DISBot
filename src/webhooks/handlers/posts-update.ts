@@ -1,11 +1,10 @@
 import { WebhookPayload } from '../../database/schema';
-import { executeDiffEngine } from '../../utils/diffEngine';
 import { upsertTrackedPost, getTrackedPost, getTierMappingByName, getMessageTemplate } from '../../database/db';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { centsMap, tierRankings, tierIdMap, getTierRank, isWaterfall, resolveFreeTier } from '../../utils/tierRanking';
+import { centsMap, tierRankings, tierIdMap, getTierRank, isWaterfall } from '../../utils/tierRanking';
 import { config } from '../../config';
 import { formatMessage } from '../../utils/formatter';
 
@@ -44,78 +43,6 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
 
         // 4. Normalize to array
         const tierData = Array.isArray(rawTierData) ? rawTierData : [];
-
-        // ── ZERO STATE INTERCEPT ──────────────────────────────────────
-        // When Patreon drops a post to "All Members," the API strips all
-        // tier data (tiers.data becomes []).  Intercept this state early
-        // and map it to the configured Free tier so the waterfall fires.
-        const isPublic = attributes.is_public === true;
-
-        if (tierData.length === 0 && isPublic) {
-            const freeTierName = resolveFreeTier();
-            if (freeTierName) {
-                logger.info(`🆓 [ZERO STATE] Post "${title}" has no tier data & is_public=true → mapped to "${freeTierName}" (rank 0)`);
-
-                // Fast-path: set final tier and skip the full detection cascade
-                const newTierName = freeTierName;
-                const newTierRank = 0;
-
-                const oldPost = await getTrackedPost(postId);
-                if (oldPost) {
-                    const oldTierName = oldPost.last_tier_access;
-                    const oldTierRank = getTierRank(oldTierName);
-
-                    if (isWaterfall(oldTierRank, newTierRank)) {
-                        logger.info(`🌊 Waterfall event (Free drop): ${title} (${oldTierName} → ${newTierName})`);
-
-                        const tierMapping = await getTierMappingByName(newTierName);
-                        if (tierMapping) {
-                            try {
-                                const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
-                                if (channel) {
-                                    const dbTemplate = await getMessageTemplate('post_waterfall');
-                                    const template = dbTemplate || "🌊 This post is now available to {tier}! **{title}**\n{url}";
-                                    const messageText = formatMessage(template, {
-                                        tier: newTierName,
-                                        title,
-                                        url,
-                                        post_snippet: (attributes.content || attributes.teaser_text || '').replace(/<[^>]*>/g, '').substring(0, 200) || 'No preview available',
-                                        pledge_amount: 'Free',
-                                        patron_count: 'N/A',
-                                    });
-                                    const embed = createPostEmbed({ title, url, tierName: newTierName, isUpdate: true });
-                                    embed.setDescription(messageText);
-                                    await channel.send({ embeds: [embed] }).then(async (msg) => {
-                                        const { createPostThread } = await import('../../utils/threadHelper');
-                                        await createPostThread(channel, msg.id, title);
-                                    });
-                                    logger.info(`✅ Waterfall alert sent to ${newTierName} channel: ${title}`);
-                                }
-                            } catch (error) {
-                                logger.error(`Failed to send waterfall alert to ${newTierName} channel`, error as Error);
-                            }
-                        } else {
-                            logger.warn(`No channel mapping found for tier: ${newTierName}`);
-                        }
-                    } else {
-                        logger.info(`Post is already at Free tier or lower — no waterfall needed: ${title}`);
-                    }
-                } else {
-                    logger.info(`📥 Untracked public post — saving as Free: ${title}`);
-                }
-
-                // Update database and return early
-                await upsertTrackedPost({
-                    post_id: postId,
-                    last_tier_access: newTierName,
-                    title,
-                    updated_at: Date.now(),
-                });
-                return;
-            } else {
-                logger.warn(`[ZERO STATE] Post "${title}" appears free but no rank:0 tier in TIER_CONFIG — falling through to standard detection`);
-            }
-        }
 
         // === ENHANCED DEBUG LOGGING START ===
         logger.info('\n🐛 ========================================');
@@ -386,20 +313,6 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         };
 
         await upsertTrackedPost(trackedPost);
-
-        // ── PIGGYBACK TRIGGER ─────────────────────────────────────────
-        // Use this webhook as an "alarm clock" to check for silent
-        // Bronze→Free drops that Patreon doesn't send webhooks for.
-        const campaignId = post.relationships?.campaign?.data?.id || config.patreonCampaignId;
-        if (campaignId) {
-            setTimeout(async () => {
-                try {
-                    await executeDiffEngine(campaignId);
-                } catch (err) {
-                    logger.error('[Piggyback] Diff Engine failed:', err as Error);
-                }
-            }, 5000); // 5s delay: non-blocking + API propagation buffer
-        }
 
     } catch (error) {
         logger.error('Error handling posts:update webhook', error as Error);

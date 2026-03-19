@@ -7,12 +7,28 @@ import { logger } from '../../utils/logger';
 import { getTierRank } from '../../utils/tierRanking';
 import { getEventChannel } from '../../commands/admin/set-event-channel';
 
+// ── Notification dedup guard ───────────────────────────────────────
+// Patreon fires both members:pledge:create AND the legacy pledges:create
+// for the same action.  Both route to this handler, so we track member IDs
+// that have already been notified within a short window.
+const NOTIFY_DEDUP_TTL_MS = 60_000; // 60 seconds
+const recentlyNotified = new Map<string, number>(); // memberId → timestamp
+
+// Cleanup expired entries every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, ts] of recentlyNotified) {
+        if (now - ts > NOTIFY_DEDUP_TTL_MS) recentlyNotified.delete(id);
+    }
+}, 5 * 60_000);
+
 /**
  * Handle members:pledge:create webhook event
  * Triggered when a patron creates a new pledge (starts a subscription)
  * 
- * Patreon v2 sends member data in data.attributes (same as members:create),
- * with user details in included[] and tiers in relationships.currently_entitled_tiers
+ * This is the SINGLE SOURCE of Discord welcome / upgrade notifications.
+ * The members:create handler only tracks data; the legacy pledges:create
+ * event routes here too, so a per-member dedup guard prevents duplicates.
  */
 export async function handleMembersPledgeCreate(payload: WebhookPayload): Promise<void> {
     try {
@@ -43,6 +59,14 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
         }
 
         logger.info(`📥 [PLEDGE:CREATE] Processing pledge for: ${fullName} (ID: ${memberId})`);
+
+        // ── Notification dedup: skip if we already notified for this member ──
+        const now = Date.now();
+        const lastNotified = recentlyNotified.get(memberId);
+        if (lastNotified && now - lastNotified < NOTIFY_DEDUP_TTL_MS) {
+            logger.info(`🔁 [PLEDGE:CREATE] Already notified for member ${memberId} — skipping duplicate`);
+            return;
+        }
 
         // Get tier information — try currently_entitled_tiers first, fall back to tier
         const entitledTiers = relationships.currently_entitled_tiers?.data || [];
@@ -89,6 +113,9 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
         };
 
         await upsertTrackedMember(trackedMember);
+
+        // Mark this member as notified (dedup guard)
+        recentlyNotified.set(memberId, now);
 
         // Route to the correct event channel based on whether this is new or upgrade
         if (isExisting && tierChanged) {
@@ -139,3 +166,4 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
         throw error;
     }
 }
+

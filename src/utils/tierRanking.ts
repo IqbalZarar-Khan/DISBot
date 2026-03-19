@@ -100,22 +100,6 @@ export function isWaterfall(oldTierRank: number, newTierRank: number): boolean {
     return newTierRank < oldTierRank;
 }
 
-/**
- * Resolve the "Free" tier from TIER_CONFIG.
- * Used when Patreon strips tier data (drops post to "All Members").
- * Searches for rank === 0 or cents === 0 in the configured tiers.
- * @returns The Free tier name, or null if no Free tier is configured.
- */
-export function resolveFreeTier(): string | null {
-    const freeTier = config.tierConfig.find(t => t.rank === 0 || t.cents === 0);
-    if (freeTier) return freeTier.name;
-
-    // Fallback: check if 'Free' exists in the dynamic rankings (set by the default fallback)
-    if (tierRankings['Free'] !== undefined) return 'Free';
-
-    return null;
-}
-
 // ── Color palette for dynamic tiers (cycles for unlimited tiers) ───
 const TIER_COLORS = [
     0x00ffff, // Cyan

@@ -35,8 +35,6 @@
 ### Core Features
 - **🎯 Waterfall Release System**: Smart, tiered content distribution that prevents spam
 - **⚡ Hybrid Broadcast System**: Detects multi-tier releases and alerts all relevant channels simultaneously
-- **🆓 Free Tier Null State Detection**: Automatically detects when Patreon strips tier data ("All Members" drop) and maps to Free tier
-- **🔍 Piggyback Diff Engine**: Uses real webhooks as alarm clocks to catch silent Bronze→Free drops Patreon hides
 - **👥 Member Tracking**: Logs new pledges, upgrades, and departures to Supabase
 - **🔒 Zero-Trust Security**: HMAC webhook verification, Row-Level Security, whitelist-protected admin commands
 - **📊 Real-time Webhooks**: Instant notifications via Patreon webhook events
@@ -338,37 +336,6 @@ Day 7: Edit to add Silver access
 → Bot sends ONLY to #silver-chat (WATERFALL)
 ```
 
-### Piggyback Diff Engine
-
-When a Patreon creator cascade-releases (e.g., Bronze→Free and Silver→Bronze simultaneously), Patreon sends webhooks for the Silver→Bronze change but **stays completely silent** about Bronze→Free drops. The Diff Engine solves this by piggybacking on the webhooks that *do* fire.
-
-**How it works:**
-
-```mermaid
-sequenceDiagram
-    participant P as Patreon
-    participant W as posts-update.ts
-    participant D as diffEngine.ts
-    participant S as Supabase
-    participant H as handlePostsUpdate
-
-    P->>W: posts:update webhook (Silver→Bronze)
-    W->>W: Normal waterfall processing
-    W->>D: setTimeout(5s) → executeDiffEngine()
-    D->>S: loadSnapshot("Bronze")
-    D->>P: Fetch live posts from API
-    D->>D: Diff: find posts missing from Bronze + is_public
-    D->>H: Synthetic payload (tiers=[], is_public=true)
-    H->>H: resolveFreeTier() intercepts → waterfall alert 🌊
-    D->>S: saveSnapshot("Bronze", currentPostIds)
-```
-
-**Key details:**
-- **Memory Lock**: A `isDiffRunning` boolean prevents duplicate concurrent runs when multiple webhooks fire simultaneously
-- **Snapshot Persistence**: Post IDs are stored in Supabase (`tier_snapshots` table), surviving bot restarts and redeployments
-- **Synthetic Payloads**: Dropped posts are fed back into the standard `handlePostsUpdate()` pipeline where `resolveFreeTier()` intercepts and triggers the waterfall
-- **Dynamic Detection**: Automatically finds the lowest paid tier (Bronze) from `TIER_CONFIG` — no hardcoded IDs
-
 ### Custom Message Templates
 
 Customize all bot messages using the `/admin set-message` command:
@@ -447,11 +414,10 @@ src/
 │   ├── firstDeploy.ts       # First-deployment welcome DM
 │   ├── healthChecks.ts      # Startup intent + webhook health checks
 │   ├── setupMode.ts         # Auto-capture Discord IDs (!claim)
-│   ├── diffEngine.ts        # Piggyback Diff Engine for silent Free drops
 │   ├── patreonClient.ts     # Axios wrapper with auto token-refresh
 │   ├── patreonPoller.ts     # Background tier-change poller
 │   ├── testHelpers.ts       # Webhook test utilities
-│   ├── tierRanking.ts       # Dynamic tier system + resolveFreeTier()
+│   ├── tierRanking.ts       # Dynamic tier system
 │   └── weeklyDigest.ts      # Weekly patron digest scheduler
 ├── webhooks/         # Webhook server and handlers
 │   ├── handlers/     # Event-specific handlers
@@ -658,8 +624,6 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 ## 🆕 Recent Updates
 
 ### Latest (Mar 2026)
-- ✅ **🆓 Free Tier Null State Detection**: Handles Patreon's stripped tier data when posts drop to "All Members"
-- ✅ **🔍 Piggyback Diff Engine**: Detects silent Bronze→Free drops by diffing Supabase snapshots vs live API
 - ✅ **🔐 OAuth Token Exchange Route**: Built-in `/oauth/start` + `/oauth/redirect` — no curl/Postman needed
 - ✅ **🔄 Auto Token Refresh**: `patreonClient.ts` automatically refreshes expired tokens on 401 errors
 - ✅ **🌍 Currency-Aware Pledges**: Normalizes international currencies (EUR, GBP, etc.) to USD cents

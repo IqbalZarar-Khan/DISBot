@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { config } from '../config';
 import { getTrackedPost, upsertTrackedPost, getTierMappingByName, getMessageTemplate } from '../database/db';
-import { tierIdMap, centsMap, getTierRank, isWaterfall, resolveFreeTier } from '../utils/tierRanking';
+import { tierIdMap, centsMap, getTierRank, isWaterfall } from '../utils/tierRanking';
 import { client } from '../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../utils/embedBuilder';
@@ -142,20 +142,9 @@ async function pollPatreonPosts(): Promise<void> {
  * Detect the lowest tier (widest audience) for a post from API data.
  */
 async function detectPostTier(post: any, included: any[], attributes: any): Promise<string | null> {
-    // 0. ZERO STATE INTERCEPT — post dropped to "All Members"
+    // 1. Check relationships → access_rules or tiers
     const relationships = post.relationships || {};
     const tierRefs = relationships.access_rules?.data || relationships.tiers?.data || [];
-    const isPublic = attributes.is_public === true;
-
-    if (tierRefs.length === 0 && isPublic) {
-        const freeTier = resolveFreeTier();
-        if (freeTier) {
-            logger.info(`🆓 [POLLER ZERO STATE] Post detected as Free (no tiers, is_public=true) → "${freeTier}"`);
-            return freeTier;
-        }
-    }
-
-    // 1. Check relationships → access_rules or tiers
 
     // Collect tier IDs from relationships
     const tierIds: string[] = tierRefs

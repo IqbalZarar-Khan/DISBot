@@ -4,7 +4,7 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { tierIdMap, centsMap, resolveFreeTier } from '../../utils/tierRanking';
+import { tierIdMap, centsMap } from '../../utils/tierRanking';
 import { config } from '../../config';
 import { handlePostsUpdate } from './posts-update';
 import { formatMessage } from '../../utils/formatter';
@@ -63,65 +63,6 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         logger.info(`📝 Min Cents Pledged: ${attributes.min_cents_pledged_to_view}`);
 
         // --- HYBRID BROADCAST TIER DETECTION LOGIC ---
-
-        // ── ZERO STATE INTERCEPT ──────────────────────────────────────
-        // When Patreon sets a post to "All Members," tier data is stripped.
-        // Intercept this early and map to the configured Free tier.
-        const isPublic = attributes.is_public === true;
-        const hasNoTierData = (
-            (!attributes.tiers || !Array.isArray(attributes.tiers) || attributes.tiers.length === 0) &&
-            (!relationships.access_rules?.data || relationships.access_rules.data.length === 0) &&
-            (!relationships.tiers?.data || relationships.tiers.data.length === 0)
-        );
-
-        if (hasNoTierData && isPublic) {
-            const freeTierName = resolveFreeTier();
-            if (freeTierName) {
-                logger.info(`🆓 [ZERO STATE] New post "${title}" has no tier data & is_public=true → mapped to "${freeTierName}"`);
-                // Inject into the detection pipeline so standard broadcast logic handles it
-                const uniqueTiers = [freeTierName];
-
-                // Send to Free tier channel
-                for (const tierName of uniqueTiers) {
-                    try {
-                        const tierMapping = await getTierMappingByName(tierName);
-                        if (!tierMapping) {
-                            logger.warn(`No channel mapping found for tier: ${tierName}`);
-                            continue;
-                        }
-                        const channel = await client.channels.fetch(tierMapping.channel_id) as TextChannel;
-                        if (channel && channel.isTextBased()) {
-                            const dbTemplate = await getMessageTemplate('post_new');
-                            const template = dbTemplate || "📢 New {tier} post: **{title}**\n{url}";
-                            const messageText = formatMessage(template, {
-                                tier: tierName,
-                                title,
-                                url,
-                                post_snippet: (attributes.content || attributes.teaser_text || '').replace(/<[^>]*>/g, '').substring(0, 200) || 'No preview available',
-                                pledge_amount: 'Free',
-                                patron_count: 'N/A',
-                            });
-                            const embed = createPostEmbed({ title, url, tierName, isUpdate: false });
-                            embed.setDescription(messageText);
-                            await channel.send({ embeds: [embed] }).then(async (msg) => {
-                                const { createPostThread } = await import('../../utils/threadHelper');
-                                await createPostThread(channel, msg.id, title);
-                            });
-                            logger.info(`✅ Free-tier broadcast sent to ${tierName} channel: ${title}`);
-                        }
-                    } catch (error) {
-                        logger.error(`Failed to send alert to ${tierName} channel`, error as Error);
-                    }
-                }
-
-                await db.addPost(postId, freeTierName, title);
-                logger.info(`💾 Saved free post to database with tier: ${freeTierName}`);
-                logger.info('📝 ========================================\n');
-                return;
-            } else {
-                logger.warn(`[ZERO STATE] Post "${title}" appears free but no rank:0 tier in TIER_CONFIG — falling through`);
-            }
-        }
 
         // 1. Extract ALL tier IDs (not just first)
         let tierIds: string[] = [];

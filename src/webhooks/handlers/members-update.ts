@@ -5,7 +5,7 @@ import { TextChannel } from 'discord.js';
 import { createMemberEmbed } from '../../utils/embedBuilder';
 import { getTierRank, isUpgrade } from '../../utils/tierRanking';
 import { logger } from '../../utils/logger';
-import { config } from '../../config';
+import { getEventChannel } from '../../commands/admin/set-event-channel';
 
 /**
  * Handle members:update webhook event
@@ -55,10 +55,11 @@ export async function handleMembersUpdate(payload: WebhookPayload): Promise<void
             if (isUpgrade(oldRank, newRank)) {
                 logger.info(`Member upgrade: ${fullName} (${oldTierName} → ${newTierName})`);
 
-                // Send upgrade alert to log channel
-                if (config.logChannelId) {
+                // Send upgrade alert to event-routed channel
+                const eventChannelId = await getEventChannel('pledge_upgrade');
+                if (eventChannelId) {
                     try {
-                        const channel = await client.channels.fetch(config.logChannelId) as TextChannel;
+                        const channel = await client.channels.fetch(eventChannelId) as TextChannel;
                         if (channel) {
                             const embed = createMemberEmbed({
                                 fullName,
