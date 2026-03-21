@@ -4,8 +4,9 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createMemberEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { getTierRank } from '../../utils/tierRanking';
+import { getTierRank, tierIdMap, centsMap } from '../../utils/tierRanking';
 import { getEventChannel } from '../../commands/admin/set-event-channel';
+import { config } from '../../config';
 
 // ── Notification dedup guard ───────────────────────────────────────
 // Patreon fires both members:pledge:create AND the legacy pledges:create
@@ -68,7 +69,11 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
             return;
         }
 
-        // Get tier information — try currently_entitled_tiers first, fall back to tier
+        // Get tier information — multi-layer resolution:
+        //   1. currently_entitled_tiers + included[] lookup
+        //   2. relationships.tier + included[] lookup
+        //   3. tierIdMap fallback (config-based tier ID → name)
+        //   4. centsMap fallback (pledge amount → tier name)
         const entitledTiers = relationships.currently_entitled_tiers?.data || [];
         const singleTier = relationships.tier?.data;
         let tierName = 'Free';
@@ -82,6 +87,16 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
             if (tierInfo) {
                 tierName = tierInfo.attributes?.title || 'Unknown Tier';
                 tierId = firstTierId;
+            } else if (tierIdMap[firstTierId]) {
+                // Fallback: tier not in included[] but known from config
+                tierName = tierIdMap[firstTierId];
+                tierId = firstTierId;
+                logger.info(`📥 [PLEDGE:CREATE] Tier resolved via tierIdMap: ${firstTierId} → ${tierName}`);
+            } else {
+                // Tier ID present but not resolvable — still record the ID
+                tierId = firstTierId;
+                tierName = 'Unknown Tier';
+                logger.warn(`📥 [PLEDGE:CREATE] Tier ID ${firstTierId} not found in included[] or tierIdMap`);
             }
         } else if (singleTier) {
             const tierInfo = included.find((item: any) =>
@@ -90,6 +105,24 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
             if (tierInfo) {
                 tierName = tierInfo.attributes?.title || 'Unknown Tier';
                 tierId = singleTier.id;
+            } else if (tierIdMap[singleTier.id]) {
+                tierName = tierIdMap[singleTier.id];
+                tierId = singleTier.id;
+                logger.info(`📥 [PLEDGE:CREATE] Tier resolved via tierIdMap: ${singleTier.id} → ${tierName}`);
+            }
+        }
+
+        // Final fallback: if still 'free', try to resolve from pledge amount (cents)
+        if (tierId === 'free') {
+            const pledgeCents = attributes.currently_entitled_amount_cents
+                || attributes.pledge_amount_cents
+                || attributes.amount_cents;
+            if (pledgeCents && pledgeCents > 0 && centsMap[pledgeCents]) {
+                tierName = centsMap[pledgeCents];
+                // Try to find the tier ID from config
+                const matchedTier = config.tierConfig?.find(t => t.name === tierName);
+                if (matchedTier) tierId = matchedTier.id;
+                logger.info(`📥 [PLEDGE:CREATE] Tier resolved via centsMap: ${pledgeCents}¢ → ${tierName}`);
             }
         }
 

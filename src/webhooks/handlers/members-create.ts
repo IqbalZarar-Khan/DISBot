@@ -1,14 +1,19 @@
 import { WebhookPayload } from '../../database/schema';
 import { upsertTrackedMember, getTrackedMember } from '../../database/db';
+import { client } from '../../index';
+import { TextChannel } from 'discord.js';
+import { createMemberEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
+import { getEventChannel } from '../../commands/admin/set-event-channel';
 
 /**
  * Handle members:create webhook event
  * 
- * DATA-ONLY handler: tracks the member in the database but does NOT send
- * Discord notifications. The members:pledge:create handler is the single
- * source of welcome / upgrade messages (Patreon fires both events together,
- * so sending from both would cause duplicates).
+ * For FREE members: sends a welcome notification (they never trigger
+ * members:pledge:create because there is no pledge).
+ * 
+ * For PAID members: data-only tracking — the members:pledge:create handler
+ * sends the welcome/upgrade notification to avoid duplicates.
  * 
  * Important: if the member already exists we preserve their current tier
  * so the pledge handler can still detect upgrades.
@@ -59,10 +64,37 @@ export async function handleMembersCreate(payload: WebhookPayload): Promise<void
 
         await upsertTrackedMember(trackedMember);
 
-        logger.info(`📋 [MEMBERS:CREATE] Tracked member: ${fullName} (${tierName}) — notifications deferred to pledge handler`);
+        // Send welcome notification ONLY for free-tier members.
+        // Free members never trigger members:pledge:create (no pledge),
+        // so this is their only chance for a welcome message.
+        // Paid members are handled by the pledge handler.
+        const isFreeOnly = tierId === 'free';
+
+        if (isFreeOnly && !existingMember) {
+            const eventChannelId = await getEventChannel('member_join');
+            if (eventChannelId) {
+                try {
+                    const channel = await client.channels.fetch(eventChannelId) as TextChannel;
+                    if (channel) {
+                        const embed = createMemberEmbed({
+                            fullName,
+                            tierName,
+                            isUpgrade: false
+                        });
+                        await channel.send({ embeds: [embed] });
+                    }
+                } catch (error) {
+                    logger.warn('Failed to send free member welcome alert', error as Error);
+                }
+            }
+            logger.info(`🆓 [MEMBERS:CREATE] Free member welcome sent: ${fullName}`);
+        } else {
+            logger.info(`📋 [MEMBERS:CREATE] Tracked member: ${fullName} (${tierName}) — notifications deferred to pledge handler`);
+        }
 
     } catch (error) {
         logger.error('Error handling members:create webhook', error as Error);
         throw error;
     }
 }
+
