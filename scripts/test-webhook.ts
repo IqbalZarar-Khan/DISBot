@@ -112,6 +112,35 @@ const mockPayloads: Record<string, any> = {
         included: [],
         links: {},
     },
+    'members:pledge:create': {
+        data: {
+            id: 'test-member-pledge-' + Date.now(),
+            type: 'member',
+            attributes: {
+                full_name: 'Smitten Oakley (V2 Test)',
+                email: 'v2test@example.com',
+                patron_status: 'active_patron',
+                currently_entitled_amount_cents: 500,
+                pledge_relationship_start: new Date().toISOString(),
+            },
+            relationships: {
+                campaign: { data: { id: process.env.PATREON_CAMPAIGN_ID || 'test-campaign', type: 'campaign' } },
+                currently_entitled_tiers: { data: [{ id: 'diamond-tier-id', type: 'tier' }] },
+                user: { data: { id: 'test-user-v2', type: 'user' } },
+            },
+        },
+        included: [
+            {
+                id: 'diamond-tier-id',
+                type: 'tier',
+                attributes: {
+                    title: 'Diamond',
+                    amount_cents: 500,
+                },
+            },
+        ],
+        links: {},
+    },
 };
 
 async function main(): Promise<void> {

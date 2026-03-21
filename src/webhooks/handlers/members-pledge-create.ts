@@ -8,45 +8,26 @@ import { getTierRank, tierIdMap, centsMap } from '../../utils/tierRanking';
 import { getEventChannel } from '../../commands/admin/set-event-channel';
 import { config } from '../../config';
 
-// ── Notification dedup guard ───────────────────────────────────────
-// Patreon fires both members:pledge:create AND the legacy pledges:create
-// for the same action.  Both route to this handler, so we track member IDs
-// that have already been notified within a short window.
-const NOTIFY_DEDUP_TTL_MS = 60_000; // 60 seconds
-const recentlyNotified = new Map<string, number>(); // memberId → timestamp
-
-// Cleanup expired entries every 5 minutes
-setInterval(() => {
-    const now = Date.now();
-    for (const [id, ts] of recentlyNotified) {
-        if (now - ts > NOTIFY_DEDUP_TTL_MS) recentlyNotified.delete(id);
-    }
-}, 5 * 60_000);
-
 /**
- * Handle members:pledge:create webhook event
+ * Handle members:pledge:create webhook event (Patreon v2)
  * Triggered when a patron creates a new pledge (starts a subscription)
  * 
- * This is the SINGLE SOURCE of Discord welcome / upgrade notifications.
- * The members:create handler only tracks data; the legacy pledges:create
- * event routes here too, so a per-member dedup guard prevents duplicates.
+ * This is the SINGLE SOURCE of Discord welcome / upgrade notifications
+ * for PAID members. Free members are welcomed by the members:create handler.
  */
 export async function handleMembersPledgeCreate(payload: WebhookPayload): Promise<void> {
     try {
         const member = payload.data;
         const included = payload.included || [];
-
-        // Extract member data from attributes (same structure as members:create)
-        const memberId = member.id;
         const attributes = member.attributes || {};
         const relationships = member.relationships || {};
+        const memberId = member.id;
 
         // Get member name — try attributes first, then fall back to included user data
-        let fullName = attributes.full_name;
+        let fullName = attributes.full_name || '';
         let email = attributes.email || null;
 
         if (!fullName) {
-            // Fall back: look for user in included data via relationships
             const userData = relationships.user?.data || relationships.patron?.data;
             if (userData) {
                 const userInfo = included.find((item: any) =>
@@ -57,16 +38,6 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
             } else {
                 fullName = 'Unknown Member';
             }
-        }
-
-        logger.info(`📥 [PLEDGE:CREATE] Processing pledge for: ${fullName} (ID: ${memberId})`);
-
-        // ── Notification dedup: skip if we already notified for this member ──
-        const now = Date.now();
-        const lastNotified = recentlyNotified.get(memberId);
-        if (lastNotified && now - lastNotified < NOTIFY_DEDUP_TTL_MS) {
-            logger.info(`🔁 [PLEDGE:CREATE] Already notified for member ${memberId} — skipping duplicate`);
-            return;
         }
 
         // Get tier information — multi-layer resolution:
@@ -88,12 +59,10 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
                 tierName = tierInfo.attributes?.title || 'Unknown Tier';
                 tierId = firstTierId;
             } else if (tierIdMap[firstTierId]) {
-                // Fallback: tier not in included[] but known from config
                 tierName = tierIdMap[firstTierId];
                 tierId = firstTierId;
                 logger.info(`📥 [PLEDGE:CREATE] Tier resolved via tierIdMap: ${firstTierId} → ${tierName}`);
             } else {
-                // Tier ID present but not resolvable — still record the ID
                 tierId = firstTierId;
                 tierName = 'Unknown Tier';
                 logger.warn(`📥 [PLEDGE:CREATE] Tier ID ${firstTierId} not found in included[] or tierIdMap`);
@@ -119,12 +88,13 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
                 || attributes.amount_cents;
             if (pledgeCents && pledgeCents > 0 && centsMap[pledgeCents]) {
                 tierName = centsMap[pledgeCents];
-                // Try to find the tier ID from config
                 const matchedTier = config.tierConfig?.find(t => t.name === tierName);
                 if (matchedTier) tierId = matchedTier.id;
                 logger.info(`📥 [PLEDGE:CREATE] Tier resolved via centsMap: ${pledgeCents}¢ → ${tierName}`);
             }
         }
+
+        logger.info(`📥 [PLEDGE:CREATE] Processing pledge for: ${fullName} (ID: ${memberId})`);
 
         // Check if member already exists — determines welcome vs upgrade message
         const existingMember = await getTrackedMember(memberId);
@@ -146,9 +116,6 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
         };
 
         await upsertTrackedMember(trackedMember);
-
-        // Mark this member as notified (dedup guard)
-        recentlyNotified.set(memberId, now);
 
         // Route to the correct event channel based on whether this is new or upgrade
         if (isExisting && tierChanged) {
@@ -199,4 +166,3 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
         throw error;
     }
 }
-
