@@ -596,7 +596,7 @@ function getDashboardHTML(token: string): string {
                     'Last updated: ' + new Date().toLocaleTimeString();
             } catch (err) {
                 console.error('Dashboard load error:', err);
-                document.getElementById('refreshInfo').textContent = 'Error loading data';
+                document.getElementById('refreshInfo').textContent = 'Error: ' + err.message;
             }
         }
 
