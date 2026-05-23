@@ -23,9 +23,14 @@ export async function handleDashboard(interaction: ChatInputCommandInteraction):
         }
 
         // Determine the base URL
-        const baseUrl = config.publicUrl
+        let baseUrl = config.publicUrl
             || process.env.PUBLIC_URL
             || `http://localhost:${config.webhookPort}`;
+            
+        // Remove trailing slash if present
+        if (baseUrl.endsWith('/')) {
+            baseUrl = baseUrl.slice(0, -1);
+        }
 
         // Generate a JWT that expires in 1 hour
         const token = jwt.sign(

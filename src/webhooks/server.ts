@@ -99,6 +99,8 @@ let fastify: FastifyInstance | null = null;
 export async function startWebhookServer(port: number, webhookSecret: string): Promise<void> {
     fastify = Fastify({
         logger: false, // We use our own logger
+        ignoreTrailingSlash: true,
+        ignoreDuplicateSlashes: true,
     });
 
     // ── Raw body parser for signature verification ──────────────────
