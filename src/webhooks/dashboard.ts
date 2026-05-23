@@ -90,15 +90,13 @@ export const dashboardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
                 tierCounts[tid] = (tierCounts[tid] || 0) + 1;
             }
 
-            // Get tier names from mappings
-            const { data: mappings } = await supabase
-                .from('tier_mappings')
-                .select('tier_id, tier_name');
+            // Get tier names from BOTH mappings tables
+            const { data: tMappings } = await supabase.from('tier_mappings').select('tier_id, tier_name');
+            const { data: rMappings } = await supabase.from('role_mappings').select('tier_id, tier_name');
 
             const nameMap: Record<string, string> = { free: 'Free' };
-            for (const m of (mappings || [])) {
-                nameMap[m.tier_id] = m.tier_name;
-            }
+            for (const m of (tMappings || [])) nameMap[m.tier_id] = m.tier_name;
+            for (const m of (rMappings || [])) nameMap[m.tier_id] = m.tier_name; // role_mappings overrides as it's newer
 
             const result = Object.entries(tierCounts).map(([id, count]) => ({
                 tierId: id,
@@ -175,14 +173,13 @@ export const dashboardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
                 .order('updated_at', { ascending: false })
                 .limit(20);
 
-            const { data: mappings } = await supabase
-                .from('tier_mappings')
-                .select('tier_id, tier_name');
+            // Get tier names from BOTH mappings tables
+            const { data: tMappings } = await supabase.from('tier_mappings').select('tier_id, tier_name');
+            const { data: rMappings } = await supabase.from('role_mappings').select('tier_id, tier_name');
 
             const nameMap: Record<string, string> = { free: 'Free' };
-            for (const m of (mappings || [])) {
-                nameMap[m.tier_id] = m.tier_name;
-            }
+            for (const m of (tMappings || [])) nameMap[m.tier_id] = m.tier_name;
+            for (const m of (rMappings || [])) nameMap[m.tier_id] = m.tier_name;
 
             const enrichedMembers = (members || []).map(m => ({
                 ...m,
