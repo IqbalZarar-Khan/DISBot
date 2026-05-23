@@ -24,45 +24,63 @@ export function recordTierDetection(success: boolean): void {
     else tierDetectionFail++;
 }
 
+// ── Cached Patreon API health check ──────────────────────────────
+const PATREON_CACHE_TTL_MS = 60_000; // Cache for 60 seconds
+let cachedPatreonResult: { status: string; latency: string; timestamp: number } | null = null;
+
+async function getPatreonHealth(): Promise<{ status: string; latency: string }> {
+    // Return cached result if still fresh
+    if (cachedPatreonResult && (Date.now() - cachedPatreonResult.timestamp) < PATREON_CACHE_TTL_MS) {
+        return { status: cachedPatreonResult.status, latency: cachedPatreonResult.latency };
+    }
+
+    let status = '🔴 Error';
+    let latency = '';
+
+    try {
+        const start = Date.now();
+        const axios = (await import('axios')).default;
+        const token = process.env.PATREON_ACCESS_TOKEN || config.patreonAccessToken;
+
+        const response = await axios.get(
+            'https://www.patreon.com/api/oauth2/api/current_user',
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Accept-Encoding': 'gzip, deflate',
+                },
+                timeout: 5000,
+            }
+        );
+        const ms = Date.now() - start;
+        if (response.status === 200) {
+            const name = response.data?.data?.attributes?.full_name || 'Unknown';
+            status = '🟢 Connected';
+            latency = ` (${ms}ms, ${name})`;
+        }
+    } catch (err: any) {
+        const code = err.response?.status;
+        if (code === 401) {
+            status = '🔴 Token expired/invalid';
+        } else if (code === 403) {
+            status = '🔴 Token missing required scopes';
+        } else {
+            status = `🔴 Error (${code || 'network'}): ${(err.message || '').substring(0, 40)}`;
+        }
+    }
+
+    cachedPatreonResult = { status, latency, timestamp: Date.now() };
+    return { status, latency };
+}
+
 export async function handleStatus(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!await checkAdminPermission(interaction)) return;
 
     await interaction.deferReply({ ephemeral: true });
 
     try {
-        // ── Patreon API ──────────────────────────────────────────
-        let patreonStatus = '🔴 Error';
-        let patreonLatency = '';
-        try {
-            const start = Date.now();
-            // Try the simplest v2 endpoint first
-            const axios = (await import('axios')).default;
-            const token = process.env.PATREON_ACCESS_TOKEN || config.patreonAccessToken;
-
-            // Try v1 API (more reliable, doesn't need specific scopes)
-            const response = await axios.get(
-                'https://www.patreon.com/api/oauth2/api/current_user',
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                    timeout: 5000
-                }
-            );
-            const latency = Date.now() - start;
-            if (response.status === 200) {
-                const name = response.data?.data?.attributes?.full_name || 'Unknown';
-                patreonStatus = '🟢 Connected';
-                patreonLatency = ` (${latency}ms, ${name})`;
-            }
-        } catch (err: any) {
-            const code = err.response?.status;
-            if (code === 401) {
-                patreonStatus = '🔴 Token expired/invalid';
-            } else if (code === 403) {
-                patreonStatus = '🔴 Token missing required scopes';
-            } else {
-                patreonStatus = `🔴 Error (${code || 'network'}): ${(err.message || '').substring(0, 40)}`;
-            }
-        }
+        // ── Patreon API (cached) ─────────────────────────────────
+        const { status: patreonStatus, latency: patreonLatency } = await getPatreonHealth();
 
         // ── Database health ──────────────────────────────────────
         let dbStatus = '🔴 Error';

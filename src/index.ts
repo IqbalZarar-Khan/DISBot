@@ -186,8 +186,8 @@ function registerEventHandlers() {
             }
         }
 
-        // Start Patreon post poller (checks for silent tier changes)
-        startPolling();
+        // Poller is OFF by default — start manually via /admin poller start
+        logger.info('🔄 [POLLER] Disabled by default. Use /admin poller start to enable.');
 
         // Start anniversary checker (daily)
         try {

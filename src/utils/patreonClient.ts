@@ -1,4 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import http from 'http';
+import https from 'https';
 import { config } from '../config';
 import { setConfig, getConfig } from '../database/db';
 import { logger } from './logger';
@@ -9,11 +11,20 @@ const TOKEN_URL = 'https://www.patreon.com/api/oauth2/token';
 let currentAccessToken: string = config.patreonAccessToken;
 let currentRefreshToken: string = config.patreonRefreshToken || '';
 let isRefreshing = false;
+let tokensLoaded = false;
+
+// Reusable HTTP agents with keep-alive to avoid TCP+TLS handshake per request
+const httpAgent = new http.Agent({ keepAlive: true, keepAliveMsecs: 30_000 });
+const httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 30_000 });
+
+// Singleton client instance
+let cachedClient: AxiosInstance | null = null;
 
 /**
  * Initialize tokens from DB if available (DB overrides env vars).
  */
 async function loadTokensFromDb(): Promise<void> {
+    if (tokensLoaded) return; // Only load once
     try {
         const dbToken = await getConfig('patreon_access_token');
         const dbRefresh = await getConfig('patreon_refresh_token');
@@ -24,6 +35,7 @@ async function loadTokensFromDb(): Promise<void> {
         if (dbRefresh) {
             currentRefreshToken = dbRefresh;
         }
+        tokensLoaded = true;
     } catch {
         // DB might not be ready yet — use env vars
     }
@@ -51,6 +63,8 @@ async function refreshAccessToken(): Promise<boolean> {
                 client_id: config.patreonClientId,
                 client_secret: config.patreonClientSecret,
             },
+            httpAgent,
+            httpsAgent,
         });
 
         const { access_token, refresh_token } = res.data;
@@ -80,6 +94,7 @@ async function refreshAccessToken(): Promise<boolean> {
 
 /**
  * Create a Patreon API client with automatic token refresh.
+ * Uses a singleton with HTTP keep-alive for minimal latency.
  *
  * Usage:
  *   const client = await getPatreonClient();
@@ -89,9 +104,17 @@ export async function getPatreonClient(): Promise<AxiosInstance> {
     // Load DB tokens on first use
     await loadTokensFromDb();
 
+    // Return cached client if available
+    if (cachedClient) return cachedClient;
+
     const instance = axios.create({
         baseURL: PATREON_API,
         timeout: 15000,
+        httpAgent,
+        httpsAgent,
+        headers: {
+            'Accept-Encoding': 'gzip, deflate',
+        },
     });
 
     // Request interceptor: attach current access token
@@ -123,6 +146,7 @@ export async function getPatreonClient(): Promise<AxiosInstance> {
         }
     );
 
+    cachedClient = instance;
     return instance;
 }
 
