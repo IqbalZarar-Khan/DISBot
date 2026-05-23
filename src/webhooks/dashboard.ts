@@ -556,7 +556,7 @@ function getDashboardHTML(token: string): string {
         }
 
         async function loadRecentTable() {
-            const data = await fetchAPI('/api/recent');
+            const data = await fetchAPI('/data/recent');
             const tbody = document.getElementById('recentTable');
 
             if (data.length === 0) {
