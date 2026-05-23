@@ -175,7 +175,21 @@ export const dashboardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
                 .order('updated_at', { ascending: false })
                 .limit(20);
 
-            return reply.send(members || []);
+            const { data: mappings } = await supabase
+                .from('tier_mappings')
+                .select('tier_id, tier_name');
+
+            const nameMap: Record<string, string> = { free: 'Free' };
+            for (const m of (mappings || [])) {
+                nameMap[m.tier_id] = m.tier_name;
+            }
+
+            const enrichedMembers = (members || []).map(m => ({
+                ...m,
+                tier_name: nameMap[m.current_tier_id] || m.current_tier_id || 'Free'
+            }));
+
+            return reply.send(enrichedMembers);
         } catch (err: any) {
             return reply.code(500).send({ error: err.message });
         }
@@ -567,7 +581,7 @@ function getDashboardHTML(token: string): string {
             tbody.innerHTML = data.map(m => {
                 const updated = new Date(typeof m.updated_at === 'number' ? m.updated_at : Date.parse(m.updated_at));
                 const timeAgo = getTimeAgo(updated);
-                const tierLabel = m.current_tier_id === 'free' ? 'Free' : m.current_tier_id;
+                const tierLabel = m.tier_name;
                 return '<tr>' +
                     '<td>' + escapeHtml(m.full_name) + '</td>' +
                     '<td><span class="tier-badge">' + escapeHtml(tierLabel) + '</span></td>' +
