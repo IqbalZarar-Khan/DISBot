@@ -44,7 +44,7 @@ export const dashboardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
 
     // ── API Endpoints ──────────────────────────────────────
 
-    fastify.get('/api/overview', async (_request: FastifyRequest, reply: FastifyReply) => {
+    fastify.get('/data/overview', async (_request: FastifyRequest, reply: FastifyReply) => {
         try {
             const supabase = getSupabase();
 
@@ -75,7 +75,7 @@ export const dashboardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
         }
     });
 
-    fastify.get('/api/tiers', async (_request: FastifyRequest, reply: FastifyReply) => {
+    fastify.get('/data/tiers', async (_request: FastifyRequest, reply: FastifyReply) => {
         try {
             const supabase = getSupabase();
 
@@ -112,7 +112,7 @@ export const dashboardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
         }
     });
 
-    fastify.get('/api/growth', async (_request: FastifyRequest, reply: FastifyReply) => {
+    fastify.get('/data/growth', async (_request: FastifyRequest, reply: FastifyReply) => {
         try {
             const supabase = getSupabase();
 
@@ -165,7 +165,7 @@ export const dashboardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
         }
     });
 
-    fastify.get('/api/recent', async (_request: FastifyRequest, reply: FastifyReply) => {
+    fastify.get('/data/recent', async (_request: FastifyRequest, reply: FastifyReply) => {
         try {
             const supabase = getSupabase();
 
@@ -429,19 +429,25 @@ function getDashboardHTML(token: string): string {
 
     <script>
         const TOKEN = '${token}';
-        const BASE = window.location.pathname.replace(new RegExp('/$'), '');
+        const BASE = window.location.origin + window.location.pathname.replace(new RegExp('/$'), '');
 
         let tierChartInstance = null;
         let growthChartInstance = null;
 
         async function fetchAPI(endpoint) {
-            const res = await fetch(BASE + endpoint + '?token=' + TOKEN);
-            if (!res.ok) throw new Error('API error: ' + res.status);
-            return res.json();
+            const url = BASE + endpoint + '?token=' + TOKEN;
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('API error: ' + res.status);
+                return await res.json();
+            } catch (err) {
+                err.message = err.message + ' (URL: ' + endpoint + ')';
+                throw err;
+            }
         }
 
         async function loadOverview() {
-            const data = await fetchAPI('/api/overview');
+            const data = await fetchAPI('/data/overview');
             document.getElementById('totalMembers').textContent = data.totalMembers.toLocaleString();
             document.getElementById('totalPosts').textContent = data.totalPosts.toLocaleString();
             document.getElementById('activeTiers').textContent = data.activeTiers.toLocaleString();
@@ -449,7 +455,7 @@ function getDashboardHTML(token: string): string {
         }
 
         async function loadTierChart() {
-            const data = await fetchAPI('/api/tiers');
+            const data = await fetchAPI('/data/tiers');
             const ctx = document.getElementById('tierChart').getContext('2d');
 
             const colors = [
@@ -484,7 +490,7 @@ function getDashboardHTML(token: string): string {
         }
 
         async function loadGrowthChart() {
-            const data = await fetchAPI('/api/growth');
+            const data = await fetchAPI('/data/growth');
             const ctx = document.getElementById('growthChart').getContext('2d');
 
             if (growthChartInstance) growthChartInstance.destroy();
