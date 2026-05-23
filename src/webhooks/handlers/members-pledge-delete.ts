@@ -1,5 +1,6 @@
 import { WebhookPayload } from '../../database/schema';
-import { upsertTrackedMember, getTrackedMember } from '../../database/db';
+import { getTrackedMember } from '../../database/db';
+import { queueMemberUpsert } from '../../database/batchWriter';
 import { client } from '../../index';
 import { TextChannel, EmbedBuilder } from 'discord.js';
 import { logger } from '../../utils/logger';
@@ -46,7 +47,20 @@ export async function handleMembersPledgeDelete(payload: WebhookPayload): Promis
             updated_at: Date.now()
         };
 
-        await upsertTrackedMember(trackedMember);
+        queueMemberUpsert(trackedMember);
+
+        // Sync Discord role: remove old tier role
+        if (existingMember && existingMember.current_tier_id !== 'free') {
+            try {
+                const { isRoleSyncEnabled, syncMemberRole } = await import('../../utils/roleSync');
+                if (await isRoleSyncEnabled()) {
+                    const { config: appConfig } = await import('../../config');
+                    await syncMemberRole(appConfig.guildId, memberId, 'free', existingMember.current_tier_id);
+                }
+            } catch (syncErr) {
+                logger.warn(`🔄 [ROLE SYNC] Failed for ${fullName}: ${(syncErr as Error).message}`);
+            }
+        }
 
         // Send cancellation notification to log channel
         if (config.logChannelId) {

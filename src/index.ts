@@ -4,8 +4,12 @@ import { initSupabase } from './database/supabase';
 import { initDatabase } from './database/db';
 import { initLogger, logger } from './utils/logger';
 import { startWebhookServer } from './webhooks/server';
-import { startPolling, stopPolling } from './utils/patreonPoller';
+import { stopPolling } from './utils/patreonPoller';
 import { initI18n } from './utils/i18n';
+import { initRedis, closeRedis } from './database/redis';
+import { initWebhookQueue, closeWebhookQueue } from './queue/webhookQueue';
+import { startWebhookWorker, stopWebhookWorker } from './queue/webhookWorker';
+import { startBatchWriter, stopBatchWriter } from './database/batchWriter';
 
 // Create Discord client
 const client = new Client({
@@ -107,6 +111,26 @@ async function main() {
         // Initialize database (test connection)
         await initDatabase();
 
+        // Initialize Redis (non-fatal — bot works without it)
+        try {
+            initRedis();
+            // Give Redis a moment to connect
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (err) {
+            console.warn('⚠️ Redis connection failed (non-fatal):', (err as Error).message);
+            console.warn('   Bot will operate without queue — webhooks processed directly.');
+        }
+
+        // Initialize webhook queue (requires Redis)
+        try {
+            initWebhookQueue();
+        } catch (err) {
+            console.warn('⚠️ Webhook queue init failed (non-fatal):', (err as Error).message);
+        }
+
+        // Start batch writer for member upserts
+        startBatchWriter();
+
         // Initialize logger
         initLogger(client, config.logChannelId);
 
@@ -138,6 +162,13 @@ function registerEventHandlers() {
     client.once(Events.ClientReady, async (readyClient) => {
         console.log(`✅ Bot logged in as ${readyClient.user.tag}`);
         logger.info(`Bot started successfully as ${readyClient.user.tag}`);
+
+        // Start the webhook worker now that Discord is connected
+        try {
+            startWebhookWorker();
+        } catch (err) {
+            console.warn('⚠️ Webhook worker failed to start (non-fatal):', (err as Error).message);
+        }
 
         // Auto-deploy slash commands on startup
         try {
@@ -236,6 +267,21 @@ function registerEventHandlers() {
         } catch (err) {
             console.warn('⚠️ First deploy DM failed:', (err as Error).message);
         }
+
+        // Run role reconciliation if role sync is enabled
+        try {
+            const { isRoleSyncEnabled, reconcileAllRoles } = await import('./utils/roleSync');
+            if (await isRoleSyncEnabled()) {
+                const guild = readyClient.guilds.cache.get(config.guildId);
+                if (guild) {
+                    logger.info('🔄 [ROLE SYNC] Running startup role reconciliation...');
+                    await reconcileAllRoles(guild);
+                    logger.info('✅ [ROLE SYNC] Startup reconciliation complete');
+                }
+            }
+        } catch (err) {
+            console.warn('⚠️ Role reconciliation failed (non-fatal):', (err as Error).message);
+        }
     });
 
     // Interaction create event (for slash commands)
@@ -248,6 +294,9 @@ function registerEventHandlers() {
             if (commandName.startsWith('admin')) {
                 const { handleAdminCommand } = await import('./commands/admin/handler');
                 await handleAdminCommand(interaction);
+            } else if (commandName === 'link') {
+                const { handleLink } = await import('./commands/link');
+                await handleLink(interaction);
             }
 
         } catch (error: any) {
@@ -287,16 +336,24 @@ function registerEventHandlers() {
 }
 
 // Handle process termination
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
     console.log('\n👋 Shutting down bot...');
     stopPolling();
+    await stopBatchWriter();
+    await stopWebhookWorker();
+    await closeWebhookQueue();
+    await closeRedis();
     client.destroy();
     process.exit(0);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     console.log('\n👋 Shutting down bot...');
     stopPolling();
+    await stopBatchWriter();
+    await stopWebhookWorker();
+    await closeWebhookQueue();
+    await closeRedis();
     client.destroy();
     process.exit(0);
 });
@@ -306,4 +363,3 @@ main();
 
 // Export client for use in other modules
 export { client };
-

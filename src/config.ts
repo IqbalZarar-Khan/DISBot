@@ -33,6 +33,15 @@ interface Config {
     supabaseUrl: string;
     supabaseKey: string;
 
+    // Redis
+    redisUrl: string;
+
+    // Role Sync
+    roleSyncEnabled: boolean;
+
+    // Public URL (for dashboard links)
+    publicUrl: string;
+
     // Tier Configuration
     tierConfig: TierDefinition[];
 
@@ -117,6 +126,15 @@ export const config: Config = {
     // Supabase
     supabaseUrl: getEnvVar('SUPABASE_URL'),
     supabaseKey: getEnvVar('SUPABASE_KEY'),
+
+    // Redis
+    redisUrl: getEnvVar('REDIS_URL', false) || 'redis://localhost:6379',
+
+    // Role Sync
+    roleSyncEnabled: (process.env.DISCORD_ROLE_SYNC_ENABLED || 'false').toLowerCase() === 'true',
+
+    // Public URL
+    publicUrl: getEnvVar('PUBLIC_URL', false) || '',
 
     // Tier Configuration
     tierConfig: parseTierConfig()

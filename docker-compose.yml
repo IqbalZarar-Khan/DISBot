@@ -30,6 +30,19 @@ services:
       timeout: 3s
       retries: 5
 
+  # ── Redis (queue + cache) ──────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # ── PostgREST (REST API layer) ────────────────────────────────────
   postgrest:
     image: postgrest/postgrest:v12.2.3
@@ -50,6 +63,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       postgrest:
         condition: service_started
     env_file: .env
@@ -57,6 +72,7 @@ services:
       # Point the Supabase JS SDK at the local PostgREST instance
       SUPABASE_URL: http://postgrest:3000
       SUPABASE_KEY: ${POSTGREST_JWT_SECRET:-super-secret-jwt-token-for-local-dev-min-32-chars}
+      REDIS_URL: redis://redis:6379
       WEBHOOK_PORT: "3000"
       NODE_ENV: production
     ports:
@@ -64,3 +80,5 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
+

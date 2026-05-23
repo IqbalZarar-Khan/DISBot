@@ -1,12 +1,23 @@
 import { TierMapping } from './schema';
 import { getSupabase } from './supabase';
+import { getRedis, isRedisConnected } from './redis';
 import { logger } from '../utils/logger';
 
 /**
- * In-memory cache for graceful degradation when Supabase is unreachable.
+ * Redis-backed cache with in-memory L2 fallback for graceful degradation.
  * Caches tier_mappings and bot_config, refreshing every 5 minutes.
+ *
+ * Cache hierarchy:
+ *   1. Redis (shared across instances, TTL-managed)
+ *   2. In-memory Map (L2 fallback when Redis is unreachable)
+ *   3. Direct Supabase query (if both caches miss)
  */
 
+const REDIS_KEY_TIERS = 'disbot:cache:tiers';
+const REDIS_KEY_CONFIG = 'disbot:cache:config';
+const REDIS_TTL_SECONDS = 5 * 60; // 5 minutes
+
+// L2 in-memory fallback
 let tierMappingsCache: TierMapping[] = [];
 let configCache: Map<string, string> = new Map();
 let lastRefresh = 0;
@@ -19,7 +30,7 @@ let refreshTimer: NodeJS.Timeout | null = null;
 export async function initDbCache(): Promise<void> {
     await refreshCache();
     refreshTimer = setInterval(() => refreshCache(), CACHE_TTL_MS);
-    logger.info('🗄️ [CACHE] In-memory DB cache initialized');
+    logger.info('🗄️ [CACHE] DB cache initialized (Redis-backed with in-memory fallback)');
 }
 
 export function stopDbCache(): void {
@@ -30,7 +41,7 @@ export function stopDbCache(): void {
 }
 
 /**
- * Refresh all caches from Supabase.
+ * Refresh all caches from Supabase → write to Redis + in-memory.
  */
 async function refreshCache(): Promise<void> {
     try {
@@ -44,6 +55,16 @@ async function refreshCache(): Promise<void> {
 
         if (!tiersErr && tiers) {
             tierMappingsCache = tiers as TierMapping[];
+
+            // Write to Redis
+            if (isRedisConnected()) {
+                try {
+                    const redis = getRedis()!;
+                    await redis.set(REDIS_KEY_TIERS, JSON.stringify(tierMappingsCache), 'EX', REDIS_TTL_SECONDS);
+                } catch {
+                    // Redis write failed — in-memory still has the data
+                }
+            }
         }
 
         // Cache bot_config
@@ -53,6 +74,20 @@ async function refreshCache(): Promise<void> {
 
         if (!configErr && configs) {
             configCache = new Map(configs.map((c: any) => [c.key, c.value]));
+
+            // Write to Redis
+            if (isRedisConnected()) {
+                try {
+                    const redis = getRedis()!;
+                    const configObj: Record<string, string> = {};
+                    for (const [k, v] of configCache) {
+                        configObj[k] = v;
+                    }
+                    await redis.set(REDIS_KEY_CONFIG, JSON.stringify(configObj), 'EX', REDIS_TTL_SECONDS);
+                } catch {
+                    // Redis write failed — in-memory still has the data
+                }
+            }
         }
 
         lastRefresh = Date.now();
@@ -73,6 +108,23 @@ export function getCachedTierMappingByName(tierName: string): TierMapping | null
 
 /**
  * Get all cached tier mappings.
+ * Tries Redis first, falls back to in-memory.
+ */
+export async function getCachedTierMappingsAsync(): Promise<TierMapping[]> {
+    if (isRedisConnected()) {
+        try {
+            const redis = getRedis()!;
+            const data = await redis.get(REDIS_KEY_TIERS);
+            if (data) return JSON.parse(data) as TierMapping[];
+        } catch {
+            // Fall through to in-memory
+        }
+    }
+    return tierMappingsCache;
+}
+
+/**
+ * Get all cached tier mappings (synchronous — in-memory only).
  */
 export function getCachedTierMappings(): TierMapping[] {
     return tierMappingsCache;

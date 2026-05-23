@@ -58,3 +58,22 @@ INSERT INTO custom_messages (type, content) VALUES
     ('post_new',       '📢 New {tier} post: **{title}**\n{url}'),
     ('post_waterfall', '🌊 This post is now available to {tier}! **{title}**\n{url}')
 ON CONFLICT (type) DO NOTHING;
+
+-- ══════════════════════════════════════════════════════════════════
+-- role_mappings — maps Patreon tiers to Discord roles (auto-sync)
+-- ══════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS role_mappings (
+    tier_id TEXT PRIMARY KEY,
+    tier_name TEXT NOT NULL,
+    discord_role_id TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ══════════════════════════════════════════════════════════════════
+-- discord_links — links Discord users to Patreon members (role sync)
+-- ══════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS discord_links (
+    discord_user_id TEXT PRIMARY KEY,
+    patreon_member_id TEXT NOT NULL UNIQUE,
+    linked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

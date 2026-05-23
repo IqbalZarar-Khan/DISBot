@@ -7,7 +7,7 @@ RETURNS VOID AS $$
 BEGIN
     EXECUTE sql;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 -- Create migrations tracking table
 CREATE TABLE IF NOT EXISTS _migrations (

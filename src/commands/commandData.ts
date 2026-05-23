@@ -165,5 +165,48 @@ export function getCommandData() {
                     .setName('server-stats')
                     .setDescription('View live server CPU, memory, uptime, and PM2 stats')
             )
+            .addSubcommand(subcommand =>
+                subcommand
+                    .setName('role-map')
+                    .setDescription('Manage Discord role sync: toggle on/off or map tiers to roles')
+                    .addStringOption(option =>
+                        option
+                            .setName('action')
+                            .setDescription('What to do')
+                            .setRequired(true)
+                            .addChoices(
+                                { name: '🟢 Enable Role Sync', value: 'on' },
+                                { name: '🔴 Disable Role Sync', value: 'off' },
+                                { name: '📊 Show Status', value: 'status' },
+                                { name: '🔗 Map Tier → Role', value: 'map' }
+                            )
+                    )
+                    .addStringOption(option =>
+                        option
+                            .setName('tier_name')
+                            .setDescription('Tier name (required for "map" action)')
+                            .setRequired(false)
+                    )
+                    .addRoleOption(option =>
+                        option
+                            .setName('role')
+                            .setDescription('Discord role (required for "map" action)')
+                            .setRequired(false)
+                    )
+            )
+            .addSubcommand(subcommand =>
+                subcommand
+                    .setName('dashboard')
+                    .setDescription('Generate a secure link to the web analytics dashboard')
+            ),
+        new SlashCommandBuilder()
+            .setName('link')
+            .setDescription('Link your Discord account to your Patreon membership for role sync')
+            .addStringOption(option =>
+                option
+                    .setName('identifier')
+                    .setDescription('Your Patreon email, display name, or member ID')
+                    .setRequired(true)
+            ),
     ].map(command => command.toJSON());
 }

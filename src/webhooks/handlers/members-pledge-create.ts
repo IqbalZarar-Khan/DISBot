@@ -1,5 +1,6 @@
 import { WebhookPayload } from '../../database/schema';
-import { upsertTrackedMember, getTrackedMember } from '../../database/db';
+import { getTrackedMember } from '../../database/db';
+import { queueMemberUpsert } from '../../database/batchWriter';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createMemberEmbed } from '../../utils/embedBuilder';
@@ -115,7 +116,18 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
             updated_at: Date.now()
         };
 
-        await upsertTrackedMember(trackedMember);
+        queueMemberUpsert(trackedMember);
+
+        // Sync Discord role if enabled
+        try {
+            const { isRoleSyncEnabled, syncMemberRole } = await import('../../utils/roleSync');
+            if (await isRoleSyncEnabled()) {
+                const { config: appConfig } = await import('../../config');
+                await syncMemberRole(appConfig.guildId, memberId, tierId, oldTierId);
+            }
+        } catch (syncErr) {
+            logger.warn(`🔄 [ROLE SYNC] Failed for ${fullName}: ${(syncErr as Error).message}`);
+        }
 
         // Route to the correct event channel based on whether this is new or upgrade
         if (isExisting && tierChanged) {

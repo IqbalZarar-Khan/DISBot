@@ -1,5 +1,6 @@
 import { WebhookPayload } from '../../database/schema';
-import { upsertTrackedMember, getTrackedMember } from '../../database/db';
+import { getTrackedMember } from '../../database/db';
+import { queueMemberUpsert } from '../../database/batchWriter';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createMemberEmbed } from '../../utils/embedBuilder';
@@ -62,7 +63,7 @@ export async function handleMembersCreate(payload: WebhookPayload): Promise<void
             updated_at: Date.now()
         };
 
-        await upsertTrackedMember(trackedMember);
+        queueMemberUpsert(trackedMember);
 
         // Send welcome notification ONLY for free-tier members.
         // Free members never trigger members:pledge:create (no pledge),

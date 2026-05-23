@@ -13,6 +13,8 @@ import { handleExportData } from './export-data';
 import { handleBulkMap } from './bulk-map';
 import { handlePoller } from './poller';
 import { handleServerStats } from './server-stats';
+import { handleRoleMap } from './role-map';
+import { handleDashboard } from './dashboard-cmd';
 import { logger } from '../../utils/logger';
 
 /**
@@ -77,6 +79,14 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'server-stats':
                 await handleServerStats(interaction);
+                break;
+
+            case 'role-map':
+                await handleRoleMap(interaction);
+                break;
+
+            case 'dashboard':
+                await handleDashboard(interaction);
                 break;
 
             default:

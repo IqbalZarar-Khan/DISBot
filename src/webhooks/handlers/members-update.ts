@@ -1,5 +1,6 @@
 import { WebhookPayload } from '../../database/schema';
-import { getTrackedMember, upsertTrackedMember, getTierMapping } from '../../database/db';
+import { getTrackedMember, getTierMapping } from '../../database/db';
+import { queueMemberUpsert } from '../../database/batchWriter';
 import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createMemberEmbed } from '../../utils/embedBuilder';
@@ -86,7 +87,20 @@ export async function handleMembersUpdate(payload: WebhookPayload): Promise<void
             updated_at: Date.now()
         };
 
-        await upsertTrackedMember(trackedMember);
+        queueMemberUpsert(trackedMember);
+
+        // Sync Discord role if tier changed
+        if (oldMember && oldMember.current_tier_id !== newTierId) {
+            try {
+                const { isRoleSyncEnabled, syncMemberRole } = await import('../../utils/roleSync');
+                if (await isRoleSyncEnabled()) {
+                    const { config: appConfig } = await import('../../config');
+                    await syncMemberRole(appConfig.guildId, memberId, newTierId, oldMember.current_tier_id);
+                }
+            } catch (syncErr) {
+                logger.warn(`🔄 [ROLE SYNC] Failed for ${fullName}: ${(syncErr as Error).message}`);
+            }
+        }
 
     } catch (error) {
         logger.error('Error handling members:update webhook', error as Error);

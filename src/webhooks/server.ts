@@ -1,9 +1,13 @@
-import express, { Request, Response } from 'express';
+import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import * as crypto from 'crypto';
 import { verifyWebhookSignature } from './verify';
 import { logger } from '../utils/logger';
 import { WebhookEventType } from '../database/schema';
-import { setupWizardRouter } from './wizard';
+import { setupWizardPlugin } from './wizard';
+import { routeWebhookEvent } from './router';
+import { enqueueWebhookEvent } from '../queue/webhookQueue';
+import { isRedisConnected } from '../database/redis';
+import { dashboardPlugin } from './dashboard';
 
 // ── Webhook idempotency guard ──────────────────────────────────────
 // Prevents duplicate notifications when Patreon retries the same webhook.
@@ -87,72 +91,83 @@ function isGhostWebhook(payload: any, eventType: string): boolean {
     }
 }
 
-let server: any = null;
+let fastify: FastifyInstance | null = null;
 
 /**
- * Start the webhook server
+ * Start the webhook server (Fastify)
  */
 export async function startWebhookServer(port: number, webhookSecret: string): Promise<void> {
-    const app = express();
-
-    // Raw body parser for signature verification
-    app.use(express.json({
-        verify: (req: any, _res, buf) => {
-            req.rawBody = buf.toString('utf8');
-        }
-    }));
-
-    // Add a second JSON parser for routes that don't need rawBody (like /setup)
-    app.use(express.json());
-
-    // Mount the setup wizard router for cloud deployments
-    app.use('/setup', setupWizardRouter);
-
-    // Health check endpoint (now on root)
-    app.get('/', (_req: Request, res: Response) => {
-        res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    fastify = Fastify({
+        logger: false, // We use our own logger
     });
 
-    // Health check endpoint (restored for automated host healthchecks)
-    app.get('/health', (_req: Request, res: Response) => {
-        res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    // ── Raw body parser for signature verification ──────────────────
+    // Fastify doesn't have Express's verify callback, so we capture
+    // the raw body via a custom content type parser.
+    fastify.addContentTypeParser(
+        'application/json',
+        { parseAs: 'buffer' },
+        (_req: FastifyRequest, body: Buffer, done: (err: Error | null, result?: any) => void) => {
+            try {
+                // Store raw body on request for signature verification
+                (_req as any).rawBody = body.toString('utf8');
+                const json = JSON.parse(body.toString('utf8'));
+                done(null, json);
+            } catch (err) {
+                done(err as Error);
+            }
+        }
+    );
+
+    // Mount the setup wizard plugin for cloud deployments
+    await fastify.register(setupWizardPlugin, { prefix: '/setup' });
+
+    // Mount the analytics dashboard
+    await fastify.register(dashboardPlugin, { prefix: '/dashboard' });
+
+    // Health check endpoint (root)
+    fastify.get('/', async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
+    });
+
+    // Health check endpoint (explicit)
+    fastify.get('/health', async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
     // ── OAuth Flow: Eliminates need for Postman/curl ─────────────────
     // GET /oauth/start → redirects creator to Patreon authorization page
-    app.get('/oauth/start', (_req: Request, res: Response) => {
+    fastify.get('/oauth/start', async (_request: FastifyRequest, reply: FastifyReply) => {
         const clientId = process.env.PATREON_CLIENT_ID;
-        const port = process.env.PORT || process.env.WEBHOOK_PORT || '3000';
-        const host = process.env.PUBLIC_URL || `http://localhost:${port}`;
+        const portNum = process.env.PORT || process.env.WEBHOOK_PORT || '3000';
+        const host = process.env.PUBLIC_URL || `http://localhost:${portNum}`;
         const redirectUri = `${host}/oauth/redirect`;
 
         if (!clientId) {
-            res.status(500).send('❌ PATREON_CLIENT_ID not configured in environment.');
-            return;
+            return reply.code(500).send('❌ PATREON_CLIENT_ID not configured in environment.');
         }
 
         const scopes = 'campaigns campaigns.members campaigns.posts w:campaigns.webhook';
         const url = `https://www.patreon.com/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
-        res.redirect(url);
+        return reply.redirect(url);
     });
 
     // GET /oauth/redirect → exchanges code for tokens, saves to DB
-    app.get('/oauth/redirect', async (req: Request, res: Response) => {
-        const code = req.query.code as string;
+    fastify.get('/oauth/redirect', async (request: FastifyRequest, reply: FastifyReply) => {
+        const query = request.query as Record<string, string>;
+        const code = query.code;
         if (!code) {
-            res.status(400).send('❌ Missing authorization code. Please start the flow at /oauth/start');
-            return;
+            return reply.code(400).send('❌ Missing authorization code. Please start the flow at /oauth/start');
         }
 
         const clientId = process.env.PATREON_CLIENT_ID;
         const clientSecret = process.env.PATREON_CLIENT_SECRET;
-        const port = process.env.PORT || process.env.WEBHOOK_PORT || '3000';
-        const host = process.env.PUBLIC_URL || `http://localhost:${port}`;
+        const portNum = process.env.PORT || process.env.WEBHOOK_PORT || '3000';
+        const host = process.env.PUBLIC_URL || `http://localhost:${portNum}`;
         const redirectUri = `${host}/oauth/redirect`;
 
         if (!clientId || !clientSecret) {
-            res.status(500).send('❌ PATREON_CLIENT_ID and PATREON_CLIENT_SECRET must be set.');
-            return;
+            return reply.code(500).send('❌ PATREON_CLIENT_ID and PATREON_CLIENT_SECRET must be set.');
         }
 
         try {
@@ -178,7 +193,7 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
 
             logger.info('🔑 [OAUTH] Tokens exchanged and saved to database successfully');
 
-            res.send(`
+            return reply.type('text/html').send(`
                 <html>
                 <head><title>DISBot - OAuth Success</title></head>
                 <body style="font-family:system-ui;background:#1a1a2e;color:#eee;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
@@ -194,17 +209,17 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
         } catch (err: any) {
             const detail = err.response?.data?.error || err.message;
             logger.error(`🔑 [OAUTH] Token exchange failed: ${detail}`);
-            res.status(500).send(`❌ Token exchange failed: ${detail}`);
+            return reply.code(500).send(`❌ Token exchange failed: ${detail}`);
         }
     });
 
     // Patreon webhook endpoint
-    app.post('/webhooks/patreon', async (req: Request, res: Response) => {
+    fastify.post('/webhooks/patreon', async (request: FastifyRequest, reply: FastifyReply) => {
         try {
             // --- 🔍 TRAFFIC CONTROL DEBUG START ---
-            const eventType = req.headers['x-patreon-event'] as WebhookEventType;
-            const signature = req.headers['x-patreon-signature'] as string;
-            const rawBody = (req as any).rawBody;
+            const eventType = request.headers['x-patreon-event'] as WebhookEventType;
+            const signature = request.headers['x-patreon-signature'] as string;
+            const rawBody = (request as any).rawBody;
 
             logger.info('\n📡 ========================================');
             logger.info('📡 [INCOMING WEBHOOK TRAFFIC]');
@@ -215,7 +230,7 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
             logger.info(`📡 Request Headers: ${JSON.stringify({
                 'x-patreon-event': eventType,
                 'x-patreon-signature': signature ? '***present***' : 'missing',
-                'content-type': req.headers['content-type']
+                'content-type': request.headers['content-type']
             })}`);
 
             // Verify signature
@@ -223,8 +238,7 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
                 logger.error('⛔ [SECURITY BLOCK] Signature verification FAILED');
                 logger.error(`⛔ Signature: ${signature ? 'present but invalid' : 'missing'}`);
                 logger.info('📡 ========================================\n');
-                res.status(401).json({ error: 'Invalid signature' });
-                return;
+                return reply.code(401).send({ error: 'Invalid signature' });
             }
 
             logger.info('✅ [SECURITY PASS] Signature verified successfully');
@@ -232,143 +246,75 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
             // Idempotency guard: skip duplicate webhooks
             if (isDuplicate(rawBody, eventType || '')) {
                 logger.warn('🔁 [DEDUP] Duplicate webhook detected — skipping');
-                res.status(200).json({ received: true, duplicate: true });
-                return;
+                return reply.code(200).send({ received: true, duplicate: true });
             }
 
             // Ghost webhook filter: skip webhooks with no meaningful state change
-            if (isGhostWebhook(req.body, eventType || '')) {
+            if (isGhostWebhook(request.body, eventType || '')) {
                 logger.info('👻 [GHOST] No meaningful state change — discarding ghost webhook');
-                res.status(200).json({ received: true, ghost: true });
-                return;
+                return reply.code(200).send({ received: true, ghost: true });
             }
 
             if (!eventType) {
                 logger.warn('⚠️ [MISSING HEADER] x-patreon-event header not found');
                 logger.info('📡 ========================================\n');
-                res.status(400).json({ error: 'Missing event type' });
-                return;
+                return reply.code(400).send({ error: 'Missing event type' });
             }
 
             // Log webhook received
             logger.info(`👉 [ROUTING] Event type: ${eventType}`);
-            logger.info(`👉 [ROUTING] Payload data ID: ${req.body?.data?.id || 'unknown'}`);
-            logger.info(`👉 [ROUTING] Included items: ${req.body?.included?.length || 0}`);
+            logger.info(`👉 [ROUTING] Payload data ID: ${(request.body as any)?.data?.id || 'unknown'}`);
+            logger.info(`👉 [ROUTING] Included items: ${(request.body as any)?.included?.length || 0}`);
 
-            // Route to appropriate handler
-            logger.info(`🚀 [EXECUTING] Calling handler for ${eventType}...`);
-            await routeWebhookEvent(eventType, req.body);
-            logger.info(`✅ [COMPLETE] Handler for ${eventType} completed successfully`);
+            // Try to enqueue via BullMQ; fall back to direct processing
+            if (isRedisConnected()) {
+                const enqueued = await enqueueWebhookEvent(eventType, request.body);
+                if (enqueued) {
+                    logger.info(`📬 [QUEUE] Event ${eventType} enqueued for async processing`);
+                } else {
+                    // Queue failed — process directly
+                    logger.warn('⚠️ [QUEUE] Enqueue failed — processing directly');
+                    await routeWebhookEvent(eventType, request.body);
+                }
+            } else {
+                // Redis unavailable — direct processing (graceful degradation)
+                logger.info(`🚀 [DIRECT] Processing ${eventType} directly (no Redis)`);
+                await routeWebhookEvent(eventType, request.body);
+            }
 
+            logger.info(`✅ [COMPLETE] Webhook ${eventType} acknowledged`);
             logger.info('📡 [END TRAFFIC] ========================================\n');
 
-            // Acknowledge receipt
-            res.status(200).json({ received: true });
+            // Acknowledge receipt immediately
+            return reply.code(200).send({ received: true });
 
         } catch (error) {
             logger.error('❌ [CRASH] Error processing webhook in server.ts', error as Error);
             logger.error(`❌ Stack trace: ${(error as Error).stack}`);
             logger.info('📡 [END TRAFFIC - ERROR] ========================================\n');
-            res.status(500).json({ error: 'Internal server error' });
+            return reply.code(500).send({ error: 'Internal server error' });
         }
     });
 
     // Start server
-    return new Promise((resolve, reject) => {
-        server = app.listen(port, () => {
-            console.log(`✅ Webhook server listening on port ${port}`);
-            resolve();
-        }).on('error', (error) => {
-            reject(error);
-        });
-    });
-}
-
-/**
- * Route webhook events to appropriate handlers
- */
-async function routeWebhookEvent(eventType: WebhookEventType, payload: any): Promise<void> {
-    try {
-        logger.info(`🔀 [ROUTER] Routing event: ${eventType}`);
-
-        switch (eventType) {
-            case 'members:create':
-                logger.info(`📥 [HANDLER] Loading members:create handler...`);
-                const { handleMembersCreate } = await import('./handlers/members-create');
-                await handleMembersCreate(payload);
-                break;
-
-            case 'members:update':
-                logger.info(`📥 [HANDLER] Loading members:update handler...`);
-                const { handleMembersUpdate } = await import('./handlers/members-update');
-                await handleMembersUpdate(payload);
-                break;
-
-            case 'members:delete':
-                logger.info(`📥 [HANDLER] Loading members:delete handler...`);
-                const { handleMembersDelete } = await import('./handlers/members-delete');
-                await handleMembersDelete(payload);
-                break;
-
-            case 'members:pledge:create':
-                logger.info(`📥 [HANDLER] Loading members:pledge:create handler...`);
-                const { handleMembersPledgeCreate } = await import('./handlers/members-pledge-create');
-                await handleMembersPledgeCreate(payload);
-                break;
-
-            case 'members:pledge:update':
-                logger.info(`📥 [HANDLER] Loading members:pledge:update handler...`);
-                const { handleMembersPledgeUpdate } = await import('./handlers/members-pledge-update');
-                await handleMembersPledgeUpdate(payload);
-                break;
-
-            case 'members:pledge:delete':
-                logger.info(`📥 [HANDLER] Loading members:pledge:delete handler...`);
-                const { handleMembersPledgeDelete } = await import('./handlers/members-pledge-delete');
-                await handleMembersPledgeDelete(payload);
-                break;
-
-            case 'posts:publish':
-                logger.info(`📥 [HANDLER] Loading posts:publish handler...`);
-                const { handlePostsPublish } = await import('./handlers/posts-publish');
-                await handlePostsPublish(payload);
-                break;
-
-            case 'posts:update':
-                logger.info(`📥 [HANDLER] Loading posts:update handler...`);
-                const { handlePostsUpdate } = await import('./handlers/posts-update');
-                await handlePostsUpdate(payload);
-                break;
-
-            case 'posts:delete':
-                logger.info(`📥 [HANDLER] Loading posts:delete handler...`);
-                const { handlePostsDelete } = await import('./handlers/posts-delete');
-                await handlePostsDelete(payload);
-                break;
-
-            default:
-                logger.warn(`⚠️ [IGNORED] No handler registered for event type: ${eventType}`);
-                logger.warn(`⚠️ [IGNORED] Available handlers: members:*, members:pledge:*, posts:*`);
-        }
-    } catch (error) {
-        logger.error(`❌ [HANDLER ERROR] Error in webhook handler for ${eventType}`, error as Error);
-        logger.error(`❌ [HANDLER ERROR] Stack: ${(error as Error).stack}`);
-        throw error;
-    }
+    await fastify.listen({ port, host: '0.0.0.0' });
+    console.log(`✅ Webhook server listening on port ${port}`);
 }
 
 /**
  * Stop the webhook server
  */
-export function stopWebhookServer(): Promise<void> {
-    return new Promise((resolve) => {
-        if (server) {
-            server.close(() => {
-                console.log('👋 Webhook server stopped');
-                resolve();
-            });
-        } else {
-            resolve();
-        }
-    });
+export async function stopWebhookServer(): Promise<void> {
+    if (fastify) {
+        await fastify.close();
+        console.log('👋 Webhook server stopped');
+        fastify = null;
+    }
+}
+
+/**
+ * Get the Fastify instance (for registering additional plugins like dashboard).
+ */
+export function getFastifyInstance(): FastifyInstance | null {
+    return fastify;
 }

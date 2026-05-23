@@ -54,3 +54,17 @@ export interface WebhookPayload {
     included?: any[];
     links?: any;
 }
+
+// Role sync: maps Patreon tiers to Discord roles
+export interface RoleMapping {
+    tier_id: string;
+    tier_name: string;
+    discord_role_id: string;
+}
+
+// Links Discord users to Patreon members for role sync
+export interface DiscordLink {
+    discord_user_id: string;
+    patreon_member_id: string;
+    linked_at: string;
+}
