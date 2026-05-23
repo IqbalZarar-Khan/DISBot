@@ -429,7 +429,7 @@ function getDashboardHTML(token: string): string {
 
     <script>
         const TOKEN = '${token}';
-        const BASE = window.location.pathname.replace(/\\/$/, '');
+        const BASE = window.location.pathname.replace(/\/$/, '');
 
         let tierChartInstance = null;
         let growthChartInstance = null;
