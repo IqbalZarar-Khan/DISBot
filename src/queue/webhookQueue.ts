@@ -10,6 +10,7 @@ export interface WebhookJobData {
     eventType: WebhookEventType;
     payload: any;
     receivedAt: number;
+    logId: number | null; // webhook_log row id for cache tracking
 }
 
 let queue: Queue<WebhookJobData> | null = null;
@@ -53,7 +54,8 @@ export function initWebhookQueue(): Queue<WebhookJobData> | null {
  */
 export async function enqueueWebhookEvent(
     eventType: WebhookEventType,
-    payload: any
+    payload: any,
+    logId: number | null = null
 ): Promise<boolean> {
     if (!queue) return false;
 
@@ -62,8 +64,9 @@ export async function enqueueWebhookEvent(
             eventType,
             payload,
             receivedAt: Date.now(),
+            logId,
         });
-        logger.info(`📬 [QUEUE] Enqueued ${eventType} event`);
+        logger.info(`📬 [QUEUE] Enqueued ${eventType} event (cache logId=${logId ?? 'none'})`);
         return true;
     } catch (error) {
         logger.error(`❌ [QUEUE] Failed to enqueue ${eventType}`, error as Error);

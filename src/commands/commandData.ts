@@ -198,6 +198,41 @@ export function getCommandData() {
                 subcommand
                     .setName('dashboard')
                     .setDescription('Generate a secure link to the web analytics dashboard')
+            )
+            .addSubcommand(subcommand =>
+                subcommand
+                    .setName('error-log')
+                    .setDescription('View logged errors with explanations, or clear the error log')
+                    .addStringOption(option =>
+                        option
+                            .setName('action')
+                            .setDescription('What to do')
+                            .setRequired(false)
+                            .addChoices(
+                                { name: '📋 View errors (default)', value: 'view' },
+                                { name: '🗑️ Clear error log', value: 'clear' }
+                            )
+                    )
+                    .addStringOption(option =>
+                        option
+                            .setName('severity')
+                            .setDescription('Filter by severity level (default: all)')
+                            .setRequired(false)
+                            .addChoices(
+                                { name: '💀 Critical only', value: 'critical' },
+                                { name: '🔴 High only', value: 'high' },
+                                { name: '🟠 Medium only', value: 'medium' },
+                                { name: '🟡 Low only', value: 'low' }
+                            )
+                    )
+                    .addIntegerOption(option =>
+                        option
+                            .setName('count')
+                            .setDescription('Number of recent errors to show (1-25, default 10)')
+                            .setRequired(false)
+                            .setMinValue(1)
+                            .setMaxValue(25)
+                    )
             ),
         new SlashCommandBuilder()
             .setName('link')

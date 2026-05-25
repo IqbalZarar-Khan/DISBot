@@ -15,6 +15,7 @@ import { handlePoller } from './poller';
 import { handleServerStats } from './server-stats';
 import { handleRoleMap } from './role-map';
 import { handleDashboard } from './dashboard-cmd';
+import { handleErrorLog } from './error-log';
 import { logger } from '../../utils/logger';
 
 /**
@@ -87,6 +88,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'dashboard':
                 await handleDashboard(interaction);
+                break;
+
+            case 'error-log':
+                await handleErrorLog(interaction);
                 break;
 
             default:

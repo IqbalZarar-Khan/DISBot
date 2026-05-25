@@ -195,6 +195,14 @@ function registerEventHandlers() {
             console.warn('⚠️ DB cache init failed (non-fatal):', (err as Error).message);
         }
 
+        // Load diagnostic counters from database (webhook stats, tier detection)
+        try {
+            const { loadDiagnosticCounters } = await import('./commands/admin/status');
+            await loadDiagnosticCounters();
+        } catch (err) {
+            console.warn('⚠️ Diagnostic counter load failed (non-fatal):', (err as Error).message);
+        }
+
         // Validate OAuth scopes on startup
         try {
             const axios = (await import('axios')).default;

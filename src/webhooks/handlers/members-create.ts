@@ -19,7 +19,7 @@ import { getEventChannel } from '../../commands/admin/set-event-channel';
  * Important: if the member already exists we preserve their current tier
  * so the pledge handler can still detect upgrades.
  */
-export async function handleMembersCreate(payload: WebhookPayload): Promise<void> {
+export async function handleMembersCreate(payload: WebhookPayload): Promise<boolean> {
     try {
         const member = payload.data;
         const included = payload.included || [];
@@ -83,15 +83,19 @@ export async function handleMembersCreate(payload: WebhookPayload): Promise<void
                             isUpgrade: false
                         });
                         await channel.send({ embeds: [embed] });
+                        logger.info(`🆓 [MEMBERS:CREATE] Free member welcome sent: ${fullName}`);
+                        return true; // ✅ Discord announcement was sent
                     }
                 } catch (error) {
                     logger.warn('Failed to send free member welcome alert', error as Error);
                 }
             }
-            logger.info(`🆓 [MEMBERS:CREATE] Free member welcome sent: ${fullName}`);
+            logger.info(`🆓 [MEMBERS:CREATE] Free member welcome NOT sent (no channel configured): ${fullName}`);
         } else {
             logger.info(`📋 [MEMBERS:CREATE] Tracked member: ${fullName} (${tierName}) — notifications deferred to pledge handler`);
         }
+
+        return false; // No Discord announcement from this handler
 
     } catch (error) {
         logger.error('Error handling members:create webhook', error as Error);

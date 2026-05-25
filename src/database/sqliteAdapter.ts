@@ -57,6 +57,19 @@ export function initSqlite(): void {
                 first_pledge_at TEXT DEFAULT (datetime('now')),
                 updated_at TEXT DEFAULT (datetime('now'))
             );
+            CREATE TABLE IF NOT EXISTS webhook_log (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type  TEXT NOT NULL,
+                member_id   TEXT,
+                payload     TEXT NOT NULL,
+                received_at TEXT DEFAULT (datetime('now')),
+                processed   INTEGER DEFAULT 0,
+                announced   INTEGER DEFAULT 0,
+                notes       TEXT
+            );
+            CREATE INDEX IF NOT EXISTS webhook_log_event_type_idx ON webhook_log (event_type);
+            CREATE INDEX IF NOT EXISTS webhook_log_member_id_idx  ON webhook_log (member_id);
+            CREATE INDEX IF NOT EXISTS webhook_log_received_at_idx ON webhook_log (received_at DESC);
         `);
 
         console.log(`✅ SQLite database initialized at ${dbPath}`);
@@ -152,6 +165,70 @@ export function sqliteUpsertTrackedMember(member: {
 
 export function sqliteGetAllTrackedMembers() {
     return db.prepare('SELECT * FROM tracked_members').all();
+}
+
+// ── Webhook Log ─────────────────────────────────────────────────────
+
+/**
+ * Insert a new row into webhook_log and return its ROWID.
+ */
+export function sqliteLogWebhookReceived(
+    eventType: string,
+    payload: any
+): number | null {
+    try {
+        const memberId: string | null = payload?.data?.id ?? null;
+        const result = db.prepare(`
+            INSERT INTO webhook_log (event_type, member_id, payload, processed, announced)
+            VALUES (?, ?, ?, 0, 0)
+        `).run(eventType, memberId, JSON.stringify(payload));
+        return result.lastInsertRowid as number;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Mark a webhook_log row as processed.
+ */
+export function sqliteMarkWebhookProcessed(
+    logId: number | null,
+    announced: boolean,
+    notes?: string
+): void {
+    if (logId === null) return;
+    db.prepare(`
+        UPDATE webhook_log
+        SET processed = 1, announced = ?, notes = ?
+        WHERE id = ?
+    `).run(announced ? 1 : 0, notes ?? null, logId);
+}
+
+/**
+ * Fetch recent webhook_log rows that were processed but not announced.
+ */
+export function sqliteGetMissedAnnouncements(limitHours = 24): any[] {
+    const since = new Date(Date.now() - limitHours * 60 * 60 * 1000)
+        .toISOString().replace('T', ' ').slice(0, 19);
+    return db.prepare(`
+        SELECT id, event_type, member_id, received_at, processed, announced, notes
+        FROM webhook_log
+        WHERE processed = 1 AND announced = 0
+          AND received_at >= datetime(?)
+        ORDER BY received_at DESC
+    `).all(since);
+}
+
+/**
+ * Fetch the most recent webhook_log rows (all, for audit).
+ */
+export function sqliteGetRecentWebhookLogs(limit = 50): any[] {
+    return db.prepare(`
+        SELECT id, event_type, member_id, received_at, processed, announced, notes
+        FROM webhook_log
+        ORDER BY received_at DESC
+        LIMIT ?
+    `).all(limit);
 }
 
 // ── Custom Messages ─────────────────────────────────────────────────

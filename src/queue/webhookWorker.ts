@@ -21,11 +21,11 @@ export function startWebhookWorker(): Worker<WebhookJobData> | null {
     worker = new Worker<WebhookJobData>(
         'webhook-events',
         async (job: Job<WebhookJobData>) => {
-            const { eventType, payload, receivedAt } = job.data;
+            const { eventType, payload, receivedAt, logId } = job.data;
             const queueDelay = Date.now() - receivedAt;
 
-            logger.info(`⚙️ [WORKER] Processing ${eventType} (queued ${queueDelay}ms ago, attempt ${job.attemptsMade + 1})`);
-            await routeWebhookEvent(eventType, payload);
+            logger.info(`⚙️ [WORKER] Processing ${eventType} (queued ${queueDelay}ms ago, attempt ${job.attemptsMade + 1}, logId=${logId ?? 'none'})`);
+            await routeWebhookEvent(eventType, payload, logId ?? null);
             logger.info(`✅ [WORKER] Completed ${eventType}`);
         },
         {

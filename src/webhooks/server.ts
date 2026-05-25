@@ -8,6 +8,7 @@ import { routeWebhookEvent } from './router';
 import { enqueueWebhookEvent } from '../queue/webhookQueue';
 import { isRedisConnected } from '../database/redis';
 import { dashboardPlugin } from './dashboard';
+import { logWebhookReceived } from '../database/webhookCache';
 
 // ── Webhook idempotency guard ──────────────────────────────────────
 // Prevents duplicate notifications when Patreon retries the same webhook.
@@ -245,6 +246,11 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
 
             logger.info('✅ [SECURITY PASS] Signature verified successfully');
 
+            // ── Webhook cache: persist every verified webhook immediately ──
+            // This creates an audit trail so we can spot missed announcements.
+            // logId is null if the table doesn't exist yet (pre-migration).
+            const logId = await logWebhookReceived(eventType || 'unknown', request.body);
+
             // Idempotency guard: skip duplicate webhooks
             if (isDuplicate(rawBody, eventType || '')) {
                 logger.warn('🔁 [DEDUP] Duplicate webhook detected — skipping');
@@ -270,18 +276,18 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
 
             // Try to enqueue via BullMQ; fall back to direct processing
             if (isRedisConnected()) {
-                const enqueued = await enqueueWebhookEvent(eventType, request.body);
+                const enqueued = await enqueueWebhookEvent(eventType, request.body, logId);
                 if (enqueued) {
                     logger.info(`📬 [QUEUE] Event ${eventType} enqueued for async processing`);
                 } else {
                     // Queue failed — process directly
                     logger.warn('⚠️ [QUEUE] Enqueue failed — processing directly');
-                    await routeWebhookEvent(eventType, request.body);
+                    await routeWebhookEvent(eventType, request.body, logId);
                 }
             } else {
                 // Redis unavailable — direct processing (graceful degradation)
                 logger.info(`🚀 [DIRECT] Processing ${eventType} directly (no Redis)`);
-                await routeWebhookEvent(eventType, request.body);
+                await routeWebhookEvent(eventType, request.body, logId);
             }
 
             logger.info(`✅ [COMPLETE] Webhook ${eventType} acknowledged`);

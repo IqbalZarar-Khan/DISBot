@@ -8,13 +8,14 @@ import { tierIdMap, centsMap } from '../../utils/tierRanking';
 import { config } from '../../config';
 import { handlePostsUpdate } from './posts-update';
 import { formatMessage } from '../../utils/formatter';
+import { recordTierDetection } from '../../commands/admin/status';
 
 /**
  * Handle posts:publish webhook event
  * CRITICAL: This also handles "Edit and Republish" workflow by redirecting to update handler
  * HYBRID BROADCAST: Sends to all channels when multiple tiers detected
  */
-export async function handlePostsPublish(payload: WebhookPayload): Promise<void> {
+export async function handlePostsPublish(payload: WebhookPayload): Promise<boolean> {
     try {
         const post = payload.data;
         const included = payload.included || [];
@@ -49,7 +50,8 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             logger.info('📝 ========================================\n');
 
             // Redirect to update handler to trigger waterfall logic
-            return await handlePostsUpdate(payload);
+            await handlePostsUpdate(payload);
+            return false; // posts:update doesn't send new-post announcements
         }
 
         logger.info(`✨ [NEW POST] Post ${postId} not found in database - treating as genuinely new post`);
@@ -150,7 +152,8 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
             logger.error(`❌ Available ID Map Keys: ${JSON.stringify(Object.keys(tierIdMap))}`);
             logger.error(`❌ Available Cents Map Keys: ${JSON.stringify(Object.keys(centsMap).map(Number))}`);
             logger.info('📝 ========================================\n');
-            return;
+            recordTierDetection(false); // ❌ tier detection failed
+            return false;
         }
 
         logger.info(`📝 Detected ${uniqueTiers.length} tier(s): ${uniqueTiers.join(', ')}`);
@@ -165,6 +168,7 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         }
 
         // Send alerts to ALL detected tiers
+        let announced = false;
         for (const tierName of uniqueTiers) {
             try {
                 const tierMapping = await getTierMappingByName(tierName);
@@ -217,6 +221,8 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
                         const { createPostThread } = await import('../../utils/threadHelper');
                         await createPostThread(channel, msg.id, title);
                     });
+                    announced = true;
+                    recordTierDetection(true); // ✅ tier detected and announcement sent
                     logger.info(`✅ Broadcast alert sent to ${tierName} channel: ${title}`);
                 }
             } catch (error) {
@@ -229,6 +235,8 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<void>
         await db.addPost(postId, lowestTier, title);
         logger.info(`💾 Saved post to database with tier: ${lowestTier}`);
         logger.info('📝 ========================================\n');
+
+        return announced;
 
     } catch (error) {
         logger.error('Error handling posts:publish webhook', error as Error);

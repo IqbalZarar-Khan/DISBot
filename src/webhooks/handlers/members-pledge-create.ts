@@ -16,7 +16,7 @@ import { config } from '../../config';
  * This is the SINGLE SOURCE of Discord welcome / upgrade notifications
  * for PAID members. Free members are welcomed by the members:create handler.
  */
-export async function handleMembersPledgeCreate(payload: WebhookPayload): Promise<void> {
+export async function handleMembersPledgeCreate(payload: WebhookPayload): Promise<boolean> {
     try {
         const member = payload.data;
         const included = payload.included || [];
@@ -130,6 +130,7 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
         }
 
         // Route to the correct event channel based on whether this is new or upgrade
+        let announced = false;
         if (isExisting && tierChanged) {
             // Existing member upgrading — send upgrade notification
             const eventType = isUpgrade ? 'pledge_upgrade' : 'pledge_downgrade';
@@ -144,6 +145,7 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
                             isUpgrade
                         });
                         await channel.send({ embeds: [embed] });
+                        announced = true;
                     }
                 } catch (error) {
                     logger.warn('Failed to send pledge upgrade/downgrade alert', error as Error);
@@ -163,6 +165,7 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
                             isUpgrade: false
                         });
                         await channel.send({ embeds: [embed] });
+                        announced = true;
                     }
                 } catch (error) {
                     logger.warn('Failed to send welcome alert', error as Error);
@@ -172,6 +175,8 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
         } else {
             logger.info(`ℹ️ Pledge re-created (same tier): ${fullName} (${tierName})`);
         }
+
+        return announced;
 
     } catch (error) {
         logger.error('Error handling members:pledge:create webhook', error as Error);
