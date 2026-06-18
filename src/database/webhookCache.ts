@@ -161,6 +161,187 @@ export async function getRecentWebhookLogs(
     }
 }
 
+// ── Weekly digest helpers ─────────────────────────────────────────────────────
+
+export interface CancellationRecord {
+    memberName: string;
+    memberId: string | null;
+    cancelledAt: string;
+}
+
+export interface TierChangeRecord {
+    memberName: string;
+    memberId: string | null;
+    oldTier: string;
+    newTier: string;
+    changedAt: string;
+}
+
+/**
+ * Fetch all cancellation events from the past N days.
+ * Covers both members:delete and members:pledge:delete.
+ */
+export async function getWeeklyCancellations(
+    days = 7
+): Promise<CancellationRecord[]> {
+    try {
+        const supabase = getSupabase();
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data, error } = await supabase
+            .from('webhook_log')
+            .select('event_type, member_id, payload, received_at')
+            .in('event_type', ['members:delete', 'members:pledge:delete'])
+            .gte('received_at', since)
+            .order('received_at', { ascending: false });
+
+        if (error) {
+            logger.warn(`📋 [WEBHOOK CACHE] Could not fetch cancellations: ${error.message}`);
+            return [];
+        }
+
+        const records: CancellationRecord[] = [];
+        const seenMembers = new Set<string>();
+
+        for (const row of data || []) {
+            const name = extractMemberName(row.payload, row.event_type);
+            const memberId = row.member_id;
+            // Deduplicate by member_id (a cancel can fire both events)
+            const key = memberId || name;
+            if (seenMembers.has(key)) continue;
+            seenMembers.add(key);
+
+            records.push({
+                memberName: name,
+                memberId: memberId,
+                cancelledAt: row.received_at,
+            });
+        }
+
+        return records;
+    } catch (err) {
+        logger.warn(`📋 [WEBHOOK CACHE] Exception fetching cancellations`, err as Error);
+        return [];
+    }
+}
+
+/**
+ * Fetch all tier-change events from the past N days.
+ * Covers both members:update and members:pledge:update where the tier actually changed.
+ */
+export async function getWeeklyTierChanges(
+    days = 7
+): Promise<TierChangeRecord[]> {
+    try {
+        const supabase = getSupabase();
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data, error } = await supabase
+            .from('webhook_log')
+            .select('event_type, member_id, payload, received_at')
+            .in('event_type', ['members:update', 'members:pledge:update'])
+            .gte('received_at', since)
+            .order('received_at', { ascending: false });
+
+        if (error) {
+            logger.warn(`📋 [WEBHOOK CACHE] Could not fetch tier changes: ${error.message}`);
+            return [];
+        }
+
+        const records: TierChangeRecord[] = [];
+
+        for (const row of data || []) {
+            const name = extractMemberName(row.payload, row.event_type);
+            const { oldTier, newTier } = extractTierChange(row.payload, row.event_type);
+
+            // Only include if there was an actual tier change
+            if (oldTier && newTier && oldTier !== newTier) {
+                records.push({
+                    memberName: name,
+                    memberId: row.member_id,
+                    oldTier,
+                    newTier,
+                    changedAt: row.received_at,
+                });
+            }
+        }
+
+        return records;
+    } catch (err) {
+        logger.warn(`📋 [WEBHOOK CACHE] Exception fetching tier changes`, err as Error);
+        return [];
+    }
+}
+
+/**
+ * Extract the member name from a webhook payload.
+ * Handles both members:* (name in data.attributes) and members:pledge:* (name in included[]).
+ */
+function extractMemberName(payload: any, eventType: string): string {
+    if (!payload) return 'Unknown';
+
+    // members:delete / members:update → data.attributes.full_name
+    if (eventType.startsWith('members:') && !eventType.includes('pledge')) {
+        return payload.data?.attributes?.full_name || 'Unknown';
+    }
+
+    // members:pledge:* → look in included[] for the user/patron
+    const included = payload.included || [];
+    const patronRef = payload.data?.relationships?.patron?.data;
+    if (patronRef) {
+        const userRecord = included.find(
+            (item: any) => item.type === 'user' && item.id === patronRef.id
+        );
+        if (userRecord?.attributes?.full_name) {
+            return userRecord.attributes.full_name;
+        }
+    }
+
+    // Fallback: search any user type in included
+    const anyUser = included.find((item: any) => item.type === 'user');
+    return anyUser?.attributes?.full_name || 'Unknown';
+}
+
+/**
+ * Extract old/new tier names from a webhook payload.
+ * For pledge:update, the new tier is in relationships.tier; the old tier isn't
+ * directly in the payload, so we store what we can.  The notes field or the
+ * tracked_members table can supplement this later.
+ */
+function extractTierChange(payload: any, eventType: string): { oldTier: string; newTier: string } {
+    if (!payload) return { oldTier: '', newTier: '' };
+
+    const included = payload.included || [];
+
+    if (eventType === 'members:pledge:update') {
+        const tierRef = payload.data?.relationships?.tier?.data;
+        let newTier = 'Free';
+        if (tierRef) {
+            const tierInfo = included.find(
+                (item: any) => item.type === 'tier' && item.id === tierRef.id
+            );
+            newTier = tierInfo?.attributes?.title || 'Unknown Tier';
+        }
+        // The old tier isn't in the webhook payload — use notes field if available
+        const notes: string = payload._digest_old_tier || '';
+        return { oldTier: notes || 'Previous Tier', newTier };
+    }
+
+    if (eventType === 'members:update') {
+        const tierData = payload.data?.relationships?.currently_entitled_tiers?.data || [];
+        let newTier = 'Free';
+        if (tierData.length > 0) {
+            const tierInfo = included.find(
+                (item: any) => item.type === 'tier' && item.id === tierData[0].id
+            );
+            newTier = tierInfo?.attributes?.title || 'Unknown Tier';
+        }
+        return { oldTier: 'Previous Tier', newTier };
+    }
+
+    return { oldTier: '', newTier: '' };
+}
+
 // ── Type definition ───────────────────────────────────────────────────────────
 
 export interface WebhookLogRow {

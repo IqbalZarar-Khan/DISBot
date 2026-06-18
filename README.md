@@ -40,6 +40,8 @@
 - **📊 Real-time Webhooks**: Instant notifications via Patreon webhook events
 - **💎 Dynamic Tier System**: Configurable via JSON or live-synced from the Patreon API
 - **🗄️ Graceful Degradation**: In-memory DB cache keeps the bot running if Supabase goes offline
+- **🔄 Automated Role Sync**: Auto-grants/revokes Discord roles based on Patreon tier changes
+- **📊 Web Analytics Dashboard**: JWT-gated Chart.js SPA with patron growth, tier distribution, and activity
 
 <p align="center">
   <img src="screenshots/4.png" alt="The Waterfall Release System — Day 1 Diamond, Day 7 Gold, Day 14 Public" width="100%" />
@@ -67,7 +69,7 @@
 - **🔄 Poller Toggle**: `/admin poller` lets admins start/stop the background poller to save resources
 - **💌 Win-Back DMs**: Auto-DMs departing patrons with a customizable farewell message
 - **🎂 Anniversary Celebrations**: Daily checker posts celebratory messages for 1yr/2yr pledge milestones
-- **📊 Weekly Digest**: Every Sunday, DMs root admin a summary of the week's patron activity
+- **📊 Weekly Digest**: Every Sunday, DMs root admin a detailed summary including cancellations (who + count) and tier changes (who + old→new tier)
 - **📖 Serialized Content Formatting**: Auto-detects "Chapter N" / "Part N" in titles for spoiler-tagged embeds
 - **🖥️ Server Monitoring**: `/admin server-stats` shows live CPU, memory, uptime, and PM2 info
 - **🧙 Setup Wizard GUI**: `npm run setup:wizard` launches a local HTML dashboard for frictionless first-time setup
@@ -89,6 +91,16 @@
 - **🎯 Drag-and-Drop Tier Ranker**: Visual tier priority cards in wizard — no JSON editing needed
 - **🚇 Zero-Auth Local Tunnels**: `npm run dev:tunnel` — no ngrok account required (uses localtunnel)
 - **🎉 First-Deploy Welcome DM**: Interactive onboarding DM with setup checklist on first deployment
+
+### Performance & Scalability (PRD Upgrades)
+- **⚡ Fastify Server**: Express replaced with Fastify for 2–3× webhook throughput
+- **📬 BullMQ + Redis Queue**: Webhook events queued via BullMQ for controlled concurrency, with auto-fallback to direct processing when Redis is unavailable
+- **🗄️ Redis-Backed Caching**: Distributed cache layer enables horizontal scaling across multiple instances
+- **📝 Batched DB Writes**: Member upserts buffered and flushed every 5 seconds to reduce Supabase load
+- **📋 Webhook Event Cache**: Every verified webhook persisted to `webhook_log` table for audit, replay, and missed-announcement recovery
+- **🔀 Centralized Event Router**: Extracted webhook routing for reuse by both Fastify (direct) and BullMQ worker (queued)
+- **🚨 Smart Error Buffer**: In-memory error log with severity classification, cause/fix explanations, and `/admin error-log` viewer
+- **🔗 `/link` Command**: Members self-link their Discord to Patreon via email/name for role sync
 
 <p align="center">
   <img src="screenshots/5.png" alt="A Complete Community Toolkit" width="100%" />
@@ -293,6 +305,10 @@ All admin commands are restricted to the user specified in `ROOT_ADMIN_ID`.
 | `/admin export-data` | Export patron data as CSV files via DM |
 | `/admin poller <action>` | Start, stop, or check the Patreon post poller |
 | `/admin server-stats` | Live CPU, memory, uptime, and PM2 monitoring |
+| `/admin role-map <action>` | Toggle role sync (on/off/status) and map tiers to Discord roles |
+| `/admin dashboard` | Generate a time-limited JWT link to the web analytics dashboard |
+| `/admin error-log [severity] [count]` | View recent errors with cause/fix explanations, filter by severity |
+| `/link <email_or_name>` | (User command) Link your Discord account to your Patreon membership |
 
 ## 🔄 How It Works
 
@@ -391,15 +407,25 @@ src/
 │   │   ├── debug-logs.ts
 │   │   ├── export-data.ts
 │   │   ├── poller.ts         # Poller toggle command
-│   │   └── server-stats.ts   # Server monitoring
+│   │   ├── server-stats.ts   # Server monitoring
+│   │   ├── role-map.ts       # Discord role sync management
+│   │   ├── dashboard-cmd.ts  # JWT dashboard link generator
+│   │   └── error-log.ts      # Severity-classified error viewer
+│   ├── link.ts               # /link — user self-links Discord↔Patreon
 │   ├── commandData.ts        # Shared command definitions
 │   └── deploy-commands.ts
 ├── database/          # Database layer (Supabase)
 │   ├── db.ts         # Database operations
 │   ├── dbCache.ts    # In-memory cache for graceful degradation
 │   ├── autoMigrate.ts # Automatic SQL migrations on startup
+│   ├── batchWriter.ts # Batched member upserts (5s flush)
+│   ├── redis.ts      # Redis connection manager
 │   ├── schema.ts     # TypeScript interfaces
+│   ├── webhookCache.ts # Webhook audit log + digest queries
 │   └── supabase.ts   # Supabase client
+├── queue/            # Message queue (BullMQ)
+│   ├── webhookQueue.ts  # Queue producer (enqueue events)
+│   └── webhookWorker.ts # Queue consumer (process events)
 ├── middleware/        # Authorization middleware
 │   └── adminCheck.ts
 ├── utils/            # Utility functions
@@ -410,9 +436,10 @@ src/
 │   ├── errorHandler.ts      # Error handling
 │   ├── formatter.ts         # Message template formatting
 │   ├── keywordDetector.ts   # FAQ keyword auto-replies + prefix commands
-│   ├── logger.ts            # Logging (console + Discord)
+│   ├── logger.ts            # Logging (console + Discord + error buffer)
 │   ├── firstDeploy.ts       # First-deployment welcome DM
 │   ├── healthChecks.ts      # Startup intent + webhook health checks
+│   ├── roleSync.ts          # Discord role sync engine + reconciliation
 │   ├── setupMode.ts         # Auto-capture Discord IDs (!claim)
 │   ├── patreonClient.ts     # Axios wrapper with auto token-refresh
 │   ├── patreonPoller.ts     # Background tier-change poller
@@ -430,7 +457,10 @@ src/
 │   │   ├── posts-publish.ts     # + chapter formatting
 │   │   ├── posts-update.ts
 │   │   └── posts-delete.ts
-│   ├── server.ts     # Express server + OAuth routes + ghost filter
+│   ├── dashboard.ts  # Chart.js analytics SPA (JWT-gated)
+│   ├── router.ts     # Centralized webhook event router
+│   ├── server.ts     # Fastify server + OAuth routes + ghost filter
+│   ├── wizard.ts     # Cloud setup wizard plugin
 │   └── verify.ts     # HMAC signature verification
 ├── config.ts         # Configuration + tier rank validation
 └── index.ts          # Main entry point + startup orchestration
@@ -452,13 +482,23 @@ setup-vps.sh          # One-command VPS setup (Caddy + PM2 + Node.js)
 
 The bot follows an **early port-binding** architecture to work correctly on cloud platforms:
 
-1. **Supabase initialization** → Database connection test
-2. **Auto-migrations** → Runs pending SQL migrations from `supabase/migrations/`
-3. **Webhook server starts** → Binds to `PORT` immediately (required by Railway/Render)
-4. **Discord client login** → Connects to Discord gateway
-5. **Ready** → Auto-deploys slash commands, validates OAuth scopes, initializes DB cache, starts poller + anniversary checker + weekly digest
+1. **Redis connection** → Connects to Redis if `REDIS_URL` is configured (optional)
+2. **Supabase initialization** → Database connection test
+3. **Auto-migrations** → Runs pending SQL migrations from `supabase/migrations/`
+4. **Webhook server starts** → Fastify binds to `PORT` immediately (required by Railway/Render)
+5. **BullMQ worker starts** → Queue consumer begins processing (if Redis is available)
+6. **Discord client login** → Connects to Discord gateway
+7. **Ready** → Auto-deploys slash commands, validates OAuth scopes, initializes DB cache, starts batch writer + poller + anniversary checker + weekly digest + role reconciliation
 
 This startup order ensures cloud platforms detect the open port before the Discord gateway connection completes.
+
+**Webhook Processing Pipeline:**
+```
+Patreon → HMAC Verify → Dedup Guard → Ghost Filter → Webhook Cache (audit log)
+  ↓
+  Redis available? → BullMQ Queue → Worker → Event Router → Handler
+  Redis unavailable? → Direct Processing → Event Router → Handler
+```
 
 ### Scripts
 
@@ -623,7 +663,25 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 
 ## 🆕 Recent Updates
 
-### Latest (Mar 2026)
+### Latest (Jun 2026)
+- ✅ **📊 Enhanced Weekly Digest**: Sunday report now includes cancellation details (who cancelled + count) and membership changes (who changed + old→new tier)
+- ✅ **📋 Webhook Event Cache**: Every verified webhook persisted to `webhook_log` for audit trail, missed-announcement recovery, and weekly digest data
+- ✅ **🚨 `/admin error-log`**: In-Discord error viewer with severity classification (low/medium/high/critical), cause/fix explanations, and filter by severity
+- ✅ **⚡ Fastify Migration**: Express replaced with Fastify for 2–3× webhook throughput and lower CPU overhead
+- ✅ **📬 BullMQ + Redis Queue**: Webhook events enqueued via BullMQ for controlled concurrency with 3 retries + exponential backoff; auto-fallback to direct processing when Redis is unavailable
+- ✅ **🗄️ Redis-Backed Caching**: Centralized cache layer supporting horizontal scaling across multiple bot instances
+- ✅ **📝 Batched DB Writes**: Member upserts buffered in memory and flushed every 5 seconds to reduce Supabase query volume
+- ✅ **🔄 Automated Discord Role Sync**: `/admin role-map` maps Patreon tiers to Discord roles; auto-grants/revokes on pledge create, update, delete, and departure events
+- ✅ **🔗 `/link` Command**: Members self-link their Discord account to Patreon via email, name, or member ID — enables role sync
+- ✅ **📊 Web Analytics Dashboard**: JWT-gated Chart.js SPA served at `/dashboard` — patron growth (30-day), tier distribution donut chart, recent activity table; link generated via `/admin dashboard` (expires 1hr)
+- ✅ **🔀 Centralized Event Router**: Webhook routing extracted into `router.ts` for reuse by both Fastify (direct) and BullMQ worker (queued)
+- ✅ **🔁 Startup Role Reconciliation**: On boot, compares all tracked members against actual Discord roles and fixes any drift that occurred while offline
+- ✅ **👥 Robust Tier Resolution**: Dashboard and stats now resolve tier names from both `tier_mappings` and `role_mappings` tables
+- ✅ **🧹 Legacy Handler Cleanup**: Removed deprecated legacy `pledges:*` handlers — v2 webhook events only
+- ✅ **🔍 Diff Engine Free Tier Drops**: Piggyback diff engine detects silent free-tier changes not triggered by webhooks
+- ✅ **🩹 Numerous Bug Fixes**: Triple welcome messages, broken upgrade detection, dashboard adblocker interference, PUBLIC_URL trailing slash, Patreon API null state handling
+
+### Previous (Mar 2026)
 - ✅ **🔐 OAuth Token Exchange Route**: Built-in `/oauth/start` + `/oauth/redirect` — no curl/Postman needed
 - ✅ **🔄 Auto Token Refresh**: `patreonClient.ts` automatically refreshes expired tokens on 401 errors
 - ✅ **🌍 Currency-Aware Pledges**: Normalizes international currencies (EUR, GBP, etc.) to USD cents
@@ -648,7 +706,7 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - ✅ **🐳 Self-Contained Docker**: Full stack with PostgreSQL + PostgREST (no Supabase Cloud)
 - ✅ **📡 Automated Webhook Creation**: Setup wizard creates Patreon webhooks via API with all 9 triggers
 - ✅ **🎩 Discord Setup in Wizard**: Interactive checklist with auto-generated invite URL
-- ✅ **💾 SQLite Fallback**: Zero-config embedded database when Supabase isn’t configured
+- ✅ **💾 SQLite Fallback**: Zero-config embedded database when Supabase isn't configured
 - ✅ **🩺 Startup Health Checks**: Verifies Server Members Intent + webhook registration on boot
 - ✅ **🚀 1-Click Railway Deploy**: Deploy button auto-provisions the app with env var form
 - ✅ **📝 Visual Template Editor**: Drag-and-drop message template builder with live preview

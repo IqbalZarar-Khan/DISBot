@@ -1,6 +1,7 @@
 import { client } from '../index';
 import { config } from '../config';
 import { getAllTrackedMembers } from '../database/db';
+import { getWeeklyCancellations, getWeeklyTierChanges } from '../database/webhookCache';
 import { logger } from './logger';
 import { EmbedBuilder } from 'discord.js';
 
@@ -52,7 +53,7 @@ async function sendWeeklyDigest(): Promise<void> {
         const now = Date.now();
         const oneWeekAgo = now - 7 * 24 * 60 * 60_000;
 
-        // Count activity in the past 7 days
+        // ── Basic counts from tracked_members ────────────────────────────
         let newPatrons = 0;
         let updatedPatrons = 0;
         let totalActive = members.length;
@@ -66,6 +67,33 @@ async function sendWeeklyDigest(): Promise<void> {
             }
         }
 
+        // ── Cancellations from webhook_log ───────────────────────────────
+        const cancellations = await getWeeklyCancellations(7);
+        const cancelCount = cancellations.length;
+
+        let cancelList = 'None this week 🎉';
+        if (cancelCount > 0) {
+            const names = cancellations.map(c => `• ${c.memberName}`);
+            cancelList = names.length <= 15
+                ? names.join('\n')
+                : [...names.slice(0, 15), `_...and ${names.length - 15} more_`].join('\n');
+        }
+
+        // ── Tier changes from webhook_log ────────────────────────────────
+        const tierChanges = await getWeeklyTierChanges(7);
+        const changeCount = tierChanges.length;
+
+        let changeList = 'None this week';
+        if (changeCount > 0) {
+            const entries = tierChanges.map(tc =>
+                `• ${tc.memberName}: ${tc.oldTier} → **${tc.newTier}**`
+            );
+            changeList = entries.length <= 15
+                ? entries.join('\n')
+                : [...entries.slice(0, 15), `_...and ${entries.length - 15} more_`].join('\n');
+        }
+
+        // ── Build the embed ──────────────────────────────────────────────
         const embed = new EmbedBuilder()
             .setTitle('📊 Weekly Patron Digest')
             .setColor(0x5865F2)
@@ -78,12 +106,24 @@ async function sendWeeklyDigest(): Promise<void> {
             .setFooter({ text: 'DISBot Weekly Digest • Sent every Sunday' })
             .setTimestamp();
 
+        // Cancellation details embed
+        const cancelEmbed = new EmbedBuilder()
+            .setColor(0xFF4444)
+            .setTitle(`❌ Cancellations (${cancelCount})`)
+            .setDescription(cancelList);
+
+        // Tier change details embed
+        const changeEmbed = new EmbedBuilder()
+            .setColor(0xFFA500)
+            .setTitle(`🔀 Membership Changes (${changeCount})`)
+            .setDescription(changeList);
+
         // DM the root admin
         const adminId = config.rootAdminId;
         if (adminId) {
             try {
                 const admin = await client.users.fetch(adminId);
-                await admin.send({ embeds: [embed] });
+                await admin.send({ embeds: [embed, cancelEmbed, changeEmbed] });
                 logger.info('📊 [DIGEST] Weekly digest sent to root admin');
             } catch (err) {
                 logger.warn(`📊 [DIGEST] Could not DM admin: ${(err as Error).message}`);
