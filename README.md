@@ -32,68 +32,73 @@
   <img src="screenshots/3.png" alt="Architecture — Patreon Webhooks → DISBot Core → Discord API" width="100%" />
 </p>
 
-### Core Features
+### 🌟 Core Features
 - **🎯 Waterfall Release System**: Smart, tiered content distribution that prevents spam
 - **⚡ Hybrid Broadcast System**: Detects multi-tier releases and alerts all relevant channels simultaneously
 - **👥 Member Tracking**: Logs new pledges, upgrades, and departures to Supabase
-- **🔒 Zero-Trust Security**: HMAC webhook verification, Row-Level Security, whitelist-protected admin commands
-- **📊 Real-time Webhooks**: Instant notifications via Patreon webhook events
-- **💎 Dynamic Tier System**: Configurable via JSON or live-synced from the Patreon API
-- **🗄️ Graceful Degradation**: In-memory DB cache keeps the bot running if Supabase goes offline
 - **🔄 Automated Role Sync**: Auto-grants/revokes Discord roles based on Patreon tier changes
 - **📊 Web Analytics Dashboard**: JWT-gated Chart.js SPA with patron growth, tier distribution, and activity
+- **🔒 Zero-Trust Security**: HMAC webhook verification, Row-Level Security, whitelist-protected admin commands
+- **💎 Dynamic Tier System**: Configurable via JSON or live-synced from the Patreon API
+- **🗄️ Graceful Degradation**: In-memory DB cache keeps the bot running if Supabase goes offline
 
 <p align="center">
   <img src="screenshots/4.png" alt="The Waterfall Release System — Day 1 Diamond, Day 7 Gold, Day 14 Public" width="100%" />
 </p>
 
-### Advanced Features
+### 🛠️ Setup & Deployment
+- **🧙 Setup Wizard GUI**: `npm run setup:wizard` launches a local HTML dashboard for frictionless first-time setup
+- **🎩 Interactive Discord Setup**: Wizard generates exact invite URL with all scopes/permissions pre-selected
+- **📡 Automated Webhook Creation**: Setup wizard auto-creates Patreon webhooks with all 9 triggers via API
+- **🎯 Drag-and-Drop Tier Ranker**: Visual tier priority cards in wizard — no JSON editing needed
+- **📝 Visual Template Editor**: Drag-and-drop placeholders with live Discord embed preview in wizard
+- **🚂 Railway Domain Auto-Detection**: Dynamically detects Railway public domains during cloud setup mode for 1-click Patreon config
+- **🚀 1-Click Railway Deploy**: Deploy button in README auto-provisions the entire app with env var form
+- **🚀 One-Command VPS Setup**: `setup-vps.sh` installs Node.js, PM2, Caddy (auto-HTTPS) in a single script
+- **🐳 Self-Contained Docker Compose**: Full stack (bot + PostgreSQL + PostgREST) — no Supabase Cloud needed
+- **🚇 Zero-Auth Local Tunnels**: `npm run dev:tunnel` — no ngrok account required (uses localtunnel)
+- **🔨 Auto-Capture IDs**: Type `!claim` in any channel — bot captures Guild ID, Admin ID, Channel ID automatically
+- **🎉 First-Deploy Welcome DM**: Interactive onboarding DM with setup checklist on first deployment
+
+### 💬 Community & Engagement
 - **💬 Custom Message Templates**: Fully customizable with placeholders (`{tier}`, `{title}`, `{url}`, `{user}`, `{post_snippet}`, `{pledge_amount}`, `{patron_count}`)
 - **🧵 Auto-Thread Creation**: Optionally creates discussion threads under post alerts to keep channels clean
 - **🗑️ Silent Post Deletion**: Automatically removes deleted posts without spammy notifications
-- **🔧 Automated DB Setup**: `npm run setup:patreon` auto-writes tiers + WEBHOOK_SECRET directly to `.env` and Supabase
-- **🔄 Live Tier Sync**: `/admin sync-tiers` fetches tiers from Patreon API without restarting
+- **💌 Win-Back DMs**: Auto-DMs departing patrons with a customizable farewell message
+- **🎂 Anniversary Celebrations**: Daily checker posts celebratory messages for 1yr/2yr pledge milestones
+- **🔑 Keyword Detection**: Auto-replies to FAQ keywords ("next chapter?") when Message Content Intent is enabled
+- **📖 Serialized Content Formatting**: Auto-detects "Chapter N" / "Part N" in titles for spoiler-tagged embeds
+
+### 🤖 Automation & Management
+- **🔀 Event Routing**: Route member events (joins, departures, upgrades) to specific Discord channels
 - **📋 Interactive Setup**: `/admin setup` with dropdown menus for tier→channel mapping
 - **🔧 Bulk Mapping Wizard**: `/admin bulk-map` maps all unmapped tiers in a guided sequence
-- **🔀 Event Routing**: Route member events (joins, departures, upgrades) to specific Discord channels
-- **📊 Patron Analytics**: `/admin stats` shows growth, tier distribution, and recent activity
-- **🔍 In-Discord Debug Logs**: `/admin debug-logs` shows the last 50 X-Ray log entries without leaving Discord
-- **📦 Data Export**: `/admin export-data` generates CSV files of all patron data and DMs them to the admin
-- **🧪 Template Preview**: `/admin test-alert <tier> <template_type>` previews custom templates with sample data
-- **🕵️ Enhanced Diagnostics**: `/admin status` shows API latency, uptime, webhook stats, and tier detection accuracy
+- **🔄 Live Tier Sync**: `/admin sync-tiers` fetches tiers from Patreon API without restarting
 - **🔐 OAuth Token Exchange**: Built-in `/oauth/start` route eliminates curl/Postman for token setup
 - **🔄 Automatic Token Refresh**: `patreonClient.ts` auto-refreshes expired tokens on 401 errors
 - **🌍 Currency-Aware Pledges**: Normalizes international currencies to USD cents for accurate tier detection
-- **⚠️ Tier Rank Validation**: Warns on startup if cheaper tiers outrank expensive tiers in config
 - **👻 Ghost Webhook Filter**: Silently discards duplicate webhooks with no meaningful state change
 - **🔄 Poller Toggle**: `/admin poller` lets admins start/stop the background poller to save resources
-- **💌 Win-Back DMs**: Auto-DMs departing patrons with a customizable farewell message
-- **🎂 Anniversary Celebrations**: Daily checker posts celebratory messages for 1yr/2yr pledge milestones
-- **📊 Weekly Digest**: Every Sunday, DMs root admin a detailed summary including cancellations (who + count) and tier changes (who + old→new tier)
-- **📖 Serialized Content Formatting**: Auto-detects "Chapter N" / "Part N" in titles for spoiler-tagged embeds
-- **🖥️ Server Monitoring**: `/admin server-stats` shows live CPU, memory, uptime, and PM2 info
-- **🧙 Setup Wizard GUI**: `npm run setup:wizard` launches a local HTML dashboard for frictionless first-time setup
-- **🔬 Startup Scope Validation**: Verifies Patreon OAuth token scopes on boot, warns if missing
-- **🏗️ Auto DB Migrations**: Runs pending SQL migrations automatically on startup
-- **🛡️ Proactive Fallback Warnings**: DMs admin when tier detection falls back to cents/title matching
-- **🔑 Keyword Detection**: Auto-replies to FAQ keywords ("next chapter?") when Message Content Intent is enabled
+- **🔗 `/link` Command**: Members self-link their Discord to Patreon via email/name for role sync
 - **⌨️ Prefix Commands**: `!status` and `!help` as slash-command fallbacks
-- **💥 HMAC Webhook Tester**: `npm run test:webhook` sends properly signed mock payloads to your endpoint
-- **🚀 One-Command VPS Setup**: `setup-vps.sh` installs Node.js, PM2, Caddy (auto-HTTPS) in a single script
-- **🐳 Self-Contained Docker Compose**: Full stack (bot + PostgreSQL + PostgREST) — no Supabase Cloud needed
-- **📡 Automated Webhook Creation**: Setup wizard auto-creates Patreon webhooks with all 9 triggers via API
-- **🎩 Interactive Discord Setup**: Wizard generates exact invite URL with all scopes/permissions pre-selected
-- **💾 SQLite Fallback Database**: Zero-config embedded DB when Supabase is not configured (Supabase still recommended)
-- **🩺 Startup Health Checks**: Verifies Server Members Intent + Patreon webhook registration on boot
-- **🚀 1-Click Railway Deploy**: Deploy button in README auto-provisions the entire app with env var form
-- **📝 Visual Template Editor**: Drag-and-drop placeholders with live Discord embed preview in wizard
-- **🔨 Auto-Capture IDs**: Type `!claim` in any channel — bot captures Guild ID, Admin ID, Channel ID automatically
-- **🎯 Drag-and-Drop Tier Ranker**: Visual tier priority cards in wizard — no JSON editing needed
-- **🚇 Zero-Auth Local Tunnels**: `npm run dev:tunnel` — no ngrok account required (uses localtunnel)
-- **🚂 Railway Domain Auto-Detection**: Dynamically detects Railway public domains during cloud setup mode for 1-click Patreon config
-- **🎉 First-Deploy Welcome DM**: Interactive onboarding DM with setup checklist on first deployment
 
-### Performance & Scalability (PRD Upgrades)
+### 📊 Diagnostics & Analytics
+- **📊 Patron Analytics**: `/admin stats` shows growth, tier distribution, and recent activity
+- **📊 Weekly Digest**: Every Sunday, DMs root admin a detailed summary including cancellations and tier changes
+- **📦 Data Export**: `/admin export-data` generates CSV files of all patron data and DMs them to the admin
+- **🖥️ Server Monitoring**: `/admin server-stats` shows live CPU, memory, uptime, and PM2 info
+- **🔍 In-Discord Debug Logs**: `/admin debug-logs` shows the last 50 X-Ray log entries without leaving Discord
+- **🕵️ Enhanced Diagnostics**: `/admin status` shows API latency, uptime, webhook stats, and tier detection accuracy
+- **🧪 Template Preview**: `/admin test-alert <tier> <template_type>` previews custom templates with sample data
+- **🛡️ Proactive Fallback Warnings**: DMs admin when tier detection falls back to cents/title matching
+- **⚠️ Tier Rank Validation**: Warns on startup if cheaper tiers outrank expensive tiers in config
+- **🔬 Startup Scope Validation**: Verifies Patreon OAuth token scopes on boot, warns if missing
+- **🩺 Startup Health Checks**: Verifies Server Members Intent + Patreon webhook registration on boot
+- **🏗️ Auto DB Migrations**: Runs pending SQL migrations automatically on startup
+- **💥 HMAC Webhook Tester**: `npm run test:webhook` sends properly signed mock payloads to your endpoint
+- **💾 SQLite Fallback Database**: Zero-config embedded DB when Supabase is not configured
+
+### 🚀 Performance & Scalability
 - **⚡ Fastify Server**: Express replaced with Fastify for 2–3× webhook throughput
 - **📬 BullMQ + Redis Queue**: Webhook events queued via BullMQ for controlled concurrency, with auto-fallback to direct processing when Redis is unavailable
 - **🗄️ Redis-Backed Caching**: Distributed cache layer enables horizontal scaling across multiple instances
@@ -101,7 +106,6 @@
 - **📋 Webhook Event Cache**: Every verified webhook persisted to `webhook_log` table for audit, replay, and missed-announcement recovery
 - **🔀 Centralized Event Router**: Extracted webhook routing for reuse by both Fastify (direct) and BullMQ worker (queued)
 - **🚨 Smart Error Buffer**: In-memory error log with severity classification, cause/fix explanations, and `/admin error-log` viewer
-- **🔗 `/link` Command**: Members self-link their Discord to Patreon via email/name for role sync
 
 <p align="center">
   <img src="screenshots/5.png" alt="A Complete Community Toolkit" width="100%" />
