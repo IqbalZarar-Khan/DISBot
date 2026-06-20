@@ -87,7 +87,17 @@ async function main() {
             console.log('   Starting web server only so you can run the Setup Wizard.');
             try {
                 await startWebhookServer(config.webhookPort, config.webhookSecret);
-                console.log(`\n\n🧙 CLOUD SETUP READY: Open your domain at /setup to complete configuration (e.g. https://your-app.up.railway.app/setup)\n\n`);
+                
+                const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL;
+                if (railwayDomain) {
+                    // Strip http(s):// if it's there
+                    const cleanDomain = railwayDomain.replace(/^https?:\/\//, '');
+                    console.log(`\n\n🧙 CLOUD SETUP READY: Running on Railway!`);
+                    console.log(`   🌍 Open this URL in your browser to complete configuration:`);
+                    console.log(`   ▶️  https://${cleanDomain}/setup?mode=cloud\n\n`);
+                } else {
+                    console.log(`\n\n🧙 CLOUD SETUP READY: Open your domain at /setup to complete configuration (e.g. https://your-app.up.railway.app/setup?mode=cloud)\n\n`);
+                }
             } catch (error) {
                 console.error('❌ Failed to start webhook server for setup:', error);
                 process.exit(1);

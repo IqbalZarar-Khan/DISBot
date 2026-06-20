@@ -90,6 +90,7 @@
 - **🔨 Auto-Capture IDs**: Type `!claim` in any channel — bot captures Guild ID, Admin ID, Channel ID automatically
 - **🎯 Drag-and-Drop Tier Ranker**: Visual tier priority cards in wizard — no JSON editing needed
 - **🚇 Zero-Auth Local Tunnels**: `npm run dev:tunnel` — no ngrok account required (uses localtunnel)
+- **🚂 Railway Domain Auto-Detection**: Dynamically detects Railway public domains during cloud setup mode for 1-click Patreon config
 - **🎉 First-Deploy Welcome DM**: Interactive onboarding DM with setup checklist on first deployment
 
 ### Performance & Scalability (PRD Upgrades)
