@@ -5,9 +5,7 @@
 # DISBot — Intelligent Content Distribution
 
 <p align="center">
-  <a href="screenshots/DISBot_Automation_Engine.pptx">
-    <strong>Download the DISBot Automation Engine Presentation (.pptx)</strong>
-  </a>
+  <img src="screenshots/1.jpg" alt="DISBot Hero — Intelligent Content Distribution" width="100%" />
 </p>
 
 <p align="center">
@@ -22,9 +20,17 @@
 
 ---
 
+<p align="center">
+  <img src="screenshots/2.jpg" alt="The Creator's Dilemma — Manual Chaos vs Automated Order" width="100%" />
+</p>
+
 ## ✨ Features
 
 ### 🏗️ Architecture
+
+<p align="center">
+  <img src="screenshots/3.jpg" alt="Architecture — Patreon Webhooks → DISBot Core → Discord API" width="100%" />
+</p>
 
 ### 🌟 Core Features
 - **🎯 Waterfall Release System**: Smart, tiered content distribution that prevents spam
@@ -35,6 +41,10 @@
 - **🔒 Zero-Trust Security**: HMAC webhook verification, Row-Level Security, whitelist-protected admin commands
 - **💎 Dynamic Tier System**: Configurable via JSON or live-synced from the Patreon API
 - **🗄️ Graceful Degradation**: In-memory DB cache keeps the bot running if Supabase goes offline
+
+<p align="center">
+  <img src="screenshots/4.jpg" alt="The Waterfall Release System — Day 1 Diamond, Day 7 Gold, Day 14 Public" width="100%" />
+</p>
 
 ### 🛠️ Setup & Deployment
 - **🧙 Setup Wizard GUI**: `npm run setup:wizard` launches a local HTML dashboard for frictionless first-time setup
@@ -96,6 +106,10 @@
 - **📋 Webhook Event Cache**: Every verified webhook persisted to `webhook_log` table for audit, replay, and missed-announcement recovery
 - **🔀 Centralized Event Router**: Extracted webhook routing for reuse by both Fastify (direct) and BullMQ worker (queued)
 - **🚨 Smart Error Buffer**: In-memory error log with severity classification, cause/fix explanations, and `/admin error-log` viewer
+
+<p align="center">
+  <img src="screenshots/5.jpg" alt="A Complete Community Toolkit" width="100%" />
+</p>
 
 ## 📚 Documentation
 
@@ -718,6 +732,84 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - ✅ Dynamic Tier Configuration, Tier ID Translation, Supabase Integration, Fallback Mechanisms
 
 ---
+
+## 🖼️ Visual Documentation
+
+<details>
+<summary><strong>📐 Architecture & Stack</strong></summary>
+
+<p align="center">
+  <img src="screenshots/6.jpg" alt="Built on a Modern Stack — Node.js 20+, RLS, Supabase" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🎯 Intelligent Tier Detection</strong></summary>
+
+<p align="center">
+  <img src="screenshots/7.jpg" alt="3-Step Tier Detection Funnel — ID Match → Pledge Amount → Title Match" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🔒 Zero-Trust Security Model</strong></summary>
+
+<p align="center">
+  <img src="screenshots/8.jpg" alt="HMAC Verification, Data Sovereignty, Row-Level Security" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🖥️ In-Chat Administration</strong></summary>
+
+<p align="center">
+  <img src="screenshots/12.jpg" alt="Admin commands in Discord — set-channel, set-message, status" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>⚙️ Automated Configuration</strong></summary>
+
+<p align="center">
+  <img src="screenshots/10.jpg" alt="npm run setup:patreon — auto-generates TIER_CONFIG and writes to Supabase" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>🏠 Hosting Strategy</strong></summary>
+
+<p align="center">
+  <img src="screenshots/9.jpg" alt="Railway (Recommended) vs Render Free Tier (Avoid)" width="100%" />
+</p>
+
+
+
+</details>
+
+<details>
+<summary><strong>🚀 Deployment Roadmap</strong></summary>
+
+<p align="center">
+  <img src="screenshots/11.jpg" alt="4-Step Roadmap — Clone, Fetch Config, Deploy, Connect" width="100%" />
+</p>
+
+</details>
+
+<details>
+<summary><strong>💡 Pro Tip: The Invisible Space Trick</strong></summary>
+
+<p align="center">
+  <img src="screenshots/13.jpg" alt="Add a space to trick Patreon into sending a webhook for tier-only changes" width="100%" />
+</p>
+
+</details>
+
+
 
 ## 📝 License
 
