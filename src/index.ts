@@ -82,7 +82,7 @@ async function main() {
         // Validate configuration
         validateConfig();
         // Is the bot unconfigured? (Missing core tokens)
-        if ((config as any)._isSetupMode) {
+        if (config._isSetupMode) {
             console.log('🚧 CORE CONFIGURATION MISSING: Entering Cloud Setup Mode...');
             console.log('   Starting web server only so you can run the Setup Wizard.');
             try {
@@ -186,7 +186,7 @@ function registerEventHandlers() {
             const { REST, Routes } = await import('discord.js');
             const { getCommandData } = await import('./commands/commandData');
             const rest = new REST({ version: '10' }).setToken(config.discordToken);
-            const applicationId = Buffer.from(config.discordToken.split('.')[0], 'base64').toString('utf-8');
+            const applicationId = readyClient.user.id;
             const commands = getCommandData();
             const data = await rest.put(
                 Routes.applicationGuildCommands(applicationId, config.guildId),

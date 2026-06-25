@@ -49,8 +49,12 @@ interface Config {
     _isSetupMode?: boolean;
 }
 
-function getEnvVar(key: string, _required: boolean = true): string {
+function getEnvVar(key: string, required: boolean = true): string {
     const value = process.env[key];
+    if (required && !value) {
+        // Don't crash here — validateConfig() will handle the user-facing error.
+        // Just return '' so all missing fields are collected and reported together.
+    }
     return value || '';
 }
 
@@ -155,13 +159,13 @@ export function validateConfig(): void {
         'webhookSecret'
     ];
 
-    const missing = requiredFields.filter(field => !(config as any)[field]);
+    const missing = requiredFields.filter(field => !config[field]);
 
     if (missing.length > 0) {
         // If we're missing core config, signal to index.ts that we're in SETUP MODE,
         // but don't hard crash here.
         console.warn(`⚠️ Missing configuration: ${missing.join(', ')}`);
-        (config as any)._isSetupMode = true;
+        config._isSetupMode = true;
         return;
     }
 

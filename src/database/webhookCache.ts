@@ -22,6 +22,64 @@
 import { getSupabase } from './supabase';
 import { logger } from '../utils/logger';
 
+// ── PII redaction ─────────────────────────────────────────────────────────────
+
+/**
+ * Sensitive attribute keys that may appear in Patreon webhook payloads.
+ * These are stripped before the payload is persisted to the webhook_log table.
+ */
+const SENSITIVE_KEYS = new Set([
+    'email',
+    'full_name',
+    'first_name',
+    'last_name',
+    'vanity',
+    'url',
+    'image_url',
+    'thumb_url',
+    'image_small_url',
+    'social_connections',
+    'discord_id',        // PII — the mapping is stored elsewhere
+    'address',           // Sometimes present for physical-reward tiers
+    'phone_number',
+]);
+
+/**
+ * Deep-clone a webhook payload and replace sensitive fields with '[REDACTED]'.
+ * Only scrubs keys inside `attributes` objects to avoid breaking references.
+ */
+function redactPayload(payload: any): any {
+    if (!payload) return payload;
+    try {
+        const clone = JSON.parse(JSON.stringify(payload));
+
+        function scrub(obj: any): void {
+            if (!obj || typeof obj !== 'object') return;
+            if (Array.isArray(obj)) { obj.forEach(scrub); return; }
+
+            // Scrub attributes at the current level
+            if (obj.attributes && typeof obj.attributes === 'object') {
+                for (const key of Object.keys(obj.attributes)) {
+                    if (SENSITIVE_KEYS.has(key)) {
+                        obj.attributes[key] = '[REDACTED]';
+                    }
+                }
+            }
+
+            // Recurse into nested objects (e.g. `included[]`)
+            for (const val of Object.values(obj)) {
+                if (val && typeof val === 'object') scrub(val);
+            }
+        }
+
+        scrub(clone);
+        return clone;
+    } catch {
+        // If cloning fails, return a stub rather than the raw PII payload
+        return { _redaction_error: true };
+    }
+}
+
 // ── Supabase helpers ──────────────────────────────────────────────────────────
 
 /**
@@ -37,12 +95,20 @@ export async function logWebhookReceived(
 
         const memberId: string | null = payload?.data?.id ?? null;
 
+        // Extract member name at insert time so digest queries don't need
+        // to fetch the full payload later.
+        const memberName: string | null = extractMemberNameFromPayload(payload, eventType) || null;
+
+        // Redact PII before persisting
+        const safePayload = redactPayload(payload);
+
         const { data, error } = await supabase
             .from('webhook_log')
             .insert({
                 event_type: eventType,
                 member_id: memberId,
-                payload,          // stored as JSONB
+                member_name: memberName,
+                payload: safePayload,   // stored as JSONB — PII stripped
                 processed: false,
                 announced: false,
             })
@@ -188,9 +254,10 @@ export async function getWeeklyCancellations(
         const supabase = getSupabase();
         const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
+        // Only select lightweight columns — avoid fetching the full JSONB payload
         const { data, error } = await supabase
             .from('webhook_log')
-            .select('event_type, member_id, payload, received_at')
+            .select('event_type, member_id, member_name, received_at')
             .in('event_type', ['members:delete', 'members:pledge:delete'])
             .gte('received_at', since)
             .order('received_at', { ascending: false });
@@ -204,7 +271,7 @@ export async function getWeeklyCancellations(
         const seenMembers = new Set<string>();
 
         for (const row of data || []) {
-            const name = extractMemberName(row.payload, row.event_type);
+            const name = row.member_name || 'Unknown';
             const memberId = row.member_id;
             // Deduplicate by member_id (a cancel can fire both events)
             const key = memberId || name;
@@ -236,9 +303,10 @@ export async function getWeeklyTierChanges(
         const supabase = getSupabase();
         const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
+        // Only select lightweight columns — avoid fetching the full JSONB payload
         const { data, error } = await supabase
             .from('webhook_log')
-            .select('event_type, member_id, payload, received_at')
+            .select('event_type, member_id, member_name, notes, received_at')
             .in('event_type', ['members:update', 'members:pledge:update'])
             .gte('received_at', since)
             .order('received_at', { ascending: false });
@@ -251,8 +319,17 @@ export async function getWeeklyTierChanges(
         const records: TierChangeRecord[] = [];
 
         for (const row of data || []) {
-            const name = extractMemberName(row.payload, row.event_type);
-            const { oldTier, newTier } = extractTierChange(row.payload, row.event_type);
+            const name = row.member_name || 'Unknown';
+
+            // Tier change info is stored in notes as "oldTier → newTier" by
+            // markWebhookProcessed when available. Fall back gracefully.
+            let oldTier = '';
+            let newTier = '';
+            if (row.notes && row.notes.includes('→')) {
+                const parts = row.notes.split('→').map((s: string) => s.trim());
+                oldTier = parts[0] || '';
+                newTier = parts[1] || '';
+            }
 
             // Only include if there was an actual tier change
             if (oldTier && newTier && oldTier !== newTier) {
@@ -274,10 +351,10 @@ export async function getWeeklyTierChanges(
 }
 
 /**
- * Extract the member name from a webhook payload.
- * Handles both members:* (name in data.attributes) and members:pledge:* (name in included[]).
+ * Extract the member name from a raw webhook payload at log-time.
+ * This runs on the raw (pre-redaction) payload so full_name is still available.
  */
-function extractMemberName(payload: any, eventType: string): string {
+function extractMemberNameFromPayload(payload: any, eventType: string): string {
     if (!payload) return 'Unknown';
 
     // members:delete / members:update → data.attributes.full_name
@@ -302,52 +379,13 @@ function extractMemberName(payload: any, eventType: string): string {
     return anyUser?.attributes?.full_name || 'Unknown';
 }
 
-/**
- * Extract old/new tier names from a webhook payload.
- * For pledge:update, the new tier is in relationships.tier; the old tier isn't
- * directly in the payload, so we store what we can.  The notes field or the
- * tracked_members table can supplement this later.
- */
-function extractTierChange(payload: any, eventType: string): { oldTier: string; newTier: string } {
-    if (!payload) return { oldTier: '', newTier: '' };
-
-    const included = payload.included || [];
-
-    if (eventType === 'members:pledge:update') {
-        const tierRef = payload.data?.relationships?.tier?.data;
-        let newTier = 'Free';
-        if (tierRef) {
-            const tierInfo = included.find(
-                (item: any) => item.type === 'tier' && item.id === tierRef.id
-            );
-            newTier = tierInfo?.attributes?.title || 'Unknown Tier';
-        }
-        // The old tier isn't in the webhook payload — use notes field if available
-        const notes: string = payload._digest_old_tier || '';
-        return { oldTier: notes || 'Previous Tier', newTier };
-    }
-
-    if (eventType === 'members:update') {
-        const tierData = payload.data?.relationships?.currently_entitled_tiers?.data || [];
-        let newTier = 'Free';
-        if (tierData.length > 0) {
-            const tierInfo = included.find(
-                (item: any) => item.type === 'tier' && item.id === tierData[0].id
-            );
-            newTier = tierInfo?.attributes?.title || 'Unknown Tier';
-        }
-        return { oldTier: 'Previous Tier', newTier };
-    }
-
-    return { oldTier: '', newTier: '' };
-}
-
 // ── Type definition ───────────────────────────────────────────────────────────
 
 export interface WebhookLogRow {
     id: number;
     event_type: string;
     member_id: string | null;
+    member_name: string | null;
     payload?: any;
     received_at: string;
     processed: boolean;
