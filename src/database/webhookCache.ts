@@ -95,23 +95,32 @@ export async function logWebhookReceived(
 
         const memberId: string | null = payload?.data?.id ?? null;
 
-        // Extract member name at insert time so digest queries don't need
-        // to fetch the full payload later.
-        const memberName: string | null = extractMemberNameFromPayload(payload, eventType) || null;
+        // Only extract member name for member-related events (tier changes,
+        // cancellations, pledge joins). Post events don't carry member data
+        // and should not attempt to write the member_name column.
+        const isMemberEvent = eventType.startsWith('members:');
 
         // Redact PII before persisting
         const safePayload = redactPayload(payload);
 
+        // Build the row dynamically — only include member_name for member
+        // events so post:update / post:publish don't break if the column
+        // hasn't been migrated yet, and don't store meaningless nulls.
+        const row: Record<string, any> = {
+            event_type: eventType,
+            member_id: memberId,
+            payload: safePayload,   // stored as JSONB — PII stripped
+            processed: false,
+            announced: false,
+        };
+
+        if (isMemberEvent) {
+            row.member_name = extractMemberNameFromPayload(payload, eventType) || null;
+        }
+
         const { data, error } = await supabase
             .from('webhook_log')
-            .insert({
-                event_type: eventType,
-                member_id: memberId,
-                member_name: memberName,
-                payload: safePayload,   // stored as JSONB — PII stripped
-                processed: false,
-                announced: false,
-            })
+            .insert(row)
             .select('id')
             .single();
 
@@ -121,7 +130,7 @@ export async function logWebhookReceived(
             return null;
         }
 
-        logger.info(`📋 [WEBHOOK CACHE] Logged ${eventType} → row #${data.id} (member: ${memberId ?? 'n/a'})`);
+        logger.info(`📋 [WEBHOOK CACHE] Logged ${eventType} → row #${data.id}${isMemberEvent ? ` (member: ${memberId ?? 'n/a'})` : ''}`);
         return data.id as number;
     } catch (err) {
         logger.warn(`📋 [WEBHOOK CACHE] Exception logging webhook`, err as Error);
