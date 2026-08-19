@@ -13,8 +13,10 @@ import { config } from '../../config';
  * Handle members:pledge:create webhook event (Patreon v2)
  * Triggered when a patron creates a new pledge (starts a subscription)
  * 
- * This is the SINGLE SOURCE of Discord welcome / upgrade notifications
- * for PAID members. Free members are welcomed by the members:create handler.
+ * Handles upgrade / downgrade notifications for EXISTING members.
+ * Welcome notifications are handled by the members:create handler
+ * (which upserts the member first), so this handler's `!isExisting`
+ * branch is a safety-net fallback only.
  */
 export async function handleMembersPledgeCreate(payload: WebhookPayload): Promise<boolean> {
     try {

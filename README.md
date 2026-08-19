@@ -113,10 +113,25 @@
 
 ## 📚 Documentation
 
-- **[Setup Guide](SETUP.md)** - Detailed setup instructions for Discord, Patreon, and Supabase
-- **[Deployment Guide](DEPLOYMENT.md)** - Deploy to Railway, Render, Heroku, VPS, or run locally
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to this project
-- **[Code of Conduct](CPDSC.md)** - Community guidelines and standards
+- **[Setup Guide](SETUP.md)** — Detailed setup instructions for Discord, Patreon, and Supabase
+- **[Deployment Guide](DEPLOYMENT.md)** — Deploy to Railway, Render, Heroku, VPS, or run locally
+- **[Contributing Guide](CONTRIBUTING.md)** — How to contribute to this project
+- **[Code of Conduct](CPDSC.md)** — Community guidelines and standards
+
+### 📖 Wiki (Maintainer Knowledge Base)
+
+| Page | Description |
+|------|-------------|
+| [Home](docs/wiki/Home.md) | Index, 30-second overview, tech stack, repo orientation |
+| [Architecture](docs/wiki/Architecture.md) | Boot sequence, component diagram, graceful degradation |
+| [Configuration](docs/wiki/Configuration.md) | All env vars, `TIER_CONFIG`, `METRICS_TOKEN`, setup mode |
+| [Webhook Pipeline](docs/wiki/Webhook-Pipeline.md) | Ingestion lifecycle: verify → log → filter → queue → route → replay |
+| [Tiers & Waterfall](docs/wiki/Tiers-and-Waterfall.md) | 5-layer tier detection cascade, ranks, waterfall mechanics, hybrid broadcast |
+| [Commands](docs/wiki/Commands.md) | All 18 `/admin` subcommands + `/link` reference |
+| [Database](docs/wiki/Database.md) | 7 tables, migrations, Supabase/SQLite adapters, batch writer |
+| [Monitoring](docs/wiki/Monitoring.md) | `/metrics` endpoint, analytics dashboard, diagnostics, replay tooling |
+| [Deployment](docs/wiki/Deployment.md) | Runtime model, hosting targets, gotchas |
+| [Development](docs/wiki/Development.md) | Testing, conventions, extension points, i18n, known tech debt |
 
 ## 🚀 Quick Start
 
@@ -608,6 +623,15 @@ A: Security is handled through multiple layers:
 1. **Environment Variables**: Sensitive credentials (like your `DISCORD_TOKEN` and `PATREON_ACCESS_TOKEN`) are stored in a `.env` file or your cloud provider's secure environment dashboard. They are never hardcoded into the source code.
 2. **Webhook Verification**: The bot uses your `WEBHOOK_SECRET` to verify an HMAC signature on every request. This ensures the bot only accepts data that genuinely comes from Patreon.
 3. **Supabase RLS**: Row-level security policies protect your database from unauthorized access.
+
+> ⚠️ **Git History Warning**: If any secret (Discord token, Patreon credentials, Supabase key, webhook secret, database password) was **ever** committed to this repository — even if it has since been removed — the old value is still recoverable from `git log`. You **must** rotate (regenerate) any such credential immediately:
+> - **Discord Bot Token**: Discord Developer Portal → Bot → Reset Token
+> - **Patreon Client Secret / Access Token**: Patreon Developer Portal → Reset or re-authorize via `/oauth/start`
+> - **Supabase Keys**: Supabase Dashboard → Settings → API → Regenerate keys
+> - **Webhook Secret**: Generate a new one: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+> - **Database Passwords**: Change via your hosting provider's dashboard
+>
+> Old credentials in git history can be exploited even after removal from the working tree.
 
 ### ⚙️ Configuration & Tiers
 

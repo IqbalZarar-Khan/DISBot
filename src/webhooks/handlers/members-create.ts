@@ -10,11 +10,9 @@ import { getEventChannel } from '../../commands/admin/set-event-channel';
 /**
  * Handle members:create webhook event
  * 
- * For FREE members: sends a welcome notification (they never trigger
- * members:pledge:create because there is no pledge).
- * 
- * For PAID members: data-only tracking — the members:pledge:create handler
- * sends the welcome/upgrade notification to avoid duplicates.
+ * Sends a welcome notification for ALL new members (free or paid).
+ * The members:pledge:create handler will only send upgrade/downgrade
+ * notifications for existing members, avoiding duplicate welcomes.
  * 
  * Important: if the member already exists we preserve their current tier
  * so the pledge handler can still detect upgrades.
@@ -65,13 +63,13 @@ export async function handleMembersCreate(payload: WebhookPayload): Promise<bool
 
         queueMemberUpsert(trackedMember);
 
-        // Send welcome notification ONLY for free-tier members.
-        // Free members never trigger members:pledge:create (no pledge),
-        // so this is their only chance for a welcome message.
-        // Paid members are handled by the pledge handler.
-        const isFreeOnly = tierId === 'free';
-
-        if (isFreeOnly && !existingMember) {
+        // Send welcome notification for ALL new members (free or paid).
+        // Previously only free members were welcomed here, with paid members
+        // deferred to members:pledge:create — but that handler isn't guaranteed
+        // to fire (test payloads, Patreon delivery quirks, race conditions).
+        // The pledge handler checks `!isExisting` before sending its own welcome,
+        // so it naturally avoids duplicates since this handler upserts first.
+        if (!existingMember) {
             const eventChannelId = await getEventChannel('member_join');
             if (eventChannelId) {
                 try {
@@ -83,16 +81,16 @@ export async function handleMembersCreate(payload: WebhookPayload): Promise<bool
                             isUpgrade: false
                         });
                         await channel.send({ embeds: [embed] });
-                        logger.info(`🆓 [MEMBERS:CREATE] Free member welcome sent: ${fullName}`);
+                        logger.info(`🎉 [MEMBERS:CREATE] Welcome sent: ${fullName} (${tierName})`);
                         return true; // ✅ Discord announcement was sent
                     }
                 } catch (error) {
-                    logger.warn('Failed to send free member welcome alert', error as Error);
+                    logger.warn('Failed to send member welcome alert', error as Error);
                 }
             }
-            logger.info(`🆓 [MEMBERS:CREATE] Free member welcome NOT sent (no channel configured): ${fullName}`);
+            logger.info(`⚠️ [MEMBERS:CREATE] Welcome NOT sent (no channel configured): ${fullName}`);
         } else {
-            logger.info(`📋 [MEMBERS:CREATE] Tracked member: ${fullName} (${tierName}) — notifications deferred to pledge handler`);
+            logger.info(`📋 [MEMBERS:CREATE] Returning member tracked: ${fullName} (${tierName}) — no welcome (already known)`);
         }
 
         return false; // No Discord announcement from this handler
