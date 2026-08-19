@@ -25,19 +25,14 @@ import { logger } from '../utils/logger';
 // ── PII redaction ─────────────────────────────────────────────────────────────
 
 /**
- * Sensitive attribute keys that may appear in Patreon webhook payloads.
- * These are stripped before the payload is persisted to the webhook_log table.
+ * Identity fields that are stripped from every record type before persisting.
  */
-const SENSITIVE_KEYS = new Set([
+const IDENTITY_KEYS = new Set([
     'email',
     'full_name',
     'first_name',
     'last_name',
     'vanity',
-    'url',
-    'image_url',
-    'thumb_url',
-    'image_small_url',
     'social_connections',
     'discord_id',        // PII — the mapping is stored elsewhere
     'address',           // Sometimes present for physical-reward tiers
@@ -45,8 +40,20 @@ const SENSITIVE_KEYS = new Set([
 ]);
 
 /**
+ * URL/image fields that are only stripped from `user` records (profile
+ * links/avatars are personal data). Post and campaign URLs are public and
+ * are kept so stored payloads can be faithfully replayed.
+ */
+const USER_ONLY_KEYS = new Set([
+    'url',
+    'image_url',
+    'thumb_url',
+    'image_small_url',
+]);
+
+/**
  * Deep-clone a webhook payload and replace sensitive fields with '[REDACTED]'.
- * Only scrubs keys inside `attributes` objects to avoid breaking references.
+ * Identity fields are scrubbed everywhere; URL/image fields only on user records.
  */
 function redactPayload(payload: any): any {
     if (!payload) return payload;
@@ -59,8 +66,9 @@ function redactPayload(payload: any): any {
 
             // Scrub attributes at the current level
             if (obj.attributes && typeof obj.attributes === 'object') {
+                const isUserRecord = obj.type === 'user';
                 for (const key of Object.keys(obj.attributes)) {
-                    if (SENSITIVE_KEYS.has(key)) {
+                    if (IDENTITY_KEYS.has(key) || (isUserRecord && USER_ONLY_KEYS.has(key))) {
                         obj.attributes[key] = '[REDACTED]';
                     }
                 }
@@ -204,6 +212,32 @@ export async function getMissedAnnouncements(
     } catch (err) {
         logger.warn(`📋 [WEBHOOK CACHE] Exception fetching missed announcements`, err as Error);
         return [];
+    }
+}
+
+/**
+ * Fetch a single webhook_log row by id (full row, including payload).
+ * Used by the replay command to re-dispatch a specific entry.
+ */
+export async function getWebhookLogById(id: number): Promise<WebhookLogRow | null> {
+    try {
+        const supabase = getSupabase();
+
+        const { data, error } = await supabase
+            .from('webhook_log')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error) {
+            logger.warn(`📋 [WEBHOOK CACHE] Could not fetch webhook log #${id}: ${error.message}`);
+            return null;
+        }
+
+        return (data as WebhookLogRow) ?? null;
+    } catch (err) {
+        logger.warn(`📋 [WEBHOOK CACHE] Exception fetching webhook log #${id}`, err as Error);
+        return null;
     }
 }
 

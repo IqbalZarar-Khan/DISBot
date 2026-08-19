@@ -16,6 +16,7 @@ import { handleServerStats } from './server-stats';
 import { handleRoleMap } from './role-map';
 import { handleDashboard } from './dashboard-cmd';
 import { handleErrorLog } from './error-log';
+import { handleReplayWebhook } from './replay-webhook';
 import { logger } from '../../utils/logger';
 
 /**
@@ -92,6 +93,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
 
             case 'error-log':
                 await handleErrorLog(interaction);
+                break;
+
+            case 'replay-webhook':
+                await handleReplayWebhook(interaction);
                 break;
 
             default:

@@ -4,6 +4,23 @@ import { markWebhookProcessed } from '../database/webhookCache';
 import { recordWebhook } from '../commands/admin/status';
 
 /**
+ * Event types this bot has a handler for. Exported so tooling (e.g. the
+ * replay command) can distinguish "missed announcement" from "event we
+ * intentionally don't process".
+ */
+export const SUPPORTED_WEBHOOK_EVENTS: ReadonlySet<string> = new Set<WebhookEventType>([
+    'members:create',
+    'members:update',
+    'members:delete',
+    'members:pledge:create',
+    'members:pledge:update',
+    'members:pledge:delete',
+    'posts:publish',
+    'posts:update',
+    'posts:delete',
+]);
+
+/**
  * Route webhook events to appropriate handlers.
  * Extracted from server.ts so it can be used by both the Fastify endpoint
  * (direct mode / fallback) and the BullMQ worker (queue mode).
@@ -18,6 +35,7 @@ export async function routeWebhookEvent(
     logId: number | null = null
 ): Promise<void> {
     let announced = false;
+    let notes: string | undefined;
 
     try {
         logger.info(`🔀 [ROUTER] Routing event: ${eventType}`);
@@ -89,10 +107,12 @@ export async function routeWebhookEvent(
             default:
                 logger.warn(`⚠️ [IGNORED] No handler registered for event type: ${eventType}`);
                 logger.warn(`⚠️ [IGNORED] Available handlers: members:*, members:pledge:*, posts:*`);
+                notes = `No handler registered for event type: ${eventType}`;
+                break;
         }
 
         // Mark the cached row as successfully processed
-        await markWebhookProcessed(logId, announced);
+        await markWebhookProcessed(logId, announced, notes);
         recordWebhook(true); // ✅ increment webhook success counter
 
     } catch (error) {

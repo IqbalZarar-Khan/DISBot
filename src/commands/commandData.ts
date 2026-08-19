@@ -233,6 +233,37 @@ export function getCommandData() {
                             .setMinValue(1)
                             .setMaxValue(25)
                     )
+            )
+            .addSubcommand(subcommand =>
+                subcommand
+                    .setName('replay-webhook')
+                    .setDescription('Audit the webhook log and replay entries that never got announced')
+                    .addStringOption(option =>
+                        option
+                            .setName('action')
+                            .setDescription('What to do')
+                            .setRequired(false)
+                            .addChoices(
+                                { name: '📋 View recent webhooks (default)', value: 'view' },
+                                { name: '🔁 Replay a specific log entry', value: 'replay' },
+                                { name: '🔁 Replay all missed in window', value: 'replay-missed' }
+                            )
+                    )
+                    .addIntegerOption(option =>
+                        option
+                            .setName('log_id')
+                            .setDescription('webhook_log row id to replay (required for "replay")')
+                            .setRequired(false)
+                            .setMinValue(1)
+                    )
+                    .addIntegerOption(option =>
+                        option
+                            .setName('hours')
+                            .setDescription('Lookback window in hours (default 24, max 168)')
+                            .setRequired(false)
+                            .setMinValue(1)
+                            .setMaxValue(168)
+                    )
             ),
         new SlashCommandBuilder()
             .setName('link')

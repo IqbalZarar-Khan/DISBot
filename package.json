@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Patreon Tier-Waterfall Bot for automated content distribution to Discord",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
     "dev:ngrok": "ts-node scripts/dev-ngrok.ts",

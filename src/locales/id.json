@@ -1,0 +1,76 @@
+{
+    "bot": {
+        "starting": "🚀 Memulai Patreon Tier-Waterfall Bot...",
+        "login_attempt": "🔑 Percobaan login Discord {{attempt}}/{{max}}...",
+        "login_success": "✅ Login Discord berhasil",
+        "login_failed": "⚠️ Login gagal: {{reason}}",
+        "login_retry": "   Mencoba lagi dalam {{delay}} detik...",
+        "login_exhausted": "❌ Semua percobaan login gagal. Bot tidak dapat terhubung ke Discord.",
+        "shutdown": "👋 Mematikan bot...",
+        "ready": "✅ Bot masuk sebagai {{tag}}"
+    },
+    "commands": {
+        "admin_only": "⛔ Hanya Root Admin yang dapat menggunakan perintah ini.",
+        "unknown": "❌ Perintah admin tidak dikenal.",
+        "error": "❌ Terjadi kesalahan saat menjalankan perintah ini.",
+        "error_check_logs": "❌ Terjadi kesalahan saat menjalankan perintah ini. Silakan periksa log."
+    },
+    "setup": {
+        "no_tiers": "❌ Belum ada tier yang dikonfigurasi. Jalankan `/admin sync-tiers` terlebih dahulu untuk mengambil tier dari Patreon.",
+        "step1_title": "🔧 Penyiapan Tier Interaktif",
+        "step1_desc": "**Langkah 1/2** — Pilih tier untuk dipetakan ke kanal Discord.",
+        "step2_desc": "**Langkah 2/2** — Pilih kanal Discord untuk **{{tier}}**",
+        "success_title": "✅ Tier Berhasil Dipetakan",
+        "timeout": "⏰ Penyiapan habis waktu. Jalankan `/admin setup` lagi saat sudah siap.",
+        "select_tier": "Pilih tier Patreon untuk dipetakan...",
+        "select_channel": "Pilih kanal untuk {{tier}}...",
+        "current_mappings": "Pemetaan Saat Ini",
+        "unmapped": "⚠️ *belum dipetakan*"
+    },
+    "sync": {
+        "title": "✅ Tier Berhasil Disinkronkan",
+        "description": "Mengambil **{{count}}** tier dari Patreon dan memperbarui basis data.",
+        "no_tiers": "⚠️ Tidak ada tier yang dipublikasikan di kampanye Patreon Anda.",
+        "missing_creds": "❌ `PATREON_ACCESS_TOKEN` atau `PATREON_CAMPAIGN_ID` tidak ada di environment.",
+        "expired_token": "❌ API Patreon mengembalikan 401 — token akses Anda mungkin sudah kedaluwarsa.",
+        "synced_tiers": "Tier yang Disinkronkan",
+        "unmapped_tiers": "⚠️ Tier Belum Dipetakan"
+    },
+    "stats": {
+        "title": "📊 Dasbor Analitik Patron",
+        "total_patrons": "👥 Total Patron",
+        "active_tiers": "🏷️ Tier Aktif",
+        "tracked_posts": "📝 Post Terlacak",
+        "growth_30d": "📈 Pertumbuhan (30 Hari Terakhir)",
+        "tier_distribution": "🎯 Distribusi Tier",
+        "recent_activity": "🕐 Aktivitas Terbaru",
+        "new_patrons": "Patron baru: **{{count}}**",
+        "active_changes": "Perubahan aktif: **{{count}}** upgrade/perubahan",
+        "new_this_week": "Baru minggu ini: **{{count}}**"
+    },
+    "webhook": {
+        "signature_failed": "⛔ [KEAMANAN] Verifikasi signature GAGAL",
+        "signature_passed": "✅ [KEAMANAN] Verifikasi signature berhasil",
+        "duplicate": "🔁 [DEDUP] Webhook duplikat terdeteksi — dilewati",
+        "incoming": "📡 [LALU LINTAS WEBHOOK MASUK]"
+    },
+    "poller": {
+        "starting": "🔄 [POLLER] Dimulai — memeriksa setiap {{interval}} menit",
+        "stopped": "🔄 [POLLER] Dihentikan",
+        "checking": "🔄 [POLLER] Memeriksa perubahan tier senyap di Patreon...",
+        "no_changes": "🔄 [POLLER] Tidak ada perubahan tier senyap terdeteksi",
+        "detected": "🔄 [POLLER] Mendeteksi {{count}} perubahan tier senyap",
+        "silent_change": "🔄 [POLLER] Perubahan tier senyap: \"{{title}}\" ({{old}} → {{new}})"
+    },
+    "errors": {
+        "failed_start": "❌ Gagal memulai bot:",
+        "webhook_server_fail": "❌ Gagal memulai server webhook:",
+        "config_invalid_json": "❌ FATAL: TIER_CONFIG bukan JSON yang valid.",
+        "config_not_array": "❌ FATAL: TIER_CONFIG harus berupa array JSON",
+        "config_invalid_entry": "❌ FATAL: TIER_CONFIG memiliki entri tier yang tidak valid:"
+    },
+    "messages": {
+        "set_channel": "✅ **Pemetaan Tier Diperbarui**\n\nTier **{{tier}}** sekarang dipetakan ke {{channel}}.",
+        "channel_text_only": "❌ Silakan pilih kanal teks."
+    }
+}

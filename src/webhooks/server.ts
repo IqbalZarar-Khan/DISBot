@@ -1,5 +1,4 @@
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import * as crypto from 'crypto';
 import { verifyWebhookSignature } from './verify';
 import { logger } from '../utils/logger';
 import { WebhookEventType } from '../database/schema';
@@ -9,88 +8,9 @@ import { enqueueWebhookEvent } from '../queue/webhookQueue';
 import { isRedisConnected } from '../database/redis';
 import { dashboardPlugin } from './dashboard';
 import { logWebhookReceived } from '../database/webhookCache';
-
-// ── Webhook idempotency guard ──────────────────────────────────────
-// Prevents duplicate notifications when Patreon retries the same webhook.
-const DEDUP_TTL_MS = 60_000; // 60 seconds
-const recentWebhooks = new Map<string, number>(); // hash → timestamp
-
-// ── Ghost webhook filter ───────────────────────────────────────────
-// Discards webhooks where the meaningful state hasn't changed.
-const GHOST_TTL_MS = 5 * 60_000; // 5 minutes
-const recentStates = new Map<string, number>(); // stateHash → timestamp
-
-// Clean expired entries every 5 minutes
-setInterval(() => {
-    const now = Date.now();
-    for (const [hash, ts] of recentWebhooks) {
-        if (now - ts > DEDUP_TTL_MS) recentWebhooks.delete(hash);
-    }
-    for (const [hash, ts] of recentStates) {
-        if (now - ts > GHOST_TTL_MS) recentStates.delete(hash);
-    }
-}, 5 * 60_000);
-
-function isDuplicate(body: string, eventType: string): boolean {
-    const hash = crypto.createHash('md5').update(eventType + body).digest('hex');
-    const now = Date.now();
-    const lastSeen = recentWebhooks.get(hash);
-    if (lastSeen && now - lastSeen < DEDUP_TTL_MS) return true;
-    recentWebhooks.set(hash, now);
-    return false;
-}
-
-/**
- * Ghost webhook filter: checks if the meaningful state actually changed.
- * Returns true if the webhook should be silently discarded.
- */
-function isGhostWebhook(payload: any, eventType: string): boolean {
-    // Only filter update events — creates/deletes always matter
-    if (!eventType.includes('update')) return false;
-
-    try {
-        const data = payload?.data;
-        if (!data) return false;
-
-        // Build a state fingerprint from meaningful fields only
-        const attrs = data.attributes || {};
-        const rels = data.relationships || {};
-
-        const stateFields: Record<string, any> = {
-            id: data.id,
-            event: eventType,
-        };
-
-        // Post-relevant fields
-        if (eventType.includes('post')) {
-            stateFields.title = attrs.title;
-            stateFields.min_cents = attrs.min_cents_pledged_to_view;
-            stateFields.tiers = rels?.access_rules?.data?.map((r: any) => r.id).sort() || [];
-            stateFields.status = attrs.current_user_can_view;
-        }
-
-        // Member-relevant fields
-        if (eventType.includes('member') || eventType.includes('pledge')) {
-            stateFields.patron_status = attrs.patron_status;
-            stateFields.pledge_amount = attrs.currently_entitled_amount_cents;
-            stateFields.tier = rels?.currently_entitled_tiers?.data?.[0]?.id;
-        }
-
-        const stateHash = crypto.createHash('md5')
-            .update(JSON.stringify(stateFields))
-            .digest('hex');
-
-        const now = Date.now();
-        const lastSeen = recentStates.get(stateHash);
-        if (lastSeen && now - lastSeen < GHOST_TTL_MS) {
-            return true; // Same state within window → ghost webhook
-        }
-        recentStates.set(stateHash, now);
-        return false;
-    } catch {
-        return false; // On any error, let the webhook through
-    }
-}
+import { isDuplicate, isGhostWebhook, startFilterCleanupInterval } from './webhookFilters';
+import { getDiagnosticCounters } from '../commands/admin/status';
+import { getWebhookQueue } from '../queue/webhookQueue';
 
 let fastify: FastifyInstance | null = null;
 
@@ -103,6 +23,9 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
         ignoreTrailingSlash: true,
         ignoreDuplicateSlashes: true,
     });
+
+    // Start the dedup/ghost filter state cleanup (idempotent)
+    startFilterCleanupInterval();
 
     // ── Raw body parser for signature verification ──────────────────
     // Fastify doesn't have Express's verify callback, so we capture
@@ -136,6 +59,75 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
     // Health check endpoint (explicit)
     fastify.get('/health', async (_request: FastifyRequest, reply: FastifyReply) => {
         return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
+    });
+
+    // ── Prometheus metrics endpoint ──────────────────────────────────
+    // Exposes runtime counters in the Prometheus text exposition format.
+    // Optional auth: set METRICS_TOKEN to require `Authorization: Bearer <token>`
+    // (or `?token=<token>`). If unset, the endpoint is open (local dev default).
+    fastify.get('/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
+        const requiredToken = process.env.METRICS_TOKEN;
+        if (requiredToken) {
+            const authHeader = (request.headers['authorization'] || '') as string;
+            const bearer = authHeader.replace(/^Bearer\s+/i, '');
+            const queryToken = (request.query as Record<string, string>).token || '';
+            if (bearer !== requiredToken && queryToken !== requiredToken) {
+                return reply.code(401).send({ error: 'Unauthorized' });
+            }
+        }
+
+        const counters = getDiagnosticCounters();
+        const mem = process.memoryUsage();
+
+        const lines: string[] = [
+            '# HELP disbot_uptime_seconds Process uptime in seconds.',
+            '# TYPE disbot_uptime_seconds gauge',
+            `disbot_uptime_seconds ${process.uptime().toFixed(2)}`,
+            '# HELP disbot_process_resident_memory_bytes Resident memory size in bytes.',
+            '# TYPE disbot_process_resident_memory_bytes gauge',
+            `disbot_process_resident_memory_bytes ${mem.rss}`,
+            '# HELP disbot_process_heap_used_bytes Heap memory currently in use, in bytes.',
+            '# TYPE disbot_process_heap_used_bytes gauge',
+            `disbot_process_heap_used_bytes ${mem.heapUsed}`,
+            '# HELP disbot_webhooks_success_total Webhooks processed successfully since last counter load.',
+            '# TYPE disbot_webhooks_success_total counter',
+            `disbot_webhooks_success_total ${counters.webhookSuccessCount}`,
+            '# HELP disbot_webhooks_failed_total Webhooks whose handler threw an error.',
+            '# TYPE disbot_webhooks_failed_total counter',
+            `disbot_webhooks_failed_total ${counters.webhookFailCount}`,
+            '# HELP disbot_tier_detection_success_total Post tier detections that resolved to a mapped tier.',
+            '# TYPE disbot_tier_detection_success_total counter',
+            `disbot_tier_detection_success_total ${counters.tierDetectionSuccess}`,
+            '# HELP disbot_tier_detection_failed_total Post tier detections that fell back or failed.',
+            '# TYPE disbot_tier_detection_failed_total counter',
+            `disbot_tier_detection_failed_total ${counters.tierDetectionFail}`,
+            '# HELP disbot_last_webhook_timestamp_seconds Unix timestamp of the last received webhook (0 = never).',
+            '# TYPE disbot_last_webhook_timestamp_seconds gauge',
+            `disbot_last_webhook_timestamp_seconds ${counters.lastWebhookTimestamp ? Math.floor(counters.lastWebhookTimestamp / 1000) : 0}`,
+            '# HELP disbot_redis_connected Whether the Redis connection is up (1) or not (0).',
+            '# TYPE disbot_redis_connected gauge',
+            `disbot_redis_connected ${isRedisConnected() ? 1 : 0}`,
+        ];
+
+        // Queue depth (only available when Redis/BullMQ is active)
+        const queue = getWebhookQueue();
+        if (queue && isRedisConnected()) {
+            try {
+                const counts = await queue.getJobCounts('waiting', 'active', 'delayed', 'failed');
+                lines.push(
+                    '# HELP disbot_queue_jobs Jobs in the BullMQ webhook queue by state.',
+                    '# TYPE disbot_queue_jobs gauge',
+                    `disbot_queue_jobs{state="waiting"} ${counts.waiting ?? 0}`,
+                    `disbot_queue_jobs{state="active"} ${counts.active ?? 0}`,
+                    `disbot_queue_jobs{state="delayed"} ${counts.delayed ?? 0}`,
+                    `disbot_queue_jobs{state="failed"} ${counts.failed ?? 0}`,
+                );
+            } catch {
+                // Queue stats are best-effort — skip on error
+            }
+        }
+
+        return reply.type('text/plain; version=0.0.4').send(lines.join('\n') + '\n');
     });
 
     // ── OAuth Flow: Eliminates need for Postman/curl ─────────────────
@@ -204,7 +196,7 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
                         <h1 style="color:#4ade80">✅ Authorization Successful!</h1>
                         <p>Your Patreon tokens have been saved to the database.</p>
                         <p style="color:#888">You can close this tab and return to your bot.</p>
-                        <p style="font-size:0.8em;color:#666;margin-top:2em">Access Token: ${access_token.substring(0, 8)}...${access_token.slice(-4)}</p>
+                        <p style="font-size:0.8em;color:#666;margin-top:2em">Access token saved securely. You can close this tab.</p>
                     </div>
                 </body>
                 </html>

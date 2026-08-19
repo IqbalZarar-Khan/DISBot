@@ -37,9 +37,8 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<boole
         logger.info(`⏳ [DB CHECK] Connecting to Supabase...`);
         const existingPost = await db.getPost(postId);
 
-        // 🕵️ X-RAY DEBUG: See exactly what Supabase returns
-        console.log('🕵️ DEBUG X-RAY:', JSON.stringify(existingPost, null, 2));
-        logger.info(`🕵️ [X-RAY] Raw result: ${JSON.stringify(existingPost)}`);
+        // Debug logging removed for production safety
+        logger.info(`🕵️ [X-RAY] Post lookup result: ${existingPost ? 'found' : 'not found'}`);
 
         if (existingPost) {
             logger.info(`✅ [DB CHECK] Result: FOUND`);

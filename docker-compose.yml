@@ -20,7 +20,7 @@ services:
     environment:
       POSTGRES_DB: disbot
       POSTGRES_USER: disbot
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -51,10 +51,10 @@ services:
       db:
         condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://disbot:${DB_PASSWORD:-changeme}@db:5432/disbot
+      PGRST_DB_URI: postgres://disbot:${DB_PASSWORD:?Set DB_PASSWORD in .env}@db:5432/disbot
       PGRST_DB_SCHEMAS: public
       PGRST_DB_ANON_ROLE: disbot
-      PGRST_JWT_SECRET: ${POSTGREST_JWT_SECRET:-super-secret-jwt-token-for-local-dev-min-32-chars}
+      PGRST_JWT_SECRET: ${POSTGREST_JWT_SECRET:?Set POSTGREST_JWT_SECRET in .env (min 32 chars)}
 
   # ── DISBot ────────────────────────────────────────────────────────
   bot:
@@ -71,7 +71,7 @@ services:
     environment:
       # Point the Supabase JS SDK at the local PostgREST instance
       SUPABASE_URL: http://postgrest:3000
-      SUPABASE_KEY: ${POSTGREST_JWT_SECRET:-super-secret-jwt-token-for-local-dev-min-32-chars}
+      SUPABASE_KEY: ${POSTGREST_JWT_SECRET:?Set POSTGREST_JWT_SECRET in .env (min 32 chars)}
       REDIS_URL: redis://redis:6379
       WEBHOOK_PORT: "3000"
       NODE_ENV: production
