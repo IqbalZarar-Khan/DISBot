@@ -33,14 +33,3 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
-
-# Outdated documentation (not for distribution)
-DEPLOY_QUICK.md
-PRD&IMPIM.md
-QUICKSTART.md
-
-# Session handoff (local only)
-leftoff.md
-HANDOFF.md
-*PRD*.md
-sessions.md
