@@ -124,6 +124,7 @@
 |------|-------------|
 | [Home](docs/wiki/Home.md) | Index, 30-second overview, tech stack, repo orientation |
 | [Architecture](docs/wiki/Architecture.md) | Boot sequence, component diagram, graceful degradation |
+| [Diagrams](docs/wiki/Diagrams.md) | Mermaid graphs: system overview, webhook lifecycle, waterfall, data layers, module map |
 | [Configuration](docs/wiki/Configuration.md) | All env vars, `TIER_CONFIG`, `METRICS_TOKEN`, setup mode |
 | [Webhook Pipeline](docs/wiki/Webhook-Pipeline.md) | Ingestion lifecycle: verify → log → filter → queue → route → replay |
 | [Tiers & Waterfall](docs/wiki/Tiers-and-Waterfall.md) | 5-layer tier detection cascade, ranks, waterfall mechanics, hybrid broadcast |

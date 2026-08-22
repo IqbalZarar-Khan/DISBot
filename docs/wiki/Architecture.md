@@ -76,5 +76,6 @@ The bot is deliberately resilient to partial infrastructure:
 - **No core env config** → setup mode; only the web server + wizard run.
 - **SQLite fallback** (`sqliteAdapter.ts`) mirrors key tables for local/offline runs.
 
-See [Webhook Pipeline](Webhook-Pipeline.md) for the request lifecycle and
-[Database](Database.md) for storage details.
+See [Webhook Pipeline](Webhook-Pipeline.md) for the request lifecycle,
+[Database](Database.md) for storage details, and [Diagrams](Diagrams.md) for rendered
+Mermaid graphs of all of the above.

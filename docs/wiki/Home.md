@@ -13,6 +13,7 @@ This wiki is the maintainers' knowledge base. For hands-on setup and deployment,
 | Page | What's in it |
 |---|---|
 | [Architecture](Architecture.md) | Boot sequence, components, and how they fit together |
+| [Diagrams](Diagrams.md) | Mermaid graphs: system overview, webhook lifecycle, waterfall, data layers, modules |
 | [Configuration](Configuration.md) | Every environment variable, `TIER_CONFIG`, and setup mode |
 | [Webhook Pipeline](Webhook-Pipeline.md) | Ingestion lifecycle: verify → log → filter → queue → route → replay |
 | [Tiers & Waterfall](Tiers-and-Waterfall.md) | Tier detection cascade, ranks, waterfall logic, hybrid broadcast |
