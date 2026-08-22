@@ -51,4 +51,4 @@ fully self-hosted runs) · Railway/Render/PM2 configs included.
 - `src/queue/` — BullMQ queue + worker
 - `src/utils/` — tier ranking, formatters, logger + error explanation engine, poller, digests, i18n
 - `supabase/migrations/` — SQL migrations (applied automatically at boot)
-- `leftoff.md` / `HANDOFF.md` — rolling session notes (gitignored)
+- `sessions.md` / `HANDOFF.md` — rolling session notes (gitignored)
