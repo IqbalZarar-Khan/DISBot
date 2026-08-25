@@ -55,7 +55,7 @@ handlers ──▶ db.ts (facade + CRUD helpers)
 ```
 
 - **Batch writer** — bursts of member events coalesce into single upserts; protected by timestamp guards against out-of-order writes.
-- **DB cache** — tier mappings, config, and templates are cached at `ClientReady`; `/admin sync-tiers` publishes `disbot:cache:invalidate` across Redis cluster.
+- **DB cache** — tier mappings, config, and templates are cached at `ClientReady`; invalidation broadcasts across instances via both Redis pub/sub (`disbot:cache:invalidate`) and Supabase Realtime WebSocket (`postgres_changes` on `tier_mappings`/`bot_config`) for instant sync without Redis.
 - **SQLite fallback** — implements the same helper surface for local dev, auto-adding missing schema columns on initialization.
 
 ## Persistence of Diagnostics, Errors & Schedulers

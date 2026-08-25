@@ -18,6 +18,8 @@ const REDIS_KEY_CONFIG = 'disbot:cache:config';
 const REDIS_TTL_SECONDS = 5 * 60; // 5 minutes
 const REDIS_INVALIDATION_CHANNEL = 'disbot:cache:invalidate';
 
+import { RealtimeChannel } from '@supabase/supabase-js';
+
 // L2 in-memory fallback
 let tierMappingsCache: TierMapping[] = [];
 let configCache: Map<string, string> = new Map();
@@ -25,6 +27,7 @@ let lastRefresh = 0;
 const CACHE_TTL_MS = 5 * 60_000; // 5 minutes
 let refreshTimer: NodeJS.Timeout | null = null;
 let subscriberRedis: any = null; // Dedicated Redis subscriber connection
+let realtimeChannel: RealtimeChannel | null = null; // Supabase Realtime WebSocket channel
 
 /**
  * Initialize the cache and start automatic refresh.
@@ -33,7 +36,7 @@ export async function initDbCache(): Promise<void> {
     await refreshCache();
     refreshTimer = setInterval(() => refreshCache(), CACHE_TTL_MS);
 
-    // Subscribe to invalidation signals from other instances
+    // 1. Subscribe to Redis pub/sub invalidation signals (when Redis is available)
     try {
         if (isRedisConnected()) {
             const Redis = (await import('ioredis')).default;
@@ -42,16 +45,46 @@ export async function initDbCache(): Promise<void> {
             subscriberRedis.subscribe(REDIS_INVALIDATION_CHANNEL);
             subscriberRedis.on('message', (channel: string) => {
                 if (channel === REDIS_INVALIDATION_CHANNEL) {
-                    logger.info('🗄️ [CACHE] Received invalidation signal — refreshing...');
+                    logger.info('🗄️ [CACHE] Received Redis invalidation signal — refreshing...');
                     refreshCache().catch(() => {});
                 }
             });
         }
     } catch {
-        // Redis sub unavailable — 5-minute polling is the fallback
+        // Redis sub unavailable
     }
 
-    logger.info('🗄️ [CACHE] DB cache initialized (Redis-backed with in-memory fallback)');
+    // 2. Subscribe to Supabase Realtime (Postgres Changes) — works without Redis!
+    try {
+        const supabase = getSupabase();
+        realtimeChannel = supabase
+            .channel('disbot-cache-sync')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'tier_mappings' },
+                () => {
+                    logger.info('🗄️ [CACHE] Realtime invalidation (tier_mappings) — refreshing...');
+                    refreshCache().catch(() => {});
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'bot_config' },
+                () => {
+                    logger.info('🗄️ [CACHE] Realtime invalidation (bot_config) — refreshing...');
+                    refreshCache().catch(() => {});
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    logger.info('🗄️ [CACHE] Supabase Realtime cache synchronization active');
+                }
+            });
+    } catch {
+        // Supabase Realtime unavailable (e.g. SQLite fallback)
+    }
+
+    logger.info('🗄️ [CACHE] DB cache initialized (Redis pub/sub + Supabase Realtime + in-memory fallback)');
 }
 
 export function stopDbCache(): void {
@@ -63,6 +96,15 @@ export function stopDbCache(): void {
         subscriberRedis.disconnect();
         subscriberRedis = null;
     }
+    if (realtimeChannel) {
+        try {
+            const supabase = getSupabase();
+            supabase.removeChannel(realtimeChannel);
+        } catch {
+            // Ignore channel cleanup errors
+        }
+        realtimeChannel = null;
+    }
 }
 
 /**
@@ -70,18 +112,26 @@ export function stopDbCache(): void {
  * Call this after sync-tiers or any operation that mutates cached data.
  */
 export async function invalidateCache(): Promise<void> {
-    // Refresh local cache immediately
+    // 1. Refresh local cache immediately
     await refreshCache();
 
-    // Notify other instances via Redis pub/sub
+    // 2. Notify other instances via Redis pub/sub (if Redis is connected)
     if (isRedisConnected()) {
         try {
             const redis = getRedis()!;
             await redis.publish(REDIS_INVALIDATION_CHANNEL, 'invalidate');
-            logger.info('🗄️ [CACHE] Published invalidation signal to all instances');
+            logger.info('🗄️ [CACHE] Published invalidation signal to Redis cluster');
         } catch {
-            // Non-critical — other instances will refresh on their 5-minute cycle
+            // Non-critical
         }
+    }
+
+    // 3. Persist invalidation timestamp in bot_config (triggers Supabase Realtime for non-Redis nodes)
+    try {
+        const { setConfig } = await import('./db');
+        await setConfig('cache_invalidation_version', String(Date.now()));
+    } catch {
+        // Non-critical
     }
 }
 
@@ -100,6 +150,17 @@ async function refreshCache(): Promise<void> {
 
         if (!tiersErr && tiers) {
             tierMappingsCache = tiers as TierMapping[];
+
+            // Synchronize global in-memory tier maps across instances
+            try {
+                const { tierIdMap, tierRankings } = await import('../utils/tierRanking');
+                for (const t of tierMappingsCache) {
+                    if (t.tier_id) tierIdMap[t.tier_id] = t.tier_name;
+                    if (t.tier_rank !== undefined) tierRankings[t.tier_name] = t.tier_rank;
+                }
+            } catch {
+                // Non-critical in-memory sync
+            }
 
             // Write to Redis
             if (isRedisConnected()) {
