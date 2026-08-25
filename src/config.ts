@@ -138,7 +138,7 @@ export const config: Config = {
     roleSyncEnabled: (process.env.DISCORD_ROLE_SYNC_ENABLED || 'false').toLowerCase() === 'true',
 
     // Public URL
-    publicUrl: getEnvVar('PUBLIC_URL', false) || '',
+    publicUrl: (getEnvVar('PUBLIC_URL', false) || '').replace(/\/+$/, ''),
 
     // Tier Configuration
     tierConfig: parseTierConfig()

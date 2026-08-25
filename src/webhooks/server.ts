@@ -11,6 +11,7 @@ import { logWebhookReceived } from '../database/webhookCache';
 import { isDuplicateAsync, isGhostWebhook, startFilterCleanupInterval } from './webhookFilters';
 import { getDiagnosticCounters } from '../commands/admin/status';
 import { getWebhookQueue } from '../queue/webhookQueue';
+import { config } from '../config';
 
 let fastify: FastifyInstance | null = null;
 
@@ -135,7 +136,7 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
     fastify.get('/oauth/start', async (_request: FastifyRequest, reply: FastifyReply) => {
         const clientId = process.env.PATREON_CLIENT_ID;
         const portNum = process.env.PORT || process.env.WEBHOOK_PORT || '3000';
-        const host = process.env.PUBLIC_URL || `http://localhost:${portNum}`;
+        const host = (config.publicUrl || process.env.PUBLIC_URL || `http://localhost:${portNum}`).replace(/\/+$/, '');
         const redirectUri = `${host}/oauth/redirect`;
 
         if (!clientId) {
@@ -158,7 +159,7 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
         const clientId = process.env.PATREON_CLIENT_ID;
         const clientSecret = process.env.PATREON_CLIENT_SECRET;
         const portNum = process.env.PORT || process.env.WEBHOOK_PORT || '3000';
-        const host = process.env.PUBLIC_URL || `http://localhost:${portNum}`;
+        const host = (config.publicUrl || process.env.PUBLIC_URL || `http://localhost:${portNum}`).replace(/\/+$/, '');
         const redirectUri = `${host}/oauth/redirect`;
 
         if (!clientId || !clientSecret) {
