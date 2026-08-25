@@ -41,17 +41,18 @@ curl -H "Authorization: Bearer $METRICS_TOKEN" https://your-host/metrics
   detection rates, recent errors, tier mappings.
 - **`/admin error-log`** — ring buffer of the last 100 errors with severity badges and
   `explainError()` cause/fix explanations (20+ recognized patterns; add new patterns as `if`
-  blocks before the fallback in `src/utils/logger.ts`). In-memory only — resets on restart.
+  blocks before the fallback in `src/utils/logger.ts`). Persisted to `bot_config` to survive restarts.
 - **`/admin replay-webhook`** — audit `webhook_log` and re-dispatch missed announcements;
   see [Webhook Pipeline](Webhook-Pipeline.md#replay-admin-replay-webhook).
 - **`/admin debug-logs`** / **`/admin server-stats`** — raw debug trail and host vitals.
 
 ## Scheduled Reports
 
-- **Weekly digest** (`src/utils/weeklyDigest.ts`) — hourly check, fires once on Sundays:
+- **Weekly digest** (`src/utils/weeklyDigest.ts`) — hourly check, fires once on Sundays (persisted to DB to catch up if restarted):
   three embeds to the root admin with totals/new/changes from `tracked_members`, plus
   cancellations and tier changes derived from `webhook_log`.
-- **Anniversary checker** — daily 1yr/2yr pledge celebrations.
+- **Anniversary checker** — daily 1yr/2yr pledge celebrations (persists execution date to DB).
+- **Proactive Token Refresh** — runs every 25 days and on boot to keep Patreon OAuth tokens refreshed.
 - **Keyword detector** — configurable keyword alerts on post content.
 - **Health checks** — periodic self-tests logged to the admin log channel.
 
@@ -62,9 +63,9 @@ curl -H "Authorization: Bearer $METRICS_TOKEN" https://your-host/metrics
 | Post announced to wrong/no tier | `/admin error-log`, tier-detection DMs | Fix `TIER_CONFIG` / mappings; `/admin replay-webhook action:replay log_id:<id>` |
 | Webhook verified but no announcement | `webhook_log` row: `processed=true, announced=false` | Replay it; check tier mappings exist |
 | Handler threw | notes: `Handler threw: …` | Check `/admin error-log` explanation; replay after fixing |
-| Phantom 401s from Patreon API | `/admin status` Patreon field | Re-run `/oauth/start` to refresh tokens |
+| Phantom 401s from Patreon API | `/admin status` Patreon field | Proactive refresh runs every 25d; re-run `/oauth/start` if refresh token was revoked |
 | Queue backlog | `disbot_queue_jobs{state="waiting"}` | Check Redis health / worker logs |
-| Duplicate announcements | dedup guard only covers 60s | Check for multiple bot instances pointing at one Redis |
+| Duplicate announcements | dedup guard covers Redis SETNX 60s | Check for multiple distinct deployments without Redis connectivity |
 
 ## Logs
 

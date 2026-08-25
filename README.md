@@ -694,27 +694,22 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 
 ## 🆕 Recent Updates
 
-### Latest (Jun 2026)
-- ✅ **📊 Enhanced Weekly Digest**: Sunday report now includes cancellation details (who cancelled + count) and membership changes (who changed + old→new tier)
-- ✅ **📋 Webhook Event Cache**: Every verified webhook persisted to `webhook_log` for audit trail, missed-announcement recovery, and weekly digest data
-- ✅ **🚨 `/admin error-log`**: In-Discord error viewer with severity classification (low/medium/high/critical), cause/fix explanations, and filter by severity
-- ✅ **⚡ Fastify Migration**: Express replaced with Fastify for 2–3× webhook throughput and lower CPU overhead
-- ✅ **📬 BullMQ + Redis Queue**: Webhook events enqueued via BullMQ for controlled concurrency with 3 retries + exponential backoff; auto-fallback to direct processing when Redis is unavailable
-- ✅ **🗄️ Redis-Backed Caching**: Centralized cache layer supporting horizontal scaling across multiple bot instances
-- ✅ **📝 Batched DB Writes**: Member upserts buffered in memory and flushed every 5 seconds to reduce Supabase query volume
-- ✅ **🔄 Automated Discord Role Sync**: `/admin role-map` maps Patreon tiers to Discord roles; auto-grants/revokes on pledge create, update, delete, and departure events
-- ✅ **🔗 `/link` Command**: Members self-link their Discord account to Patreon via email, name, or member ID — enables role sync
-- ✅ **📊 Web Analytics Dashboard**: JWT-gated Chart.js SPA served at `/dashboard` — patron growth (30-day), tier distribution donut chart, recent activity table; link generated via `/admin dashboard` (expires 1hr)
-- ✅ **🔀 Centralized Event Router**: Webhook routing extracted into `router.ts` for reuse by both Fastify (direct) and BullMQ worker (queued)
-- ✅ **🔁 Startup Role Reconciliation**: On boot, compares all tracked members against actual Discord roles and fixes any drift that occurred while offline
-- ✅ **👥 Robust Tier Resolution**: Dashboard and stats now resolve tier names from both `tier_mappings` and `role_mappings` tables
-- ✅ **🧹 Legacy Handler Cleanup**: Removed deprecated legacy `pledges:*` handlers — v2 webhook events only
-- ✅ **🔍 Diff Engine Free Tier Drops**: Piggyback diff engine detects silent free-tier changes not triggered by webhooks
-- ✅ **🩹 Numerous Bug Fixes**: Triple welcome messages, broken upgrade detection, dashboard adblocker interference, PUBLIC_URL trailing slash, Patreon API null state handling
+### Latest (Aug 2026 — Architectural Hardening & Reliability Pass)
+- 🔒 **Setup Mode Anti-Hijacking**: Setup wizard requires a cryptographically generated, one-time console `SETUP_TOKEN` when `DISCORD_TOKEN` is unset, securing public deployments against takeover
+- 🛡️ **Fatal Rank-Inversion Safeguards**: `TIER_CONFIG` now fails fast with a fatal error (`process.exit(1)`) on rank/cents inversions to strictly prevent premium content leaks (with `ALLOW_RANK_INVERSION=true` override)
+- 🗄️ **Cross-Instance Dedup & Retry**: Redis `SETNX` (60s TTL) distributed deduplication with local memory fallback; direct webhook processor now includes 3x retry with backoff
+- 💾 **DB-Persisted Diagnostics & Error Buffers**: Error ring buffers (`error_log_<id>`) and diagnostic counters persist to `bot_config` and flush synchronously on `SIGINT`/`SIGTERM` shutdowns
+- 🔑 **Proactive Patreon Token Refresh**: Background scheduler refreshes tokens every 25 days, preventing expired token 401s on idle bot deployments
+- ⚡ **Rate-Limit Safe Command Deployment**: Auto-deploy fingerprints command schemas via MD5 hash to skip redundant Discord API registration on restarts
+- 🔄 **Cluster Cache Invalidation**: `/admin sync-tiers` publishes `disbot:cache:invalidate` across Redis cluster instances for zero-lag cache synchronization
+- 🎯 **Targeted Replay with Discord ID**: Migration `014` captures `discord_user_id` pre-redaction; `/admin replay-webhook` re-hydrates Discord IDs for win-back DMs
+- 🗃️ **SQLite Schema Auto-Upgrades**: SQLite adapter auto-applies missing columns (`member_name`, `discord_user_id`, `is_active`) on initialization
+- ⏱️ **Ephemeral Scheduler Persistence**: Weekly digest and anniversary checkers persist run states to `bot_config` to avoid missed or repeated schedules across container recycles
+- 🩹 **Member Lifecycle Fixes**: Fixed join/rejoin announcements for paid members; added `is_active` tracking (migration `013`), cross-handler welcome guards, and fallback upgrade channels
 
 ### Previous Releases
 
-> 📜 The full history — Mar 2026 (OAuth, win-back DMs, SQLite fallback, setup wizard), Feb 2026 (Railway, threads, bulk mapping), and the initial core-features release — now lives in **[CHANGELOG.md](CHANGELOG.md)**.
+> 📜 The full history — Jun 2026 (weekly digest, BullMQ, role sync, dashboard), Mar 2026 (OAuth, win-back DMs, SQLite fallback, setup wizard), Feb 2026 (Railway, threads, bulk mapping), and the initial core-features release — now lives in **[CHANGELOG.md](CHANGELOG.md)**.
 
 ---
 

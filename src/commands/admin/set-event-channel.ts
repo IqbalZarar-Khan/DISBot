@@ -19,14 +19,29 @@ export type MemberEventType = typeof MEMBER_EVENT_TYPES[number];
 
 /**
  * Get the channel ID configured for a specific member event.
- * Falls back to LOG_CHANNEL_ID if no event-specific channel is set.
+ * Falls back to LOG_CHANNEL_ID, then to the member_join channel — an
+ * announcement routed somewhere visible beats one silently dropped.
  */
 export async function getEventChannel(eventType: MemberEventType): Promise<string | null> {
     const channelId = await getConfig(`event_channel_${eventType}`);
     if (channelId) return channelId;
 
     // Fallback to the global log channel
-    return process.env.LOG_CHANNEL_ID || null;
+    const logChannel = process.env.LOG_CHANNEL_ID;
+    if (logChannel) return logChannel;
+
+    // Final fallback: the welcome channel is where members are watched —
+    // use it rather than dropping the announcement entirely.
+    if (eventType !== 'member_join') {
+        try {
+            const joinChannel = await getConfig('event_channel_member_join');
+            if (joinChannel) return joinChannel;
+        } catch {
+            // Config lookup failure — treat as no fallback
+        }
+    }
+
+    return null;
 }
 
 /**

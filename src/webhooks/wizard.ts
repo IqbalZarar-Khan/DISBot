@@ -31,8 +31,22 @@ export function writeEnv(vars: Record<string, string>): void {
  * Fastify plugin for the DISBot Setup Wizard.
  * Migrated from Express Router — all routes and HTML/JS remain identical.
  */
+// One-time setup token for cloud deploys where DISCORD_TOKEN isn't set yet
+let generatedSetupToken: string | null = null;
+
+function getSetupToken(): string {
+    if (!generatedSetupToken) {
+        generatedSetupToken = crypto.randomBytes(32).toString('hex');
+        console.log('\n🔐 ════════════════════════════════════════════════════════');
+        console.log('🔐 SETUP WIZARD ACCESS TOKEN (one-time, required for /setup):');
+        console.log(`🔐   ${generatedSetupToken}`);
+        console.log('🔐 ════════════════════════════════════════════════════════\n');
+    }
+    return generatedSetupToken;
+}
+
 export const setupWizardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
-    // Middleware: secure the cloud setup route with DISCORD_TOKEN
+    // Middleware: secure the cloud setup route
     fastify.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
         const query = request.query as Record<string, string>;
 
@@ -43,18 +57,37 @@ export const setupWizardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
 
         const token = query.token || (request.headers['authorization']?.split(' ')[1]);
 
-        // If DISCORD_TOKEN is set, require it as a password
-        if (process.env.DISCORD_TOKEN && token !== process.env.DISCORD_TOKEN) {
-            return reply.code(401).type('text/html').send(`
-                <html><body style="background:#0f0c29;color:#fff;text-align:center;padding:4rem;font-family:system-ui">
-                <h2>🔒 Setup Wizard is Locked</h2>
-                <p>Please provide your Discord Bot Token to access the setup wizard.</p>
-                <form method="GET" style="margin-top:2rem;">
-                    <input type="password" name="token" placeholder="Bot Token" style="padding:0.6rem;border-radius:6px;border:none;width:300px"/>
-                    <button type="submit" style="padding:0.6rem 1rem;background:#5865F2;border:none;border-radius:6px;color:#fff;cursor:pointer">Unlock</button>
-                </form>
-                </body></html>
-            `);
+        // If DISCORD_TOKEN is set, use it as the auth gate (existing behavior)
+        if (process.env.DISCORD_TOKEN) {
+            if (token !== process.env.DISCORD_TOKEN) {
+                return reply.code(401).type('text/html').send(`
+                    <html><body style="background:#0f0c29;color:#fff;text-align:center;padding:4rem;font-family:system-ui">
+                    <h2>🔒 Setup Wizard is Locked</h2>
+                    <p>Please provide your Discord Bot Token to access the setup wizard.</p>
+                    <form method="GET" style="margin-top:2rem;">
+                        <input type="password" name="token" placeholder="Bot Token" style="padding:0.6rem;border-radius:6px;border:none;width:300px"/>
+                        <button type="submit" style="padding:0.6rem 1rem;background:#5865F2;border:none;border-radius:6px;color:#fff;cursor:pointer">Unlock</button>
+                    </form>
+                    </body></html>
+                `);
+            }
+        } else {
+            // DISCORD_TOKEN not set (setup mode) — require generated token
+            // This prevents unauthenticated hijacking of fresh deploys
+            const setupToken = getSetupToken();
+            if (token !== setupToken) {
+                return reply.code(401).type('text/html').send(`
+                    <html><body style="background:#0f0c29;color:#fff;text-align:center;padding:4rem;font-family:system-ui">
+                    <h2>🔒 Setup Wizard is Locked</h2>
+                    <p>A one-time setup token was printed to the server console on startup.</p>
+                    <p style="color:#888">Check your hosting platform's logs for the token.</p>
+                    <form method="GET" style="margin-top:2rem;">
+                        <input type="password" name="token" placeholder="Setup Token" style="padding:0.6rem;border-radius:6px;border:none;width:300px"/>
+                        <button type="submit" style="padding:0.6rem 1rem;background:#5865F2;border:none;border-radius:6px;color:#fff;cursor:pointer">Unlock</button>
+                    </form>
+                    </body></html>
+                `);
+            }
         }
     });
 

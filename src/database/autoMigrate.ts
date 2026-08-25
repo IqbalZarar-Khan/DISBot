@@ -99,4 +99,29 @@ export async function runAutoMigrations(): Promise<void> {
     } else {
         console.log(`📦 [MIGRATE] Applied ${applied_count} new migration(s).`);
     }
+
+    // ── 5. Post-migration schema verification ──────────────────────────
+    try {
+        // Verify webhook_log structure
+        const { error: whErr } = await supabase
+            .from('webhook_log')
+            .select('id, event_type, member_name, discord_user_id')
+            .limit(1);
+
+        if (whErr) {
+            console.warn(`⚠️ [MIGRATE] webhook_log schema warning: ${whErr.message}`);
+        }
+
+        // Verify tracked_members structure
+        const { error: tmErr } = await supabase
+            .from('tracked_members')
+            .select('member_id, is_active')
+            .limit(1);
+
+        if (tmErr) {
+            console.warn(`⚠️ [MIGRATE] tracked_members schema warning: ${tmErr.message}`);
+        }
+    } catch {
+        // Verification is best-effort
+    }
 }

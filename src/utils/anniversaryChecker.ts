@@ -1,6 +1,6 @@
 import { client } from '../index';
 import { config } from '../config';
-import { getAllTrackedMembers, getCustomMessage } from '../database/db';
+import { getAllTrackedMembers, getCustomMessage, getConfig, setConfig } from '../database/db';
 import { logger } from './logger';
 import { EmbedBuilder, TextChannel } from 'discord.js';
 
@@ -17,8 +17,8 @@ export function startAnniversaryChecker(): void {
     logger.info('🎂 [ANNIVERSARY] Daily checker started');
 
     // Run first check 60s after boot (give DB time to initialize)
-    setTimeout(() => checkAnniversaries(), 60_000);
-    anniversaryTimer = setInterval(() => checkAnniversaries(), CHECK_INTERVAL_MS);
+    setTimeout(() => checkAnniversaries().catch(err => logger.error('🎂 [ANNIVERSARY] Check failed', err as Error)), 60_000);
+    anniversaryTimer = setInterval(() => checkAnniversaries().catch(err => logger.error('🎂 [ANNIVERSARY] Check failed', err as Error)), CHECK_INTERVAL_MS);
 }
 
 export function stopAnniversaryChecker(): void {
@@ -30,9 +30,18 @@ export function stopAnniversaryChecker(): void {
 
 async function checkAnniversaries(): Promise<void> {
     try {
-        const members = await getAllTrackedMembers();
         const now = new Date();
+        const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`; // "YYYY-M-D" format
         const today = `${now.getMonth() + 1}-${now.getDate()}`; // "M-D" format
+
+        // Check if we already checked today (survives restarts)
+        const lastCheckDate = await getConfig('last_anniversary_check_date').catch(() => null);
+        if (lastCheckDate === dateKey) {
+            logger.info('🎂 [ANNIVERSARY] Already checked today — skipping');
+            return;
+        }
+
+        const members = await getAllTrackedMembers();
 
         for (const member of members) {
             if (!member.joined_at) continue;
@@ -48,6 +57,9 @@ async function checkAnniversaries(): Promise<void> {
                 await sendAnniversaryMessage(member.full_name, yearsAgo);
             }
         }
+
+        // Persist completion date
+        await setConfig('last_anniversary_check_date', dateKey).catch(() => {});
     } catch (err) {
         logger.warn(`🎂 [ANNIVERSARY] Check failed: ${(err as Error).message}`);
     }

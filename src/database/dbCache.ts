@@ -16,6 +16,7 @@ import { logger } from '../utils/logger';
 const REDIS_KEY_TIERS = 'disbot:cache:tiers';
 const REDIS_KEY_CONFIG = 'disbot:cache:config';
 const REDIS_TTL_SECONDS = 5 * 60; // 5 minutes
+const REDIS_INVALIDATION_CHANNEL = 'disbot:cache:invalidate';
 
 // L2 in-memory fallback
 let tierMappingsCache: TierMapping[] = [];
@@ -23,6 +24,7 @@ let configCache: Map<string, string> = new Map();
 let lastRefresh = 0;
 const CACHE_TTL_MS = 5 * 60_000; // 5 minutes
 let refreshTimer: NodeJS.Timeout | null = null;
+let subscriberRedis: any = null; // Dedicated Redis subscriber connection
 
 /**
  * Initialize the cache and start automatic refresh.
@@ -30,6 +32,25 @@ let refreshTimer: NodeJS.Timeout | null = null;
 export async function initDbCache(): Promise<void> {
     await refreshCache();
     refreshTimer = setInterval(() => refreshCache(), CACHE_TTL_MS);
+
+    // Subscribe to invalidation signals from other instances
+    try {
+        if (isRedisConnected()) {
+            const Redis = (await import('ioredis')).default;
+            const url = process.env.REDIS_URL || 'redis://localhost:6379';
+            subscriberRedis = new Redis(url, { maxRetriesPerRequest: null });
+            subscriberRedis.subscribe(REDIS_INVALIDATION_CHANNEL);
+            subscriberRedis.on('message', (channel: string) => {
+                if (channel === REDIS_INVALIDATION_CHANNEL) {
+                    logger.info('🗄️ [CACHE] Received invalidation signal — refreshing...');
+                    refreshCache().catch(() => {});
+                }
+            });
+        }
+    } catch {
+        // Redis sub unavailable — 5-minute polling is the fallback
+    }
+
     logger.info('🗄️ [CACHE] DB cache initialized (Redis-backed with in-memory fallback)');
 }
 
@@ -37,6 +58,30 @@ export function stopDbCache(): void {
     if (refreshTimer) {
         clearInterval(refreshTimer);
         refreshTimer = null;
+    }
+    if (subscriberRedis) {
+        subscriberRedis.disconnect();
+        subscriberRedis = null;
+    }
+}
+
+/**
+ * Publish a cache invalidation signal so all instances refresh immediately.
+ * Call this after sync-tiers or any operation that mutates cached data.
+ */
+export async function invalidateCache(): Promise<void> {
+    // Refresh local cache immediately
+    await refreshCache();
+
+    // Notify other instances via Redis pub/sub
+    if (isRedisConnected()) {
+        try {
+            const redis = getRedis()!;
+            await redis.publish(REDIS_INVALIDATION_CHANNEL, 'invalidate');
+            logger.info('🗄️ [CACHE] Published invalidation signal to all instances');
+        } catch {
+            // Non-critical — other instances will refresh on their 5-minute cycle
+        }
     }
 }
 

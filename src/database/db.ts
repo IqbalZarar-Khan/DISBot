@@ -192,6 +192,19 @@ export async function upsertTrackedMember(member: TrackedMember): Promise<void> 
     if (error) throw error;
 }
 
+/**
+ * Flip a member's active flag without touching their other columns.
+ * Set to false on members:delete; create/pledge handlers set it back to true.
+ */
+export async function setMemberActive(memberId: string, isActive: boolean): Promise<void> {
+    const supabase = getSupabase();
+    const { error } = await supabase
+        .from('tracked_members')
+        .update({ is_active: isActive, updated_at: Date.now() })
+        .eq('member_id', memberId);
+    if (error) throw error;
+}
+
 export async function getAllTrackedMembers(): Promise<TrackedMember[]> {
     const supabase = getSupabase();
 

@@ -43,10 +43,11 @@ function timeAgoTag(receivedAt: string): string {
 }
 
 /**
- * Restore redacted patron names in a stored payload before replay.
+ * Restore redacted patron names and Discord IDs in a stored payload before replay.
  * full_name/email etc. are stripped by PII redaction at log time; the
- * member_name column still holds the display name, so we patch it back in.
- * Emails and Discord IDs stay redacted (not recoverable — by design).
+ * member_name column still holds the display name, and discord_user_id
+ * preserves the Discord ID, so we patch them back in for replay.
+ * Emails stay redacted (not recoverable — by design).
  */
 function hydrateRedactedNames(row: WebhookLogRow): any {
     if (!row.payload) return null;
@@ -70,6 +71,12 @@ function hydrateRedactedNames(row: WebhookLogRow): any {
         : included.find((item: any) => item.type === 'user');
     if (userRecord?.attributes) {
         userRecord.attributes.full_name = row.member_name;
+        // Restore Discord user ID if available (for targeted DM delivery)
+        if ((row as any).discord_user_id && userRecord.attributes.social_connections) {
+            userRecord.attributes.social_connections.discord = {
+                user_id: (row as any).discord_user_id,
+            };
+        }
     }
 
     return payload;
@@ -113,8 +120,8 @@ async function replayRow(row: WebhookLogRow): Promise<ReplayOutcome> {
             row,
             ok: true,
             detail: announced
-                ? `Replayed${caveat} — announcement sent ✅`
-                : `Replayed${caveat} — no announcement produced (check tier mappings)`,
+                ? `Replayed${caveat} — announcement sent ✅ (⚠️ dedup/ghost filters bypassed)`
+                : `Replayed${caveat} — no announcement produced (check tier mappings) (⚠️ dedup/ghost filters bypassed)`,
         };
     } catch (err) {
         logger.error(`🔁 [REPLAY] Replaying webhook log #${row.id} failed`, err as Error);

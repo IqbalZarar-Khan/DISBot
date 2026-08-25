@@ -5,6 +5,7 @@ import { config, TierDefinition } from '../../config';
 import { upsertTierMapping, getAllTierMappings } from '../../database/db';
 import { logger } from '../../utils/logger';
 import { tierIdMap, tierRankings, centsMap } from '../../utils/tierRanking';
+import { invalidateCache } from '../../database/dbCache';
 
 /**
  * /admin sync-tiers
@@ -83,6 +84,9 @@ export async function handleSyncTiers(interaction: ChatInputCommandInteraction):
         // Also update config.tierConfig in memory
         config.tierConfig.length = 0;
         config.tierConfig.push(...syncedTiers);
+
+        // Invalidate database cache across all instances
+        await invalidateCache().catch(() => {});
 
         // Build response embed
         const embed = new EmbedBuilder()

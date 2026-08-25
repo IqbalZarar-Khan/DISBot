@@ -4,6 +4,33 @@ All notable changes to DISBot, newest first. For setup, features, and deployment
 [README](README.md) — the most recent release is also summarized there under
 [Recent Updates](README.md#-recent-updates).
 
+## Aug 2026 (Part 2 — Architectural Hardening & Reliability Pass)
+
+- 🔒 **Setup Mode Hijacking Prevention** (`wizard.ts`): Setup wizard generates a secure, one-time `SETUP_TOKEN` printed to the server console when `DISCORD_TOKEN` is unset, preventing unauthorized credential injection or deployment hijacking on public domains
+- 🛡️ **Fatal Tier Rank-Inversion Guard** (`config.ts`): Config validator fails fast with `process.exit(1)` when cheaper tiers outrank expensive tiers, preventing accidental premium content distribution (`ALLOW_RANK_INVERSION=true` escape hatch provided)
+- 🗄️ **Distributed Deduplication** (`webhookFilters.ts`, `server.ts`): Added `isDuplicateAsync()` using Redis `SETNX` (60s TTL) for cross-instance deduplication coordination, with in-memory map fallback when Redis is offline; direct webhook execution now features 3x exponential retry backoff
+- 💾 **DB-Persisted Diagnostics & Error Buffers** (`logger.ts`, `status.ts`, `index.ts`): Error ring buffer (`error_log_<id>`) and debounced diagnostic counters (`diag_tier_detect_*`, `diag_last_webhook_at`) now persist to `bot_config` and flush synchronously during `SIGINT`/`SIGTERM` process terminations
+- 🔑 **Proactive Patreon Token Refresh** (`patreonClient.ts`): Background scheduler runs every 25 days and on boot to proactively refresh Patreon OAuth tokens, preventing phantom 401s on idle deployments
+- ⚡ **Rate-Limit Safe Slash Command Deployment** (`index.ts`): Auto-deploy calculates an MD5 fingerprint of command schemas and skips deployment if `command_definition_hash` in `bot_config` matches, eliminating Discord API 429 rate limits on container recycles
+- 🔄 **Cluster Cache Invalidation** (`dbCache.ts`, `sync-tiers.ts`): Added Redis pub/sub invalidation channel (`disbot:cache:invalidate`); `/admin sync-tiers` broadcasts invalidation signals to instantly refresh in-memory caches across all cluster nodes
+- 🎯 **Targeted Replay with Discord ID** (`webhookCache.ts`, `replay-webhook.ts`, migration `014`): Captured `discord_user_id` pre-redaction into `webhook_log.discord_user_id`; `hydrateRedactedNames()` re-injects Discord IDs on replay to restore win-back DM capabilities
+- 🗃️ **SQLite Schema Auto-Upgrades** (`sqliteAdapter.ts`): Embedded SQLite adapter auto-applies missing columns (`member_name`, `discord_user_id`, `is_active`) on initialization via `ALTER TABLE` checks
+- ⏱️ **Ephemeral Scheduler Persistence** (`weeklyDigest.ts`, `anniversaryChecker.ts`): Weekly digest and anniversary checkers persist run states (`last_digest_week`, `last_anniversary_check_date`) to `bot_config` to eliminate missed/repeated schedules on ephemeral hosting
+- 🧹 **Ledger Noise Reduction** (`router.ts`, `webhookCache.ts`): Unhandled events are tagged with `[UNSUPPORTED]` notes and filtered out from `getMissedAnnouncements()`
+- 🛡️ **Race Condition Prevention** (`batchWriter.ts`): Added timestamp guards in `queueMemberUpsert()` to ensure only newer data overwrites buffered member records during rapid webhook bursts
+- 🔍 **Auto-Migration Verification** (`autoMigrate.ts`): Added post-migration schema integrity checks for `webhook_log` and `tracked_members` tables
+- ⚠️ **Unawaited Promise Fixes** (`set-owner.ts`, `anniversaryChecker.ts`, `weeklyDigest.ts`): Added `await` to `setConfig` in `set-owner.ts` and wrapped interval/timeout callbacks in `.catch()` error loggers
+
+## Aug 2026 (Part 1 — Member Lifecycle & Welcome Announcements)
+
+- 🩹 **Fix: paid-member joins & rejoins not announced**: `members:create` now resolves tiers via `tierIdMap` when missing from `included[]` (paid joins were misreported as "Free"), and welcomes members whose row was kept after departure
+- 🎉 **Welcome-Back announcements**: departed members are flagged `is_active=false` (new migration `013`); rejoining — even directly as paid or at their old tier — now announces "🎉 Welcome Back!" instead of silence
+- 🔁 **Cross-handler welcome guard** (`welcomeGuard.ts`): in-memory dedup so the near-simultaneous `members:create` + `members:pledge:create` webhooks can't double-welcome during the 5s batch-write window
+- 📈 **Upgrades never silently dropped**: `getEventChannel` now falls back event channel → `LOG_CHANNEL_ID` → the `member_join` channel, so free→paid upgrades are announced even without a dedicated `pledge_upgrade` channel
+- 🛡️ **Rejoin vs upgrade disambiguation**: `members:update` / `members:pledge:update` announce departed members as 🎉 Welcome Back — never as an upgrade notice — deduped by the welcome guard; `members:update` syncs `is_active` from `patron_status`
+- 📖 Wiki: `Webhook-Pipeline.md` semantics table updated to match the welcome-all-tiers + returning-member behavior
+- ⚠️ **Deploy note**: the bug persisted partly because local `dist/` was six months stale (built Feb 17) — the running bot predated the Aug 20 welcome fix. Migration `013` applies automatically on startup, but deployments **must rebuild** (`npm run build`) before `pm2 restart disbot`; Docker/Railway/Render builds are unaffected
+
 ## Jun 2026
 
 - ✅ **📊 Enhanced Weekly Digest**: Sunday report now includes cancellation details (who cancelled + count) and membership changes (who changed + old→new tier)

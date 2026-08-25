@@ -6,11 +6,16 @@ import * as crypto from 'crypto';
  * Extracted from server.ts so the filter logic can be unit-tested without
  * bootstrapping the Fastify server. The cleanup interval is started
  * explicitly by startWebhookServer() rather than at import time.
+ *
+ * Dedup hierarchy:
+ *   1. Redis SETNX (cross-instance, when Redis is connected)
+ *   2. Local in-memory Map (single-instance fallback)
  */
 
 // ── Webhook idempotency guard ──────────────────────────────────────
 // Prevents duplicate notifications when Patreon retries the same webhook.
 const DEDUP_TTL_MS = 60_000; // 60 seconds
+const DEDUP_TTL_SECONDS = 60; // Redis TTL in seconds
 const recentWebhooks = new Map<string, number>(); // hash → timestamp
 
 // ── Ghost webhook filter ───────────────────────────────────────────
@@ -48,6 +53,34 @@ export function stopFilterCleanupInterval(): void {
 export function clearFilterState(): void {
     recentWebhooks.clear();
     recentStates.clear();
+}
+
+/**
+ * Check for duplicate webhooks using Redis SETNX for cross-instance
+ * coordination, with local memory as a fallback.
+ */
+export async function isDuplicateAsync(body: string, eventType: string): Promise<boolean> {
+    const hash = crypto.createHash('md5').update(eventType + body).digest('hex');
+    const redisKey = `disbot:dedup:${hash}`;
+
+    // Try Redis first for cross-instance dedup
+    try {
+        const { getRedis, isRedisConnected } = await import('../database/redis');
+        if (isRedisConnected()) {
+            const redis = getRedis()!;
+            // SETNX returns 'OK' if the key was set (first time), null if it already existed
+            const result = await redis.set(redisKey, '1', 'EX', DEDUP_TTL_SECONDS, 'NX');
+            if (result === null) {
+                return true; // Key already existed → duplicate
+            }
+            return false; // Key set successfully → first time
+        }
+    } catch {
+        // Redis unavailable — fall through to local memory
+    }
+
+    // Local memory fallback (single-instance only)
+    return isDuplicate(body, eventType);
 }
 
 export function isDuplicate(body: string, eventType: string): boolean {

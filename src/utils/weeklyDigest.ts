@@ -1,6 +1,6 @@
 import { client } from '../index';
 import { config } from '../config';
-import { getAllTrackedMembers } from '../database/db';
+import { getAllTrackedMembers, getConfig, setConfig } from '../database/db';
 import { getWeeklyCancellations, getWeeklyTierChanges } from '../database/webhookCache';
 import { logger } from './logger';
 import { EmbedBuilder } from 'discord.js';
@@ -17,7 +17,9 @@ let lastDigestWeek = -1;
  */
 export function startWeeklyDigest(): void {
     logger.info('📊 [DIGEST] Weekly digest scheduler started');
-    digestTimer = setInterval(() => maybeRunDigest(), CHECK_INTERVAL_MS);
+    // Run an initial check 30s after boot (handles restart on Sunday)
+    setTimeout(() => maybeRunDigest().catch(err => logger.error('📊 [DIGEST] Initial digest check failed', err as Error)), 30_000);
+    digestTimer = setInterval(() => maybeRunDigest().catch(err => logger.error('📊 [DIGEST] Digest check failed', err as Error)), CHECK_INTERVAL_MS);
 }
 
 export function stopWeeklyDigest(): void {
@@ -33,10 +35,23 @@ async function maybeRunDigest(): Promise<void> {
     // Only run on Sunday (day 0)
     if (now.getDay() !== 0) return;
 
+    // Load persisted last digest week from DB to survive ephemeral container restarts
+    try {
+        const savedWeek = await getConfig('last_digest_week');
+        if (savedWeek) {
+            lastDigestWeek = parseInt(savedWeek, 10);
+        }
+    } catch {
+        // Fall back to memory
+    }
+
     // Only run once per week (prevent re-runs on the same Sunday)
     const weekNumber = getWeekNumber(now);
     if (weekNumber === lastDigestWeek) return;
     lastDigestWeek = weekNumber;
+
+    // Persist week number to DB
+    await setConfig('last_digest_week', String(weekNumber)).catch(() => {});
 
     await sendWeeklyDigest();
 }

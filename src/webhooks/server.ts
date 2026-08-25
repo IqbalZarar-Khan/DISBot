@@ -8,7 +8,7 @@ import { enqueueWebhookEvent } from '../queue/webhookQueue';
 import { isRedisConnected } from '../database/redis';
 import { dashboardPlugin } from './dashboard';
 import { logWebhookReceived } from '../database/webhookCache';
-import { isDuplicate, isGhostWebhook, startFilterCleanupInterval } from './webhookFilters';
+import { isDuplicateAsync, isGhostWebhook, startFilterCleanupInterval } from './webhookFilters';
 import { getDiagnosticCounters } from '../commands/admin/status';
 import { getWebhookQueue } from '../queue/webhookQueue';
 
@@ -243,8 +243,8 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
             // logId is null if the table doesn't exist yet (pre-migration).
             const logId = await logWebhookReceived(eventType || 'unknown', request.body);
 
-            // Idempotency guard: skip duplicate webhooks
-            if (isDuplicate(rawBody, eventType || '')) {
+            // Idempotency guard: skip duplicate webhooks (cross-instance via Redis, local fallback)
+            if (await isDuplicateAsync(rawBody, eventType || '')) {
                 logger.warn('🔁 [DEDUP] Duplicate webhook detected — skipping');
                 return reply.code(200).send({ received: true, duplicate: true });
             }
@@ -277,9 +277,25 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
                     await routeWebhookEvent(eventType, request.body, logId);
                 }
             } else {
-                // Redis unavailable — direct processing (graceful degradation)
+                // Redis unavailable — direct processing with retry (graceful degradation)
                 logger.info(`🚀 [DIRECT] Processing ${eventType} directly (no Redis)`);
-                await routeWebhookEvent(eventType, request.body, logId);
+                let lastError: Error | null = null;
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        await routeWebhookEvent(eventType, request.body, logId);
+                        lastError = null;
+                        break;
+                    } catch (err) {
+                        lastError = err as Error;
+                        if (attempt < 3) {
+                            logger.warn(`⚠️ [DIRECT] Attempt ${attempt}/3 failed — retrying in ${attempt}s...`);
+                            await new Promise(r => setTimeout(r, attempt * 1000));
+                        }
+                    }
+                }
+                if (lastError) {
+                    logger.error(`❌ [DIRECT] All 3 attempts failed for ${eventType}`, lastError);
+                }
             }
 
             logger.info(`✅ [COMPLETE] Webhook ${eventType} acknowledged`);

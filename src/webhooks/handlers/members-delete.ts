@@ -1,5 +1,5 @@
 import { WebhookPayload } from '../../database/schema';
-import { getTrackedMember } from '../../database/db';
+import { getTrackedMember, setMemberActive } from '../../database/db';
 import { logger } from '../../utils/logger';
 import { client } from '../../index';
 import { TextChannel, EmbedBuilder } from 'discord.js';
@@ -18,6 +18,15 @@ export async function handleMembersDelete(payload: WebhookPayload): Promise<void
 
         if (trackedMember) {
             logger.info(`Member departed: ${trackedMember.full_name}`);
+
+            // Mark the row inactive so a later rejoin (members:create /
+            // members:pledge:create) is recognized as a returning member and
+            // gets a welcome-back instead of being silenced as "already known"
+            try {
+                await setMemberActive(memberId, false);
+            } catch (markErr) {
+                logger.warn(`Failed to mark member inactive: ${(markErr as Error).message}`);
+            }
 
             // Send departure log to event-routed channel
             const eventChannelId = await getEventChannel('member_leave');

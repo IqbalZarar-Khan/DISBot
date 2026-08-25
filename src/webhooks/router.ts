@@ -105,9 +105,9 @@ export async function routeWebhookEvent(
             }
 
             default:
-                logger.warn(`⚠️ [IGNORED] No handler registered for event type: ${eventType}`);
-                logger.warn(`⚠️ [IGNORED] Available handlers: members:*, members:pledge:*, posts:*`);
-                notes = `No handler registered for event type: ${eventType}`;
+                logger.warn(`⚠️ [UNSUPPORTED] No handler registered for event type: ${eventType}`);
+                logger.warn(`⚠️ [UNSUPPORTED] Available handlers: members:*, members:pledge:*, posts:*`);
+                notes = `[UNSUPPORTED] No handler registered for event type: ${eventType}`;
                 break;
         }
 

@@ -88,6 +88,30 @@ function redactPayload(payload: any): any {
     }
 }
 
+/**
+ * Extract Discord user ID from raw payload before PII redaction.
+ * Looks in included[].attributes.social_connections.discord.user_id
+ */
+function extractDiscordUserId(payload: any): string | null {
+    try {
+        const included = payload?.included || [];
+        for (const item of included) {
+            const discordConn = item?.attributes?.social_connections?.discord;
+            if (discordConn?.user_id) {
+                return discordConn.user_id;
+            }
+        }
+        // Also check data.attributes.social_connections
+        const dataDiscord = payload?.data?.attributes?.social_connections?.discord;
+        if (dataDiscord?.user_id) {
+            return dataDiscord.user_id;
+        }
+    } catch {
+        // Non-critical extraction
+    }
+    return null;
+}
+
 // ── Supabase helpers ──────────────────────────────────────────────────────────
 
 /**
@@ -111,6 +135,9 @@ export async function logWebhookReceived(
         // Redact PII before persisting
         const safePayload = redactPayload(payload);
 
+        // Extract Discord user ID before it gets scrubbed
+        const discordUserId = extractDiscordUserId(payload);
+
         // Build the row dynamically — only include member_name for member
         // events so post:update / post:publish don't break if the column
         // hasn't been migrated yet, and don't store meaningless nulls.
@@ -120,6 +147,7 @@ export async function logWebhookReceived(
             payload: safePayload,   // stored as JSONB — PII stripped
             processed: false,
             announced: false,
+            discord_user_id: discordUserId,
         };
 
         if (isMemberEvent) {
@@ -200,6 +228,7 @@ export async function getMissedAnnouncements(
             .select('*')
             .eq('processed', true)
             .eq('announced', false)
+            .not('notes', 'like', '[UNSUPPORTED]%')
             .gte('received_at', since)
             .order('received_at', { ascending: false });
 
@@ -429,6 +458,7 @@ export interface WebhookLogRow {
     event_type: string;
     member_id: string | null;
     member_name: string | null;
+    discord_user_id: string | null;
     payload?: any;
     received_at: string;
     processed: boolean;

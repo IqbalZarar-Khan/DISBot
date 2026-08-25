@@ -16,6 +16,7 @@ interface MemberAlertData {
     fullName: string;
     tierName: string;
     isUpgrade?: boolean;
+    isReturning?: boolean;
 }
 
 /**
@@ -83,6 +84,10 @@ export function createMemberEmbed(data: MemberAlertData): EmbedBuilder {
         embed
             .setTitle('📈 Member Upgrade!')
             .setDescription(`**${data.fullName}** just upgraded to **${emoji} ${data.tierName}**! Welcome to the inner circle.`);
+    } else if (data.isReturning) {
+        embed
+            .setTitle('🎉 Welcome Back!')
+            .setDescription(`**${data.fullName}** is back, pledging to the **${emoji} ${data.tierName}** tier!`);
     } else {
         embed
             .setTitle('🎉 New Member!')

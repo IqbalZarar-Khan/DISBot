@@ -161,6 +161,30 @@ function schedulePersist(): void {
 }
 
 /**
+ * Immediately flush all diagnostic counters to the database.
+ * Called during graceful shutdown (SIGINT/SIGTERM) to prevent data loss
+ * from the 5-second debounce window.
+ */
+export async function flushDiagnosticCounters(): Promise<void> {
+    // Cancel any pending debounced write
+    if (persistTimer) {
+        clearTimeout(persistTimer);
+        persistTimer = null;
+    }
+
+    try {
+        await setConfig('diag_tier_detect_success', String(counters.tierDetectionSuccess));
+        await setConfig('diag_tier_detect_fail', String(counters.tierDetectionFail));
+        if (counters.lastWebhookTimestamp) {
+            await setConfig('diag_last_webhook_at', String(counters.lastWebhookTimestamp));
+        }
+        console.log('📊 [DIAGNOSTICS] Counters flushed to database on shutdown');
+    } catch (err) {
+        console.warn('⚠️ [DIAGNOSTICS] Failed to flush counters on shutdown:', (err as Error).message);
+    }
+}
+
+/**
  * Get the current diagnostic counters (for use by other modules).
  */
 export function getDiagnosticCounters(): Readonly<DiagnosticCounters> {

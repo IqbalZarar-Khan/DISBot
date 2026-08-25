@@ -18,6 +18,11 @@ let flushTimer: NodeJS.Timeout | null = null;
  * If the same member_id is queued again before flush, the newer data wins.
  */
 export function queueMemberUpsert(member: TrackedMember): void {
+    const existing = writeBuffer.get(member.member_id);
+    // Only overwrite if the new data is more recent (prevents out-of-order flush from rapid events)
+    if (existing && existing.updated_at && member.updated_at && existing.updated_at > member.updated_at) {
+        return; // Keep the newer buffered entry
+    }
     writeBuffer.set(member.member_id, member);
 }
 

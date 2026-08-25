@@ -85,12 +85,12 @@ detect a healthy port during Discord's slow login (see [Architecture](Architectu
 ```mermaid
 flowchart TD
     B1["1 · config.ts — load env, parse/validate TIER_CONFIG<br/>missing core config → setup mode (web server + /setup wizard only)"]
-    B1 --> B2["2 · initSupabase → autoMigrate (supabase/migrations 000–012) → connection test"]
+    B1 --> B2["2 · initSupabase → autoMigrate (supabase/migrations 000–014) → connection test"]
     B2 --> B3["3 · initRedis (optional) → initWebhookQueue<br/>failure is non-fatal → direct processing"]
     B3 --> B4["4 · startBatchWriter — member upserts buffered into 5s flushes"]
     B4 --> B5["5 · startWebhookServer — binds port, mounts /setup + /dashboard,<br/>starts webhook-filter cleanup interval"]
     B5 --> B6["6 · loginWithRetry — exponential backoff (Cloudflare-blocked IPs)"]
-    B6 --> B7["7 · ClientReady — BullMQ worker, slash-command deploy, DB cache init,<br/>diagnostic counters, OAuth scope check, schedulers,<br/>role reconciliation if DISCORD_ROLE_SYNC_ENABLED"]
+    B6 --> B7["7 · ClientReady — BullMQ worker, slash-command deploy (hash-checked), DB cache init,<br/>diagnostic counters, OAuth scope check, schedulers,<br/>role reconciliation if DISCORD_ROLE_SYNC_ENABLED"]
 ```
 
 ## Webhook lifecycle

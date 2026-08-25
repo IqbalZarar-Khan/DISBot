@@ -7,6 +7,7 @@ import { createMemberEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
 import { getTierRank } from '../../utils/tierRanking';
 import { getEventChannel } from '../../commands/admin/set-event-channel';
+import { markMemberWelcomed, wasRecentlyWelcomed } from '../welcomeGuard';
 
 /**
  * Handle members:pledge:update webhook event
@@ -60,6 +61,11 @@ export async function handleMembersPledgeUpdate(payload: WebhookPayload): Promis
         const tierChanged = oldTierId !== tierId;
         const isUpgrade = tierChanged && getTierRank(tierId) > getTierRank(oldTierId);
 
+        // A departed member with a paid pledge in this update is re-pledging —
+        // that's a return, not an upgrade. Flip the row back to active so
+        // later events don't re-announce the return.
+        const isReturningMember = !!existingMember && existingMember.is_active === false && tierId !== 'free';
+
         // Update member in database
         const trackedMember = {
             member_id: memberId,
@@ -67,7 +73,8 @@ export async function handleMembersPledgeUpdate(payload: WebhookPayload): Promis
             current_tier_id: tierId,
             email: email,
             joined_at: existingMember?.joined_at || Date.now(),
-            updated_at: Date.now()
+            updated_at: Date.now(),
+            ...(isReturningMember ? { is_active: true } : {})
         };
 
         queueMemberUpsert(trackedMember);
@@ -85,8 +92,32 @@ export async function handleMembersPledgeUpdate(payload: WebhookPayload): Promis
             }
         }
 
-        // Send tier change notification if tier changed
-        if (tierChanged) {
+        // Announce tier changes. A departed member re-pledging is announced as
+        // a return (the create handlers may not have fired); the welcome guard
+        // prevents double announcements across handlers.
+        if (isReturningMember && !wasRecentlyWelcomed(memberId)) {
+            const eventChannelId = await getEventChannel('member_join');
+            if (eventChannelId) {
+                try {
+                    const channel = await client.channels.fetch(eventChannelId) as TextChannel;
+                    if (channel) {
+                        const embed = createMemberEmbed({
+                            fullName,
+                            tierName,
+                            isUpgrade: false,
+                            isReturning: true
+                        });
+                        await channel.send({ embeds: [embed] });
+                        markMemberWelcomed(memberId);
+                    }
+                } catch (error) {
+                    logger.warn('Failed to send welcome-back alert', error as Error);
+                }
+            }
+            logger.info(`🆕 [PLEDGE:UPDATE] Departed member re-pledging: ${fullName} (${tierName})`);
+        } else if (isReturningMember) {
+            logger.info(`📋 [PLEDGE:UPDATE] Welcome Back skipped (already announced moments ago): ${fullName}`);
+        } else if (tierChanged && !wasRecentlyWelcomed(memberId)) {
             const eventType = isUpgrade ? 'pledge_upgrade' : 'pledge_downgrade';
             const eventChannelId = await getEventChannel(eventType);
             if (eventChannelId) {

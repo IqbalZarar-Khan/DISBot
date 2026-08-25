@@ -8,15 +8,16 @@ import { logger } from '../../utils/logger';
 import { getTierRank, tierIdMap, centsMap } from '../../utils/tierRanking';
 import { getEventChannel } from '../../commands/admin/set-event-channel';
 import { config } from '../../config';
+import { markMemberWelcomed, wasRecentlyWelcomed } from '../welcomeGuard';
 
 /**
  * Handle members:pledge:create webhook event (Patreon v2)
  * Triggered when a patron creates a new pledge (starts a subscription)
- * 
- * Handles upgrade / downgrade notifications for EXISTING members.
- * Welcome notifications are handled by the members:create handler
- * (which upserts the member first), so this handler's `!isExisting`
- * branch is a safety-net fallback only.
+ *
+ * Handles upgrade / downgrade notifications for EXISTING ACTIVE members.
+ * Welcomes for brand-new members are handled by the members:create handler;
+ * here the `!isExisting` branch is a safety-net fallback, and members whose
+ * row was kept after a departure (is_active=false) get a welcome-back.
  */
 export async function handleMembersPledgeCreate(payload: WebhookPayload): Promise<boolean> {
     try {
@@ -103,10 +104,13 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
         const existingMember = await getTrackedMember(memberId);
         const oldTierId = existingMember?.current_tier_id || 'free';
         const isExisting = !!existingMember;
+        // Departed member re-pledging → welcome-back, not an upgrade notice
+        const isReturningMember = isExisting && existingMember!.is_active === false;
+        const recentlyWelcomed = wasRecentlyWelcomed(memberId);
         const tierChanged = oldTierId !== tierId;
         const isUpgrade = tierChanged && getTierRank(tierId) > getTierRank(oldTierId);
 
-        logger.info(`📥 [PLEDGE:CREATE] Existing member: ${isExisting}, Old tier: ${oldTierId}, New tier: ${tierId} (${tierName}), Upgrade: ${isUpgrade}`);
+        logger.info(`📥 [PLEDGE:CREATE] Existing member: ${isExisting}, Active: ${!isReturningMember}, Old tier: ${oldTierId}, New tier: ${tierId} (${tierName}), Upgrade: ${isUpgrade}`);
 
         // Store/update member in database
         const trackedMember = {
@@ -115,7 +119,8 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
             current_tier_id: tierId,
             email: email,
             joined_at: existingMember?.joined_at || Date.now(),
-            updated_at: Date.now()
+            updated_at: Date.now(),
+            is_active: true
         };
 
         queueMemberUpsert(trackedMember);
@@ -133,8 +138,34 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
 
         // Route to the correct event channel based on whether this is new or upgrade
         let announced = false;
-        if (isExisting && tierChanged) {
-            // Existing member upgrading — send upgrade notification
+        if (recentlyWelcomed && (isReturningMember || !isExisting)) {
+            // members:create announced this joiner moments ago — the batched
+            // DB write may not have flushed yet, so don't duplicate the welcome
+            logger.info(`📋 [PLEDGE:CREATE] Welcome skipped (already announced moments ago): ${fullName}`);
+        } else if (isReturningMember || !isExisting) {
+            // New member — or a departed member re-pledging — send welcome
+            const eventChannelId = await getEventChannel('member_join');
+            if (eventChannelId) {
+                try {
+                    const channel = await client.channels.fetch(eventChannelId) as TextChannel;
+                    if (channel) {
+                        const embed = createMemberEmbed({
+                            fullName,
+                            tierName,
+                            isUpgrade: false,
+                            isReturning: isReturningMember
+                        });
+                        await channel.send({ embeds: [embed] });
+                        markMemberWelcomed(memberId);
+                        announced = true;
+                    }
+                } catch (error) {
+                    logger.warn('Failed to send welcome alert', error as Error);
+                }
+            }
+            logger.info(`🆕 New pledge created: ${fullName} (${tierName})${isReturningMember ? ' — returning member' : ''}`);
+        } else if (tierChanged) {
+            // Existing active member upgrading — send upgrade notification
             const eventType = isUpgrade ? 'pledge_upgrade' : 'pledge_downgrade';
             const eventChannelId = await getEventChannel(eventType);
             if (eventChannelId) {
@@ -154,26 +185,6 @@ export async function handleMembersPledgeCreate(payload: WebhookPayload): Promis
                 }
             }
             logger.info(`♻️ Pledge changed: ${fullName} → ${tierName} (${isUpgrade ? 'UPGRADE' : 'DOWNGRADE'})`);
-        } else if (!isExisting) {
-            // Brand new member — send welcome notification
-            const eventChannelId = await getEventChannel('member_join');
-            if (eventChannelId) {
-                try {
-                    const channel = await client.channels.fetch(eventChannelId) as TextChannel;
-                    if (channel) {
-                        const embed = createMemberEmbed({
-                            fullName,
-                            tierName,
-                            isUpgrade: false
-                        });
-                        await channel.send({ embeds: [embed] });
-                        announced = true;
-                    }
-                } catch (error) {
-                    logger.warn('Failed to send welcome alert', error as Error);
-                }
-            }
-            logger.info(`🆕 New pledge created: ${fullName} (${tierName})`);
         } else {
             logger.info(`ℹ️ Pledge re-created (same tier): ${fullName} (${tierName})`);
         }

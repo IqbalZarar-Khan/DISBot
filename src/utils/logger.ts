@@ -314,6 +314,9 @@ export async function log(level: LogLevel, message: string, error?: Error): Prom
         if (errorBuffer.length > ERROR_BUFFER_SIZE) {
             errorBuffer.shift();
         }
+
+        // Persist to DB for crash survival (fire-and-forget)
+        persistErrorToDb(entry).catch(() => {});
     }
 
     // Discord log (only for WARN and ERROR)
@@ -398,6 +401,79 @@ export function getErrorSummary(): Record<ErrorExplanation['severity'], number> 
  */
 export function clearErrorLog(): void {
     errorBuffer.length = 0;
+}
+
+/**
+ * Persist an error entry to the database for crash survival.
+ * Called automatically on every ERROR-level log.
+ */
+async function persistErrorToDb(entry: ErrorLogEntry): Promise<void> {
+    try {
+        // Lazy import to avoid circular dependency at module load time
+        const { getSupabase } = await import('../database/supabase');
+        const supabase = getSupabase();
+        await supabase.from('bot_config').upsert({
+            key: `error_log_${entry.id}`,
+            value: JSON.stringify({
+                timestamp: entry.timestamp,
+                message: entry.message,
+                errorMessage: entry.errorMessage,
+                stack: entry.stack,
+                context: entry.context,
+                severity: entry.explanation.severity,
+            }),
+        }, { onConflict: 'key' });
+    } catch {
+        // DB may not be ready — non-critical, in-memory buffer still works
+    }
+}
+
+/**
+ * Load persisted error entries from the database on startup.
+ * Pre-populates the in-memory error buffer so diagnostic history
+ * survives container restarts.
+ */
+export async function loadPersistedErrors(): Promise<void> {
+    try {
+        const { getSupabase } = await import('../database/supabase');
+        const supabase = getSupabase();
+        const { data } = await supabase
+            .from('bot_config')
+            .select('key, value')
+            .like('key', 'error_log_%')
+            .order('key', { ascending: true });
+
+        if (!data || data.length === 0) return;
+
+        let loaded = 0;
+        for (const row of data) {
+            try {
+                const parsed = JSON.parse(row.value);
+                const entry: ErrorLogEntry = {
+                    id: ++errorIdCounter,
+                    timestamp: parsed.timestamp,
+                    message: parsed.message,
+                    errorMessage: parsed.errorMessage,
+                    stack: parsed.stack,
+                    context: parsed.context,
+                    explanation: explainError(parsed.message),
+                };
+                errorBuffer.push(entry);
+                if (errorBuffer.length > ERROR_BUFFER_SIZE) {
+                    errorBuffer.shift();
+                }
+                loaded++;
+            } catch {
+                // Skip malformed entries
+            }
+        }
+
+        if (loaded > 0) {
+            console.log(`📋 [LOGGER] Loaded ${loaded} persisted error(s) from database`);
+        }
+    } catch {
+        // DB not ready — will start with empty buffer
+    }
 }
 
 function getLogPrefix(level: LogLevel): string {

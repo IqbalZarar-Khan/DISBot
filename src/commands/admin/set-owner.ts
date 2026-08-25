@@ -10,7 +10,7 @@ export async function handleSetOwner(interaction: ChatInputCommandInteraction): 
 
     try {
         // Update admin ID in database
-        setConfig('current_admin_id', newOwner.id);
+        await setConfig('current_admin_id', newOwner.id);
 
         await interaction.reply({
             content: `✅ **Owner Updated**\n\nBot control has been transferred to <@${newOwner.id}>.\n\n⚠️ **Important:** You will need to update the \`ROOT_ADMIN_ID\` in your environment variables and restart the bot for this change to take full effect.`,

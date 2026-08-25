@@ -7,6 +7,7 @@ import { createMemberEmbed } from '../../utils/embedBuilder';
 import { getTierRank, isUpgrade } from '../../utils/tierRanking';
 import { logger } from '../../utils/logger';
 import { getEventChannel } from '../../commands/admin/set-event-channel';
+import { markMemberWelcomed, wasRecentlyWelcomed } from '../welcomeGuard';
 
 /**
  * Handle members:update webhook event
@@ -43,35 +44,75 @@ export async function handleMembersUpdate(payload: WebhookPayload): Promise<void
         // Get old member data from database
         const oldMember = await getTrackedMember(memberId);
 
+        // Patreon reports active / former_member / declined. Sync our active
+        // flag from it so a member who lapsed without a members:delete webhook
+        // is still recognized as returning when they re-pledge.
+        const patronStatus = (attributes.patron_status as string) || null;
+        const derivedActive = patronStatus
+            ? (patronStatus === 'active')
+            : undefined; // payload doesn't say — preserve whatever the DB has
+
         if (oldMember) {
-            // Get tier mappings to find tier names
-            const oldTierMapping = await getTierMapping(oldMember.current_tier_id);
-            const oldTierName = oldTierMapping?.tier_name || 'Free';
-
-            // Compare tier ranks
-            const oldRank = getTierRank(oldTierName);
-            const newRank = getTierRank(newTierName);
-
-            // Check if this is an upgrade
-            if (isUpgrade(oldRank, newRank)) {
-                logger.info(`Member upgrade: ${fullName} (${oldTierName} → ${newTierName})`);
-
-                // Send upgrade alert to event-routed channel
-                const eventChannelId = await getEventChannel('pledge_upgrade');
-                if (eventChannelId) {
-                    try {
-                        const channel = await client.channels.fetch(eventChannelId) as TextChannel;
-                        if (channel) {
-                            const embed = createMemberEmbed({
-                                fullName,
-                                tierName: newTierName,
-                                isUpgrade: true
-                            });
-
-                            await channel.send({ embeds: [embed] });
+            if (oldMember.is_active === false && (derivedActive === true || (derivedActive === undefined && tierData.length > 0))) {
+                // Departed member is back — announce as returning. The create
+                // handlers may not have fired for the rejoin, so this handler
+                // announces too; the welcome guard prevents duplicates.
+                if (!wasRecentlyWelcomed(memberId)) {
+                    const eventChannelId = await getEventChannel('member_join');
+                    if (eventChannelId) {
+                        try {
+                            const channel = await client.channels.fetch(eventChannelId) as TextChannel;
+                            if (channel) {
+                                const embed = createMemberEmbed({
+                                    fullName,
+                                    tierName: newTierName,
+                                    isUpgrade: false,
+                                    isReturning: true
+                                });
+                                await channel.send({ embeds: [embed] });
+                                markMemberWelcomed(memberId);
+                                logger.info(`🎉 [MEMBERS:UPDATE] Welcome Back sent: ${fullName} (${newTierName})`);
+                            }
+                        } catch (error) {
+                            logger.warn('Failed to send welcome-back alert', error as Error);
                         }
-                    } catch (error) {
-                        logger.warn('Failed to send upgrade alert', error as Error);
+                    }
+                } else {
+                    logger.info(`📋 [MEMBERS:UPDATE] Welcome Back skipped (already announced moments ago): ${fullName}`);
+                }
+            } else if (oldMember.is_active === false) {
+                // Departure-related update (patron_status former_member/declined) — not a return
+                logger.info(`Member update for departed member: ${fullName} (${patronStatus || 'status unknown'}) — no announcement`);
+            } else {
+                // Get tier mappings to find tier names
+                const oldTierMapping = await getTierMapping(oldMember.current_tier_id);
+                const oldTierName = oldTierMapping?.tier_name || 'Free';
+
+                // Compare tier ranks
+                const oldRank = getTierRank(oldTierName);
+                const newRank = getTierRank(newTierName);
+
+                // Check if this is an upgrade
+                if (isUpgrade(oldRank, newRank)) {
+                    logger.info(`Member upgrade: ${fullName} (${oldTierName} → ${newTierName})`);
+
+                    // Send upgrade alert to event-routed channel
+                    const eventChannelId = await getEventChannel('pledge_upgrade');
+                    if (eventChannelId) {
+                        try {
+                            const channel = await client.channels.fetch(eventChannelId) as TextChannel;
+                            if (channel) {
+                                const embed = createMemberEmbed({
+                                    fullName,
+                                    tierName: newTierName,
+                                    isUpgrade: true
+                                });
+
+                                await channel.send({ embeds: [embed] });
+                            }
+                        } catch (error) {
+                            logger.warn('Failed to send upgrade alert', error as Error);
+                        }
                     }
                 }
             }
@@ -84,7 +125,8 @@ export async function handleMembersUpdate(payload: WebhookPayload): Promise<void
             current_tier_id: newTierId,
             email: email,
             joined_at: oldMember?.joined_at || Date.now(),
-            updated_at: Date.now()
+            updated_at: Date.now(),
+            ...(derivedActive !== undefined ? { is_active: derivedActive } : {})
         };
 
         queueMemberUpsert(trackedMember);

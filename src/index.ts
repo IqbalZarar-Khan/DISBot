@@ -180,19 +180,30 @@ function registerEventHandlers() {
             console.warn('⚠️ Webhook worker failed to start (non-fatal):', (err as Error).message);
         }
 
-        // Auto-deploy slash commands on startup
+        // Auto-deploy slash commands on startup (skip if unchanged to avoid rate limits)
         try {
-            console.log('🔄 Auto-deploying slash commands...');
+            const crypto = await import('crypto');
             const { REST, Routes } = await import('discord.js');
             const { getCommandData } = await import('./commands/commandData');
-            const rest = new REST({ version: '10' }).setToken(config.discordToken);
-            const applicationId = readyClient.user.id;
+            const { getConfig: getDbConfig, setConfig: setDbConfig } = await import('./database/db');
+
             const commands = getCommandData();
-            const data = await rest.put(
-                Routes.applicationGuildCommands(applicationId, config.guildId),
-                { body: commands }
-            ) as any[];
-            console.log(`✅ Auto-deployed ${data.length} slash commands`);
+            const commandHash = crypto.createHash('md5').update(JSON.stringify(commands)).digest('hex');
+            const lastHash = await getDbConfig('command_definition_hash').catch(() => null);
+
+            if (lastHash === commandHash) {
+                console.log('✅ Slash commands unchanged — skipping registration (rate limit safe)');
+            } else {
+                console.log('🔄 Slash commands changed — deploying...');
+                const rest = new REST({ version: '10' }).setToken(config.discordToken);
+                const applicationId = readyClient.user.id;
+                const data = await rest.put(
+                    Routes.applicationGuildCommands(applicationId, config.guildId),
+                    { body: commands }
+                ) as any[];
+                await setDbConfig('command_definition_hash', commandHash);
+                console.log(`✅ Auto-deployed ${data.length} slash commands`);
+            }
         } catch (err) {
             console.warn('⚠️ Auto-deploy commands failed (non-fatal):', (err as Error).message);
         }
@@ -211,6 +222,14 @@ function registerEventHandlers() {
             await loadDiagnosticCounters();
         } catch (err) {
             console.warn('⚠️ Diagnostic counter load failed (non-fatal):', (err as Error).message);
+        }
+
+        // Load persisted error log from database (crash survival)
+        try {
+            const { loadPersistedErrors } = await import('./utils/logger');
+            await loadPersistedErrors();
+        } catch (err) {
+            console.warn('⚠️ Persisted error log load failed (non-fatal):', (err as Error).message);
         }
 
         // Validate OAuth scopes on startup
@@ -233,6 +252,14 @@ function registerEventHandlers() {
             } else {
                 console.warn('⚠️ Could not validate Patreon scopes:', scopeErr.message);
             }
+        }
+
+        // Start proactive token refresh scheduler (idle deployment protection)
+        try {
+            const { startProactiveTokenRefresh } = await import('./utils/patreonClient');
+            await startProactiveTokenRefresh();
+        } catch (err) {
+            console.warn('⚠️ Proactive token refresh failed to start:', (err as Error).message);
         }
 
         // Poller is OFF by default — start manually via /admin poller start
@@ -357,6 +384,14 @@ function registerEventHandlers() {
 process.on('SIGINT', async () => {
     console.log('\n👋 Shutting down bot...');
     stopPolling();
+    try {
+        const { stopProactiveTokenRefresh } = await import('./utils/patreonClient');
+        stopProactiveTokenRefresh();
+    } catch { /* non-critical */ }
+    try {
+        const { flushDiagnosticCounters } = await import('./commands/admin/status');
+        await flushDiagnosticCounters();
+    } catch { /* non-critical */ }
     await stopBatchWriter();
     await stopWebhookWorker();
     await closeWebhookQueue();
@@ -368,6 +403,14 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
     console.log('\n👋 Shutting down bot...');
     stopPolling();
+    try {
+        const { stopProactiveTokenRefresh } = await import('./utils/patreonClient');
+        stopProactiveTokenRefresh();
+    } catch { /* non-critical */ }
+    try {
+        const { flushDiagnosticCounters } = await import('./commands/admin/status');
+        await flushDiagnosticCounters();
+    } catch { /* non-critical */ }
     await stopBatchWriter();
     await stopWebhookWorker();
     await closeWebhookQueue();

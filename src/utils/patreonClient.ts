@@ -41,10 +41,51 @@ async function loadTokensFromDb(): Promise<void> {
     }
 }
 
+let proactiveRefreshTimer: NodeJS.Timeout | null = null;
+const REFRESH_INTERVAL_MS = 25 * 24 * 60 * 60_000; // 25 days
+
+/**
+ * Start proactive token refresh scheduler.
+ * Runs on boot and checks if tokens should be proactively refreshed to avoid
+ * phantom 401s on idle deployments.
+ */
+export async function startProactiveTokenRefresh(): Promise<void> {
+    await loadTokensFromDb();
+
+    // Check if token was refreshed within last 25 days
+    try {
+        const lastRefreshedAtStr = await getConfig('patreon_token_refreshed_at');
+        const lastRefreshedAt = lastRefreshedAtStr ? parseInt(lastRefreshedAtStr, 10) : 0;
+        const now = Date.now();
+
+        if (currentRefreshToken && (!lastRefreshedAt || now - lastRefreshedAt > REFRESH_INTERVAL_MS)) {
+            logger.info('🔑 [TOKEN] Token refresh window reached — proactively refreshing token');
+            await refreshAccessToken();
+        }
+    } catch {
+        // Non-critical startup check
+    }
+
+    if (proactiveRefreshTimer) clearInterval(proactiveRefreshTimer);
+    proactiveRefreshTimer = setInterval(async () => {
+        if (currentRefreshToken) {
+            logger.info('🔑 [TOKEN] Running scheduled proactive token refresh');
+            await refreshAccessToken().catch(err => logger.warn('🔑 [TOKEN] Scheduled refresh failed', err as Error));
+        }
+    }, REFRESH_INTERVAL_MS);
+}
+
+export function stopProactiveTokenRefresh(): void {
+    if (proactiveRefreshTimer) {
+        clearInterval(proactiveRefreshTimer);
+        proactiveRefreshTimer = null;
+    }
+}
+
 /**
  * Refresh the Patreon access token using the refresh token.
  */
-async function refreshAccessToken(): Promise<boolean> {
+export async function refreshAccessToken(): Promise<boolean> {
     if (isRefreshing) return false;
     if (!currentRefreshToken) {
         logger.warn('🔑 [TOKEN] No refresh token available — cannot auto-refresh');
@@ -54,7 +95,7 @@ async function refreshAccessToken(): Promise<boolean> {
     isRefreshing = true;
 
     try {
-        logger.info('🔑 [TOKEN] Access token expired — refreshing...');
+        logger.info('🔑 [TOKEN] Access token expired or refresh requested — refreshing...');
 
         const res = await axios.post(TOKEN_URL, null, {
             params: {
@@ -79,6 +120,7 @@ async function refreshAccessToken(): Promise<boolean> {
         if (refresh_token) {
             await setConfig('patreon_refresh_token', refresh_token);
         }
+        await setConfig('patreon_token_refreshed_at', String(Date.now()));
 
         logger.info('🔑 [TOKEN] Token refreshed and saved to database');
         return true;

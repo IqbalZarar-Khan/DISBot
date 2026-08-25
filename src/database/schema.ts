@@ -26,6 +26,8 @@ export interface TrackedMember {
     email: string | null;
     joined_at: number;
     updated_at: number;
+    /** False once the member departs (members:delete); flipped back on rejoin. */
+    is_active?: boolean;
 }
 
 // Tier ranking enum (higher number = higher tier)

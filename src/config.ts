@@ -181,11 +181,15 @@ export function validateConfig(): void {
             const cheaper = sorted[i + 1];
 
             if (cheaper.rank > expensive.rank) {
-                console.warn(`\n⚠️  TIER RANK MISMATCH DETECTED:`);
-                console.warn(`    "${cheaper.name}" costs ${cheaper.cents}¢ but has rank ${cheaper.rank}`);
-                console.warn(`    "${expensive.name}" costs ${expensive.cents}¢ but has rank ${expensive.rank}`);
-                console.warn(`    → The cheaper tier "${cheaper.name}" outranks the expensive tier "${expensive.name}".`);
-                console.warn(`    → This will break waterfall logic. Fix your TIER_CONFIG ranks.\n`);
+                console.error(`\n❌ FATAL: TIER RANK INVERSION DETECTED:`);
+                console.error(`    "${cheaper.name}" costs ${cheaper.cents}¢ but has rank ${cheaper.rank}`);
+                console.error(`    "${expensive.name}" costs ${expensive.cents}¢ but has rank ${expensive.rank}`);
+                console.error(`    → The cheaper tier "${cheaper.name}" outranks the expensive tier "${expensive.name}".`);
+                console.error(`    → This WILL break waterfall logic and may leak premium content.`);
+                console.error(`    → Fix your TIER_CONFIG ranks, or set ALLOW_RANK_INVERSION=true to bypass.\n`);
+                if (process.env.ALLOW_RANK_INVERSION?.toLowerCase() !== 'true') {
+                    process.exit(1);
+                }
             }
         }
     }

@@ -73,13 +73,15 @@ higher priority = narrower audience:
 At boot, `src/utils/tierRanking.ts` builds three lookup maps from this: `tierIdMap`
 (id → name), `tierRankings` (name → rank), and `centsMap` (cents → name).
 
-Boot validation warns if a **cheaper tier outranks a more expensive one** — that inversion would
-break waterfall logic (see the rank/cents mismatch check in `src/config.ts`).
+Boot validation **aborts with a fatal error (`process.exit(1)`)** if a **cheaper tier outranks a more expensive one** — that inversion would break waterfall distribution and risk leaking premium content. Set `ALLOW_RANK_INVERSION=true` in environment variables if non-standard inverted tier rankings are intentionally required.
 
 ## Setup Mode
 
-If any of `DISCORD_TOKEN`, `GUILD_ID`, `ROOT_ADMIN_ID`, Patreon credentials, `WEBHOOK_SECRET`
+If any of `DISCORD_TOKEN`, `GUILD_ID`, `ROOT_ADMIN_ID`, Patreon credentials, or `WEBHOOK_SECRET`
 are missing, `config._isSetupMode` is set: the bot starts **only** the web server and the
-cloud Setup Wizard at `/setup`, which walks through credential entry, then the owner runs
-`!claim` in Discord to bind `ROOT_ADMIN_ID`. This exists so a fresh cloud deployment can be
-configured entirely through the browser without redeploying.
+cloud Setup Wizard at `/setup`.
+
+**Authentication in Setup Mode:**
+- When `DISCORD_TOKEN` is configured, it acts as the unlock password.
+- When `DISCORD_TOKEN` is missing (fresh cloud deployment), the bot generates a secure, one-time random `SETUP_TOKEN` printed to the server console upon boot. This token must be entered into `/setup` to unlock the wizard, preventing unauthorized hijacking of fresh deployments on public URLs.
+- After configuring credentials in the wizard, the owner runs `!claim` in Discord to bind `ROOT_ADMIN_ID`.
