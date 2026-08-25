@@ -207,20 +207,47 @@ async function getPatreonHealth(): Promise<{ status: string; latency: string }> 
     try {
         const start = Date.now();
         const axios = (await import('axios')).default;
-        const token = process.env.PATREON_ACCESS_TOKEN || config.patreonAccessToken;
+        const { getCurrentAccessToken, refreshAccessToken } = await import('../../utils/patreonClient');
+        let token = getCurrentAccessToken() || process.env.PATREON_ACCESS_TOKEN || config.patreonAccessToken;
 
-        const response = await axios.get(
-            'https://www.patreon.com/api/oauth2/api/current_user',
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Accept-Encoding': 'gzip, deflate',
-                },
-                timeout: 5000,
+        let response;
+        try {
+            response = await axios.get(
+                'https://www.patreon.com/api/oauth2/api/current_user',
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Accept-Encoding': 'gzip, deflate',
+                    },
+                    timeout: 5000,
+                }
+            );
+        } catch (requestErr: any) {
+            // If token expired, attempt auto-refresh
+            if (requestErr.response?.status === 401) {
+                const refreshed = await refreshAccessToken();
+                if (refreshed) {
+                    token = getCurrentAccessToken();
+                    response = await axios.get(
+                        'https://www.patreon.com/api/oauth2/api/current_user',
+                        {
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                'Accept-Encoding': 'gzip, deflate',
+                            },
+                            timeout: 5000,
+                        }
+                    );
+                } else {
+                    throw requestErr;
+                }
+            } else {
+                throw requestErr;
             }
-        );
+        }
+
         const ms = Date.now() - start;
-        if (response.status === 200) {
+        if (response && response.status === 200) {
             const name = response.data?.data?.attributes?.full_name || 'Unknown';
             status = '🟢 Connected';
             latency = ` (${ms}ms, ${name})`;

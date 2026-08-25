@@ -232,11 +232,21 @@ function registerEventHandlers() {
             console.warn('⚠️ Persisted error log load failed (non-fatal):', (err as Error).message);
         }
 
-        // Validate OAuth scopes on startup
+        // Start proactive token refresh scheduler (loads tokens from DB, idle deployment protection)
+        try {
+            const { startProactiveTokenRefresh } = await import('./utils/patreonClient');
+            await startProactiveTokenRefresh();
+        } catch (err) {
+            console.warn('⚠️ Proactive token refresh failed to start:', (err as Error).message);
+        }
+
+        // Validate OAuth scopes on startup using active token
         try {
             const axios = (await import('axios')).default;
+            const { getCurrentAccessToken } = await import('./utils/patreonClient');
+            const token = getCurrentAccessToken() || config.patreonAccessToken;
             const res = await axios.get('https://www.patreon.com/api/oauth2/v2/campaigns', {
-                headers: { Authorization: `Bearer ${config.patreonAccessToken}` },
+                headers: { Authorization: `Bearer ${token}` },
                 timeout: 10000,
             });
             if (res.status === 200) {
@@ -252,14 +262,6 @@ function registerEventHandlers() {
             } else {
                 console.warn('⚠️ Could not validate Patreon scopes:', scopeErr.message);
             }
-        }
-
-        // Start proactive token refresh scheduler (idle deployment protection)
-        try {
-            const { startProactiveTokenRefresh } = await import('./utils/patreonClient');
-            await startProactiveTokenRefresh();
-        } catch (err) {
-            console.warn('⚠️ Proactive token refresh failed to start:', (err as Error).message);
         }
 
         // Poller is OFF by default — start manually via /admin poller start

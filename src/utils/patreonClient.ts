@@ -42,37 +42,38 @@ async function loadTokensFromDb(): Promise<void> {
 }
 
 let proactiveRefreshTimer: NodeJS.Timeout | null = null;
-const REFRESH_INTERVAL_MS = 25 * 24 * 60 * 60_000; // 25 days
+const TOKEN_EXPIRY_WINDOW_MS = 25 * 24 * 60 * 60_000; // 25 days
+const CHECK_INTERVAL_MS = 60 * 60_000; // Check every 1 hour (avoids 32-bit int overflow in setInterval)
 
-/**
- * Start proactive token refresh scheduler.
- * Runs on boot and checks if tokens should be proactively refreshed to avoid
- * phantom 401s on idle deployments.
- */
-export async function startProactiveTokenRefresh(): Promise<void> {
-    await loadTokensFromDb();
-
-    // Check if token was refreshed within last 25 days
+async function checkAndRefreshToken(): Promise<void> {
+    if (!currentRefreshToken) return;
     try {
         const lastRefreshedAtStr = await getConfig('patreon_token_refreshed_at');
         const lastRefreshedAt = lastRefreshedAtStr ? parseInt(lastRefreshedAtStr, 10) : 0;
         const now = Date.now();
 
-        if (currentRefreshToken && (!lastRefreshedAt || now - lastRefreshedAt > REFRESH_INTERVAL_MS)) {
-            logger.info('🔑 [TOKEN] Token refresh window reached — proactively refreshing token');
+        // Only refresh if token was never refreshed or has been active for > 25 days
+        if (lastRefreshedAt && (now - lastRefreshedAt >= TOKEN_EXPIRY_WINDOW_MS)) {
+            logger.info('🔑 [TOKEN] 25-day refresh window reached — proactively refreshing token');
             await refreshAccessToken();
         }
-    } catch {
-        // Non-critical startup check
+    } catch (err) {
+        logger.warn('🔑 [TOKEN] Scheduled token check failed', err as Error);
     }
+}
+
+/**
+ * Start proactive token refresh scheduler.
+ * Runs on boot and checks hourly if tokens should be refreshed (every 25 days).
+ */
+export async function startProactiveTokenRefresh(): Promise<void> {
+    await loadTokensFromDb();
+
+    // Run initial check
+    await checkAndRefreshToken();
 
     if (proactiveRefreshTimer) clearInterval(proactiveRefreshTimer);
-    proactiveRefreshTimer = setInterval(async () => {
-        if (currentRefreshToken) {
-            logger.info('🔑 [TOKEN] Running scheduled proactive token refresh');
-            await refreshAccessToken().catch(err => logger.warn('🔑 [TOKEN] Scheduled refresh failed', err as Error));
-        }
-    }, REFRESH_INTERVAL_MS);
+    proactiveRefreshTimer = setInterval(checkAndRefreshToken, CHECK_INTERVAL_MS);
 }
 
 export function stopProactiveTokenRefresh(): void {
