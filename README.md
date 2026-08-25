@@ -701,7 +701,7 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - 💾 **DB-Persisted Diagnostics & Error Buffers**: Error ring buffers (`error_log_<id>`) and diagnostic counters persist to `bot_config` and flush synchronously on `SIGINT`/`SIGTERM` shutdowns
 - 🔑 **Proactive Patreon Token Refresh**: Background scheduler refreshes tokens every 25 days, preventing expired token 401s on idle bot deployments
 - ⚡ **Rate-Limit Safe Command Deployment**: Auto-deploy fingerprints command schemas via MD5 hash to skip redundant Discord API registration on restarts
-- 🔄 **Cluster Cache Invalidation**: `/admin sync-tiers` publishes `disbot:cache:invalidate` across Redis cluster instances for zero-lag cache synchronization
+- 🔄 **Multi-Node Cache Invalidation**: `/admin sync-tiers` synchronizes in-memory tier maps across all cluster nodes via dual-channel invalidation: Redis pub/sub (`disbot:cache:invalidate`) and native Supabase Realtime WebSockets (`postgres_changes`) for non-Redis environments
 - 🎯 **Targeted Replay with Discord ID**: Migration `014` captures `discord_user_id` pre-redaction; `/admin replay-webhook` re-hydrates Discord IDs for win-back DMs
 - 🗃️ **SQLite Schema Auto-Upgrades**: SQLite adapter auto-applies missing columns (`member_name`, `discord_user_id`, `is_active`) on initialization
 - ⏱️ **Ephemeral Scheduler Persistence**: Weekly digest and anniversary checkers persist run states to `bot_config` to avoid missed or repeated schedules across container recycles
