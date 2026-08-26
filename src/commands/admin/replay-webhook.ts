@@ -24,8 +24,8 @@ import { logger } from '../../utils/logger';
  *   hours:   lookback window for "replay-missed" (default 24, max 168)
  */
 
-// Safety cap: replaying sends real Discord messages — keep batches small
-const MAX_BATCH_REPLAY = 10;
+// Default batch cap if limit is unspecified
+const DEFAULT_BATCH_REPLAY = 25;
 
 const VIEW_ROW_LIMIT = 25; // Discord embed field limit
 
@@ -49,33 +49,59 @@ function timeAgoTag(receivedAt: string): string {
  * preserves the Discord ID, so we patch them back in for replay.
  * Emails stay redacted (not recoverable — by design).
  */
-function hydrateRedactedNames(row: WebhookLogRow): any {
+/**
+ * Restore redacted patron names, Discord IDs, and legacy post URLs in a stored payload before replay.
+ * full_name/email etc. are stripped by PII redaction at log time; the
+ * member_name column still holds the display name, and discord_user_id
+ * preserves the Discord ID, so we patch them back in for replay.
+ * For legacy posts:* rows where URL was redacted, we look up tracked_posts.
+ */
+async function hydrateRedactedPayload(row: WebhookLogRow): Promise<any> {
     if (!row.payload) return null;
 
     const payload = JSON.parse(JSON.stringify(row.payload));
-    if (!row.member_name || row.member_name === 'Unknown') return payload;
 
-    // members:create / members:update / members:delete → name on data.attributes
-    if (row.event_type.startsWith('members:') && !row.event_type.includes('pledge')) {
-        if (payload.data?.attributes) {
-            payload.data.attributes.full_name = row.member_name;
+    // 1. Member Events: Restore member name and Discord ID
+    if (row.member_name && row.member_name !== 'Unknown') {
+        if (row.event_type.startsWith('members:') && !row.event_type.includes('pledge')) {
+            if (payload.data?.attributes) {
+                payload.data.attributes.full_name = row.member_name;
+            }
+        } else if (row.event_type.startsWith('members:pledge')) {
+            const included = payload.included || [];
+            const patronRef = payload.data?.relationships?.patron?.data;
+            const userRecord = patronRef
+                ? included.find((item: any) => item.type === 'user' && item.id === patronRef.id)
+                : included.find((item: any) => item.type === 'user');
+            if (userRecord?.attributes) {
+                userRecord.attributes.full_name = row.member_name;
+                // Restore Discord user ID if available (for targeted DM delivery)
+                if (row.discord_user_id && userRecord.attributes.social_connections) {
+                    userRecord.attributes.social_connections.discord = {
+                        user_id: row.discord_user_id,
+                    };
+                }
+            }
         }
-        return payload;
     }
 
-    // members:pledge:* → name lives on the user record inside included[]
-    const included = payload.included || [];
-    const patronRef = payload.data?.relationships?.patron?.data;
-    const userRecord = patronRef
-        ? included.find((item: any) => item.type === 'user' && item.id === patronRef.id)
-        : included.find((item: any) => item.type === 'user');
-    if (userRecord?.attributes) {
-        userRecord.attributes.full_name = row.member_name;
-        // Restore Discord user ID if available (for targeted DM delivery)
-        if ((row as any).discord_user_id && userRecord.attributes.social_connections) {
-            userRecord.attributes.social_connections.discord = {
-                user_id: (row as any).discord_user_id,
-            };
+    // 2. Post Events: Restore legacy redacted post URL / title from tracked_posts
+    if (row.event_type.startsWith('posts:')) {
+        const postId = payload.data?.id;
+        if (postId && (payload.data?.attributes?.url === '[REDACTED]' || !payload.data?.attributes?.url)) {
+            try {
+                const { getTrackedPost } = await import('../../database/db');
+                const post = await getTrackedPost(postId);
+                if (post) {
+                    payload.data.attributes = payload.data.attributes || {};
+                    if (payload.data.attributes.title === '[REDACTED]' || !payload.data.attributes.title) {
+                        payload.data.attributes.title = post.title;
+                    }
+                    payload.data.attributes.url = `https://www.patreon.com/posts/${post.post_id}`;
+                }
+            } catch {
+                // Non-critical fallback
+            }
         }
     }
 
@@ -106,8 +132,10 @@ async function replayRow(row: WebhookLogRow): Promise<ReplayOutcome> {
         return { row, ok: false, detail: 'No payload stored for this row' };
     }
 
-    const payload = hydrateRedactedNames(row);
-    const caveat = hasLegacyRedactedUrl(row) ? ' (legacy row — post link was redacted at log time)' : '';
+    const payload = await hydrateRedactedPayload(row);
+    const caveat = hasLegacyRedactedUrl(row) && (!payload.data?.attributes?.url || payload.data?.attributes?.url === '[REDACTED]')
+        ? ' (legacy row — post link was redacted at log time)'
+        : '';
 
     try {
         // Re-dispatch through the normal router; it updates the same
@@ -139,6 +167,7 @@ export async function handleReplayWebhook(interaction: ChatInputCommandInteracti
     const action = interaction.options.getString('action') ?? 'view';
     const logId = interaction.options.getInteger('log_id');
     const hours = Math.min(Math.max(interaction.options.getInteger('hours') ?? 24, 1), 168);
+    const limit = Math.min(Math.max(interaction.options.getInteger('limit') ?? DEFAULT_BATCH_REPLAY, 1), 50);
 
     // ── View: list recent webhook_log rows ────────────────────────────────────
     if (action === 'view') {
@@ -220,10 +249,12 @@ export async function handleReplayWebhook(interaction: ChatInputCommandInteracti
             return;
         }
 
-        const batch = replayable.slice(0, MAX_BATCH_REPLAY);
+        const batch = replayable.slice(0, limit);
         const outcomes: ReplayOutcome[] = [];
         for (const row of batch) {
             outcomes.push(await replayRow(row));
+            // Gentle 300ms pacing to avoid Discord API rate limits
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
         const okCount = outcomes.filter(o => o.ok).length;
@@ -238,8 +269,8 @@ export async function handleReplayWebhook(interaction: ChatInputCommandInteracti
                 .setTitle('🔁 Replay Missed Webhooks')
                 .setDescription(
                     `**${okCount}/${outcomes.length}** replayed successfully from the last **${hours}h**.` +
-                    (replayable.length > MAX_BATCH_REPLAY
-                        ? `\n⚠️ ${replayable.length - MAX_BATCH_REPLAY} older row(s) not replayed (batch cap ${MAX_BATCH_REPLAY}) — run again after reviewing.`
+                    (replayable.length > limit
+                        ? `\n⚠️ ${replayable.length - limit} older row(s) remaining (batch limit ${limit}) — run again to continue.`
                         : '') +
                     (skippedUnknown > 0 ? `\nℹ️ ${skippedUnknown} row(s) skipped (no handler for their event type).` : '')
                 )

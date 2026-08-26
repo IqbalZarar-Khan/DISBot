@@ -76,7 +76,26 @@ export async function isDuplicateAsync(body: string, eventType: string): Promise
             return false; // Key set successfully → first time
         }
     } catch {
-        // Redis unavailable — fall through to local memory
+        // Redis unavailable — fall through to database
+    }
+
+    // Try Database (PostgreSQL/Supabase) for cross-instance deduplication when Redis is absent
+    try {
+        const { getSupabase } = await import('../database/supabase');
+        const supabase = getSupabase();
+        const sixtySecondsAgo = new Date(Date.now() - DEDUP_TTL_MS).toISOString();
+        const { data } = await supabase
+            .from('webhook_log')
+            .select('id')
+            .eq('dedup_hash', hash)
+            .gte('received_at', sixtySecondsAgo)
+            .limit(1);
+
+        if (data && data.length > 0) {
+            return true; // Found matching recent event in DB across cluster
+        }
+    } catch {
+        // Database check failed — fall through to local memory
     }
 
     // Local memory fallback (single-instance only)

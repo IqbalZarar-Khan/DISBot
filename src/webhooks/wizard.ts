@@ -55,10 +55,31 @@ export const setupWizardPlugin: FastifyPluginAsync = async (fastify, _opts) => {
             return;
         }
 
+        // Production Lockdown: Disable /setup if explicitly disabled or completed
+        if (process.env.DISABLE_SETUP_WIZARD === 'true') {
+            return reply.code(403).type('text/html').send(`
+                <html><body style="background:#0f0c29;color:#fff;text-align:center;padding:4rem;font-family:system-ui">
+                <h2>⛔ Setup Wizard Disabled</h2>
+                <p>The web setup wizard is disabled in this environment.</p>
+                <p style="color:#aaa;margin-top:1rem">To configure your bot, use Discord Slash commands (e.g., <code>/admin setup</code>, <code>/admin sync-tiers</code>).</p>
+                </body></html>
+            `);
+        }
+
         const token = query.token || (request.headers['authorization']?.split(' ')[1]);
 
-        // If DISCORD_TOKEN is set, use it as the auth gate (existing behavior)
+        // If DISCORD_TOKEN is set, check if setup is already locked/completed
         if (process.env.DISCORD_TOKEN) {
+            if (process.env.SETUP_COMPLETED === 'true' && process.env.ALLOW_WIZARD_RECONFIG !== 'true') {
+                return reply.code(403).type('text/html').send(`
+                    <html><body style="background:#0f0c29;color:#fff;text-align:center;padding:4rem;font-family:system-ui">
+                    <h2>🔒 Setup Already Completed</h2>
+                    <p>This bot deployment has already completed setup and the wizard is locked for security.</p>
+                    <p style="color:#aaa;margin-top:1rem">To modify settings, use Discord admin commands or set <code>ALLOW_WIZARD_RECONFIG=true</code> in your environment.</p>
+                    </body></html>
+                `);
+            }
+
             if (token !== process.env.DISCORD_TOKEN) {
                 return reply.code(401).type('text/html').send(`
                     <html><body style="background:#0f0c29;color:#fff;text-align:center;padding:4rem;font-family:system-ui">

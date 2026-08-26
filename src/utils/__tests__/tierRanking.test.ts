@@ -13,6 +13,7 @@ import {
     compareTiers,
     isUpgrade,
     isWaterfall,
+    getWidestAudienceTier,
     getTierColor,
     getTierEmoji,
 } from '../tierRanking';
@@ -96,6 +97,17 @@ describe('compareTiers / isUpgrade / isWaterfall', () => {
         expect(isWaterfall(100, 25)).toBe(true);
         expect(isWaterfall(25, 25)).toBe(false);
         expect(isWaterfall(25, 100)).toBe(false);
+    });
+
+    it('getWidestAudienceTier selects lowest access tier from multiple options', () => {
+        const result = getWidestAudienceTier(['ZqxTestDiamond', 'ZqxTestGold', 'ZqxTestBronze']);
+        expect(result.name).toBe('ZqxTestBronze');
+        expect(result.rank).toBe(25);
+    });
+
+    it('getWidestAudienceTier handles empty or unknown list safely', () => {
+        expect(getWidestAudienceTier([])).toEqual({ name: 'Free', rank: 0 });
+        expect(getWidestAudienceTier(['UnknownTier123'])).toEqual({ name: 'Free', rank: 0 });
     });
 });
 

@@ -64,6 +64,7 @@ export function initSqlite(): void {
                 member_id        TEXT,
                 member_name      TEXT,
                 discord_user_id  TEXT,
+                dedup_hash       TEXT,
                 payload          TEXT NOT NULL,
                 received_at      TEXT DEFAULT (datetime('now')),
                 processed        INTEGER DEFAULT 0,
@@ -72,6 +73,7 @@ export function initSqlite(): void {
             );
             CREATE INDEX IF NOT EXISTS webhook_log_event_type_idx ON webhook_log (event_type);
             CREATE INDEX IF NOT EXISTS webhook_log_member_id_idx  ON webhook_log (member_id);
+            CREATE INDEX IF NOT EXISTS webhook_log_dedup_hash_idx ON webhook_log (dedup_hash);
             CREATE INDEX IF NOT EXISTS webhook_log_received_at_idx ON webhook_log (received_at DESC);
         `);
 
@@ -79,6 +81,7 @@ export function initSqlite(): void {
         const upgrades = [
             { table: 'webhook_log', column: 'member_name', type: 'TEXT' },
             { table: 'webhook_log', column: 'discord_user_id', type: 'TEXT' },
+            { table: 'webhook_log', column: 'dedup_hash', type: 'TEXT' },
             { table: 'tracked_members', column: 'is_active', type: 'INTEGER DEFAULT 1' },
         ];
         for (const { table, column, type } of upgrades) {
@@ -93,6 +96,8 @@ export function initSqlite(): void {
                 // Column might already exist — safe to ignore
             }
         }
+
+        console.log('⚠️  [SQLITE] Running on embedded SQLite fallback (local/single-instance mode only)');
 
         console.log(`✅ SQLite database initialized at ${dbPath}`);
     } catch (err: any) {

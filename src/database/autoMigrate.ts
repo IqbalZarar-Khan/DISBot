@@ -105,7 +105,7 @@ export async function runAutoMigrations(): Promise<void> {
         // Verify webhook_log structure
         const { error: whErr } = await supabase
             .from('webhook_log')
-            .select('id, event_type, member_name, discord_user_id')
+            .select('id, event_type, member_name, discord_user_id, dedup_hash')
             .limit(1);
 
         if (whErr) {

@@ -1,0 +1,76 @@
+{
+    "bot": {
+        "starting": "🚀 Starte Patreon Tier-Waterfall Bot...",
+        "login_attempt": "🔑 Discord-Anmeldeversuch {{attempt}}/{{max}}...",
+        "login_success": "✅ Discord-Anmeldung erfolgreich",
+        "login_failed": "⚠️ Anmeldung fehlgeschlagen: {{reason}}",
+        "login_retry": "   Wiederhole in {{delay}}s...",
+        "login_exhausted": "❌ Alle Anmeldeversuche fehlgeschlagen. Der Bot kann sich nicht mit Discord verbinden.",
+        "shutdown": "👋 Fahre Bot herunter...",
+        "ready": "✅ Bot angemeldet als {{tag}}"
+    },
+    "commands": {
+        "admin_only": "⛔ Nur der Hauptadministrator darf diesen Befehl verwenden.",
+        "unknown": "❌ Unbekannter Admin-Befehl.",
+        "error": "❌ Beim Ausführen dieses Befehls ist ein Fehler aufgetreten.",
+        "error_check_logs": "❌ Ein Fehler ist aufgetreten. Bitte überprüfen Sie die Protokolle."
+    },
+    "setup": {
+        "no_tiers": "❌ Keine Stufen konfiguriert. Führen Sie zuerst `/admin sync-tiers` aus.",
+        "step1_title": "🔧 Interaktives Stufen-Setup",
+        "step1_desc": "**Schritt 1/2** — Wählen Sie eine Stufe aus, die einem Discord-Kanal zugewiesen werden soll.",
+        "step2_desc": "**Schritt 2/2** — Wählen Sie einen Discord-Kanal für **{{tier}}**",
+        "success_title": "✅ Stufe erfolgreich zugewiesen",
+        "timeout": "⏰ Setup-Zeitüberschreitung. Führen Sie `/admin setup` erneut aus.",
+        "select_tier": "Wählen Sie eine Patreon-Stufe aus...",
+        "select_channel": "Wählen Sie einen Kanal für {{tier}}...",
+        "current_mappings": "Aktuelle Zuweisungen",
+        "unmapped": "⚠️ *nicht zugewiesen*"
+    },
+    "sync": {
+        "title": "✅ Stufen synchronisiert",
+        "description": "**{{count}}** Stufe(n) von Patreon abgerufen und Datenbank aktualisiert.",
+        "no_tiers": "⚠️ Keine veröffentlichten Stufen in Ihrer Patreon-Kampagne gefunden.",
+        "missing_creds": "❌ `PATREON_ACCESS_TOKEN` oder `PATREON_CAMPAIGN_ID` fehlt in der Umgebung.",
+        "expired_token": "❌ Patreon API gab 401 zurück — Ihr Zugriffstoken ist möglicherweise abgelaufen.",
+        "synced_tiers": "Synchronisierte Stufen",
+        "unmapped_tiers": "⚠️ Nicht zugewiesene Stufen"
+    },
+    "stats": {
+        "title": "📊 Patron-Analyse-Dashboard",
+        "total_patrons": "👥 Gesamte Patrons",
+        "active_tiers": "🏷️ Aktive Stufen",
+        "tracked_posts": "📝 Verfolgte Beiträge",
+        "growth_30d": "📈 Wachstum (letzte 30 Tage)",
+        "tier_distribution": "🎯 Stufenverteilung",
+        "recent_activity": "🕐 Letzte Aktivität",
+        "new_patrons": "Neue Patrons: **{{count}}**",
+        "active_changes": "Aktive Änderungen: **{{count}}** Upgrades/Änderungen",
+        "new_this_week": "Neu diese Woche: **{{count}}**"
+    },
+    "webhook": {
+        "signature_failed": "⛔ [SICHERHEITSBLOCKIERUNG] Signaturüberprüfung FEHLGESCHLAGEN",
+        "signature_passed": "✅ [SICHERHEIT ERFOLGREICH] Signatur erfolgreich verifiziert",
+        "duplicate": "🔁 [DEDUP] Duplizierter Webhook erkannt — überspringe",
+        "incoming": "📡 [EINGEHENDER WEBHOOK-VERKEHR]"
+    },
+    "poller": {
+        "starting": "🔄 [POLLER] Startet — Prüfung alle {{interval}} Minuten",
+        "stopped": "🔄 [POLLER] Gestoppt",
+        "checking": "🔄 [POLLER] Überprüfe Patreon auf stille Stufenänderungen...",
+        "no_changes": "🔄 [POLLER] Keine stillen Stufenänderungen erkannt",
+        "detected": "🔄 [POLLER] {{count}} stille Stufenänderung(en) erkannt",
+        "silent_change": "🔄 [POLLER] Stille Stufenänderung: \"{{title}}\" ({{old}} → {{new}})"
+    },
+    "errors": {
+        "failed_start": "❌ Fehler beim Starten des Bots:",
+        "webhook_server_fail": "❌ Fehler beim Starten des Webhook-Servers:",
+        "config_invalid_json": "❌ FATAL: TIER_CONFIG ist kein gültiges JSON.",
+        "config_not_array": "❌ FATAL: TIER_CONFIG muss ein JSON-Array sein",
+        "config_invalid_entry": "❌ FATAL: TIER_CONFIG enthält ungültige Einträge:"
+    },
+    "messages": {
+        "set_channel": "✅ **Stufenzuweisung aktualisiert**\n\nDie Stufe **{{tier}}** ist jetzt {{channel}} zugewiesen.",
+        "channel_text_only": "❌ Bitte wählen Sie einen Textkanal aus."
+    }
+}

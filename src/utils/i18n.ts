@@ -42,7 +42,21 @@ export function t(key: string, params?: Record<string, string | number>): string
         if (value && typeof value === 'object' && part in value) {
             value = value[part];
         } else {
-            // Key not found — return the key itself as fallback
+            // Key not found in current locale — fall back to English if not already using en
+            if (currentLocale !== en) {
+                let enValue: any = en;
+                for (const enPart of parts) {
+                    if (enValue && typeof enValue === 'object' && enPart in enValue) {
+                        enValue = enValue[enPart];
+                    } else {
+                        return key;
+                    }
+                }
+                if (typeof enValue === 'string') {
+                    value = enValue;
+                    break;
+                }
+            }
             return key;
         }
     }

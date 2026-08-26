@@ -1,0 +1,76 @@
+{
+    "bot": {
+        "starting": "🚀 正在启动 Patreon 阶梯瀑布流机器人...",
+        "login_attempt": "🔑 Discord 登录尝试 {{attempt}}/{{max}}...",
+        "login_success": "✅ Discord 登录成功",
+        "login_failed": "⚠️ 登录失败: {{reason}}",
+        "login_retry": "   将在 {{delay}} 秒后重试...",
+        "login_exhausted": "❌ 所有登录尝试均失败。机器人无法连接至 Discord。",
+        "shutdown": "👋 正在关闭机器人...",
+        "ready": "✅ 机器人已成功登录为 {{tag}}"
+    },
+    "commands": {
+        "admin_only": "⛔ 仅超级管理员可以使用此命令。",
+        "unknown": "❌ 未知的管理员命令。",
+        "error": "❌ 执行此命令时发生错误。",
+        "error_check_logs": "❌ 发生错误，请查看日志。"
+    },
+    "setup": {
+        "no_tiers": "❌ 未配置任何赞助等级。请先运行 `/admin sync-tiers` 从 Patreon 获取等级。",
+        "step1_title": "🔧 交互式等级配置",
+        "step1_desc": "**步骤 1/2** — 选择要映射到 Discord 频道的赞助等级。",
+        "step2_desc": "**步骤 2/2** — 为 **{{tier}}** 选择 Discord 频道",
+        "success_title": "✅ 等级映射成功",
+        "timeout": "⏰ 配置超时。准备好后请重新运行 `/admin setup`。",
+        "select_tier": "选择要映射的 Patreon 等级...",
+        "select_channel": "为 {{tier}} 选择频道...",
+        "current_mappings": "当前映射列表",
+        "unmapped": "⚠️ *未映射*"
+    },
+    "sync": {
+        "title": "✅ 等级同步完成",
+        "description": "已从 Patreon 获取 **{{count}}** 个等级并更新数据库。",
+        "no_tiers": "⚠️ 在您的 Patreon 创作者主页未找到已发布的赞助等级。",
+        "missing_creds": "❌ 环境变量中缺少 `PATREON_ACCESS_TOKEN` 或 `PATREON_CAMPAIGN_ID`。",
+        "expired_token": "❌ Patreon API 返回 401 — 您的访问令牌可能已过期。",
+        "synced_tiers": "已同步等级",
+        "unmapped_tiers": "⚠️ 未映射等级"
+    },
+    "stats": {
+        "title": "📊 赞助者数据分析面板",
+        "total_patrons": "👥 赞助者总数",
+        "active_tiers": "🏷️ 活跃等级数",
+        "tracked_posts": "📝 追踪文章数",
+        "growth_30d": "📈 近30天增长",
+        "tier_distribution": "🎯 等级分布",
+        "recent_activity": "🕐 最近动态",
+        "new_patrons": "新增赞助者: **{{count}}**",
+        "active_changes": "变动记录: **{{count}}** 次升级/变动",
+        "new_this_week": "本周新增: **{{count}}**"
+    },
+    "webhook": {
+        "signature_failed": "⛔ [安全拦截] 签名验证失败",
+        "signature_passed": "✅ [安全放行] 签名验证成功",
+        "duplicate": "🔁 [去重处理] 检测到重复 Webhook — 已跳过",
+        "incoming": "📡 [收到 Webhook 流量]"
+    },
+    "poller": {
+        "starting": "🔄 [轮询器] 启动 — 每 {{interval}} 分钟检查一次",
+        "stopped": "🔄 [轮询器] 已停止",
+        "checking": "🔄 [轮询器] 正在检查 Patreon 上的文章等级变更...",
+        "no_changes": "🔄 [轮询器] 未检测到等级变更",
+        "detected": "🔄 [轮询器] 检测到 {{count}} 个等级变更",
+        "silent_change": "🔄 [轮询器] 文章等级变动: \"{{title}}\" ({{old}} → {{new}})"
+    },
+    "errors": {
+        "failed_start": "❌ 机器人启动失败:",
+        "webhook_server_fail": "❌ Webhook 服务启动失败:",
+        "config_invalid_json": "❌ 致命错误: TIER_CONFIG 不是合法的 JSON。",
+        "config_not_array": "❌ 致命错误: TIER_CONFIG 必须是 JSON 数组",
+        "config_invalid_entry": "❌ 致命错误: TIER_CONFIG 包含无效的等级条目:"
+    },
+    "messages": {
+        "set_channel": "✅ **等级映射已更新**\n\n等级 **{{tier}}** 现已映射至 {{channel}}。",
+        "channel_text_only": "❌ 请选择文字频道。"
+    }
+}

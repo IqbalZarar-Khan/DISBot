@@ -1,0 +1,76 @@
+{
+    "bot": {
+        "starting": "🚀 Démarrage du Patreon Tier-Waterfall Bot...",
+        "login_attempt": "🔑 Tentative de connexion à Discord {{attempt}}/{{max}}...",
+        "login_success": "✅ Connexion à Discord réussie",
+        "login_failed": "⚠️ Échec de connexion : {{reason}}",
+        "login_retry": "   Nouvelle tentative dans {{delay}}s...",
+        "login_exhausted": "❌ Toutes les tentatives ont échoué. Le bot ne peut pas se connecter à Discord.",
+        "shutdown": "👋 Arrêt du bot...",
+        "ready": "✅ Bot connecté en tant que {{tag}}"
+    },
+    "commands": {
+        "admin_only": "⛔ Seul l'administrateur principal peut utiliser cette commande.",
+        "unknown": "❌ Commande admin inconnue.",
+        "error": "❌ Une erreur est survenue lors de l'exécution de cette commande.",
+        "error_check_logs": "❌ Une erreur est survenue. Veuillez vérifier les journaux."
+    },
+    "setup": {
+        "no_tiers": "❌ Aucun niveau configuré. Exécutez d'abord `/admin sync-tiers`.",
+        "step1_title": "🔧 Configuration interactive des niveaux",
+        "step1_desc": "**Étape 1/2** — Sélectionnez un niveau à associer à un salon Discord.",
+        "step2_desc": "**Étape 2/2** — Sélectionnez un salon Discord pour **{{tier}}**",
+        "success_title": "✅ Niveau associé avec succès",
+        "timeout": "⏰ Délai de configuration expiré. Réexécutez `/admin setup`.",
+        "select_tier": "Sélectionnez un niveau Patreon à associer...",
+        "select_channel": "Sélectionnez un salon pour {{tier}}...",
+        "current_mappings": "Associations actuelles",
+        "unmapped": "⚠️ *non associé*"
+    },
+    "sync": {
+        "title": "✅ Niveaux synchronisés",
+        "description": "**{{count}}** niveau(x) récupéré(s) de Patreon et base de données mise à jour.",
+        "no_tiers": "⚠️ Aucun niveau publié trouvé sur votre campagne Patreon.",
+        "missing_creds": "❌ `PATREON_ACCESS_TOKEN` ou `PATREON_CAMPAIGN_ID` manquant dans l'environnement.",
+        "expired_token": "❌ L'API Patreon a renvoyé 401 — votre jeton d'accès est peut-être expiré.",
+        "synced_tiers": "Niveaux synchronisés",
+        "unmapped_tiers": "⚠️ Niveaux non associés"
+    },
+    "stats": {
+        "title": "📊 Tableau de bord des contributeurs",
+        "total_patrons": "👥 Total des contributeurs",
+        "active_tiers": "🏷️ Niveaux actifs",
+        "tracked_posts": "📝 Publications suivies",
+        "growth_30d": "📈 Croissance (30 derniers jours)",
+        "tier_distribution": "🎯 Distribution des niveaux",
+        "recent_activity": "🕐 Activité récente",
+        "new_patrons": "Nouveaux contributeurs : **{{count}}**",
+        "active_changes": "Changements actifs : **{{count}}** surclassements/modifications",
+        "new_this_week": "Nouveaux cette semaine : **{{count}}**"
+    },
+    "webhook": {
+        "signature_failed": "⛔ [BLOCAGE DE SÉCURITÉ] Échec de vérification de signature",
+        "signature_passed": "✅ [SÉCURITÉ VALIDÉE] Signature vérifiée avec succès",
+        "duplicate": "🔁 [DEDUP] Webhook dupliqué détecté — ignoré",
+        "incoming": "📡 [TRAFIC WEBHOOK ENTRANT]"
+    },
+    "poller": {
+        "starting": "🔄 [POLLER] Démarrage — vérification toutes les {{interval}} minutes",
+        "stopped": "🔄 [POLLER] Arrêté",
+        "checking": "🔄 [POLLER] Recherche de modifications silencieuses de niveaux sur Patreon...",
+        "no_changes": "🔄 [POLLER] Aucune modification silencieuse détectée",
+        "detected": "🔄 [POLLER] {{count}} modification(s) silencieuse(s) détectée(s)",
+        "silent_change": "🔄 [POLLER] Modification silencieuse : \"{{title}}\" ({{old}} → {{new}})"
+    },
+    "errors": {
+        "failed_start": "❌ Échec du démarrage du bot :",
+        "webhook_server_fail": "❌ Échec du démarrage du serveur de webhooks :",
+        "config_invalid_json": "❌ FATAL : TIER_CONFIG n'est pas un JSON valide.",
+        "config_not_array": "❌ FATAL : TIER_CONFIG doit être un tableau JSON",
+        "config_invalid_entry": "❌ FATAL : TIER_CONFIG contient des entrées invalides :"
+    },
+    "messages": {
+        "set_channel": "✅ **Association de niveau mise à jour**\n\nLe niveau **{{tier}}** est désormais associé à {{channel}}.",
+        "channel_text_only": "❌ Veuillez sélectionner un salon textuel."
+    }
+}

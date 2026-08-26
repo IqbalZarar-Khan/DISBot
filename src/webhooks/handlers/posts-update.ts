@@ -4,7 +4,7 @@ import { client } from '../../index';
 import { TextChannel } from 'discord.js';
 import { createPostEmbed } from '../../utils/embedBuilder';
 import { logger } from '../../utils/logger';
-import { centsMap, tierRankings, tierIdMap, getTierRank, isWaterfall } from '../../utils/tierRanking';
+import { centsMap, tierRankings, tierIdMap, getTierRank, isWaterfall, getWidestAudienceTier } from '../../utils/tierRanking';
 import { config } from '../../config';
 import { formatMessage } from '../../utils/formatter';
 
@@ -104,34 +104,17 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
         logger.info(`🐛 Translated Tier Names: ${JSON.stringify(availableTiers)}`);
 
         // 3. WATERFALL LOGIC: Find the "Lowest" Tier (Widest Audience)
-        // If a post is available to Diamond AND Gold, we want to alert Gold 
-        // (because Gold is the "new" audience that needs to know)
-        let newTierName = 'Free';
-        let newTierRank = 999; // Start high to find the lowest
-
+        // Uses getWidestAudienceTier to guarantee no rank-inversion leakage
         logger.info(`\n🐛 [WATERFALL LOGIC]`);
         logger.info(`🐛 Finding lowest tier (widest audience)...`);
 
-        availableTiers.forEach(tierName => {
-            // Sanitize dot if present
-            const cleanName = tierName.trim().replace(/\.+$/, '');
+        const widest = getWidestAudienceTier(availableTiers);
+        let newTierName = widest.name;
+        let newTierRank = widest.rank;
 
-            // Get the rank value from tierRankings (Diamond=100, Gold=75)
-            const rank = tierRankings[cleanName];
-            logger.info(`🐛 Checking tier: ${cleanName} (Rank: ${rank})`);
-
-            // We want the tier with the LOWEST rank number that is > 0
-            // (This ensures we alert the widest audience, e.g., Gold instead of Diamond)
-            if (rank !== undefined && rank > 0 && rank < newTierRank) {
-                newTierRank = rank;
-                newTierName = cleanName;
-                logger.info(`Updated target tier: ${cleanName} (Rank: ${rank})`);
-            }
-        });
-
-        // If no valid tier found, reset to 0
-        if (newTierRank === 999) {
-            newTierRank = 0;
+        if (newTierRank > 0) {
+            logger.info(`Selected target tier: ${newTierName} (Rank: ${newTierRank})`);
+        } else {
             logger.warn(`⚠️ No valid tier found in waterfall logic`);
         }
 

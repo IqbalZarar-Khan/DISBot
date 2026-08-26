@@ -1,0 +1,76 @@
+{
+    "bot": {
+        "starting": "🚀 Iniciando Patreon Tier-Waterfall Bot...",
+        "login_attempt": "🔑 Intento de inicio de sesión en Discord {{attempt}}/{{max}}...",
+        "login_success": "✅ Inicio de sesión en Discord exitoso",
+        "login_failed": "⚠️ Error de inicio de sesión: {{reason}}",
+        "login_retry": "   Reintentando en {{delay}}s...",
+        "login_exhausted": "❌ Todos los intentos de inicio de sesión fallaron. El bot no puede conectarse a Discord.",
+        "shutdown": "👋 Apagando el bot...",
+        "ready": "✅ Bot conectado como {{tag}}"
+    },
+    "commands": {
+        "admin_only": "⛔ Solo el Administrador Principal puede usar este comando.",
+        "unknown": "❌ Comando de administración desconocido.",
+        "error": "❌ Ocurrió un error al ejecutar este comando.",
+        "error_check_logs": "❌ Ocurrió un error al ejecutar este comando. Por favor revise los registros."
+    },
+    "setup": {
+        "no_tiers": "❌ No hay niveles configurados. Ejecute `/admin sync-tiers` primero para obtener niveles de Patreon.",
+        "step1_title": "🔧 Configuración Interactiva de Niveles",
+        "step1_desc": "**Paso 1/2** — Seleccione un nivel para asignarlo a un canal de Discord.",
+        "step2_desc": "**Paso 2/2** — Seleccione un canal de Discord para **{{tier}}**",
+        "success_title": "✅ Nivel Asignado Exitosamente",
+        "timeout": "⏰ Se agotó el tiempo de configuración. Ejecute `/admin setup` nuevamente cuando esté listo.",
+        "select_tier": "Seleccione un nivel de Patreon para asignar...",
+        "select_channel": "Seleccione un canal para {{tier}}...",
+        "current_mappings": "Asignaciones Actuales",
+        "unmapped": "⚠️ *sin asignar*"
+    },
+    "sync": {
+        "title": "✅ Niveles Sincronizados",
+        "description": "Se obtuvieron **{{count}}** nivel(es) de Patreon y se actualizó la base de datos.",
+        "no_tiers": "⚠️ No se encontraron niveles publicados en su campaña de Patreon.",
+        "missing_creds": "❌ Falta `PATREON_ACCESS_TOKEN` o `PATREON_CAMPAIGN_ID` en el entorno.",
+        "expired_token": "❌ La API de Patreon devolvió 401 — su token de acceso puede haber expirado.",
+        "synced_tiers": "Niveles Sincronizados",
+        "unmapped_tiers": "⚠️ Niveles Sin Asignar"
+    },
+    "stats": {
+        "title": "📊 Panel de Análisis de Mecenas",
+        "total_patrons": "👥 Total de Mecenas",
+        "active_tiers": "🏷️ Niveles Activos",
+        "tracked_posts": "📝 Publicaciones Rastreadas",
+        "growth_30d": "📈 Crecimiento (Últimos 30 Días)",
+        "tier_distribution": "🎯 Distribución de Niveles",
+        "recent_activity": "🕐 Actividad Reciente",
+        "new_patrons": "Nuevos mecenas: **{{count}}**",
+        "active_changes": "Cambios activos: **{{count}}** mejoras/cambios",
+        "new_this_week": "Nuevos esta semana: **{{count}}**"
+    },
+    "webhook": {
+        "signature_failed": "⛔ [BLOQUEO DE SEGURIDAD] Falló la verificación de firma",
+        "signature_passed": "✅ [PASE DE SEGURIDAD] Firma verificada exitosamente",
+        "duplicate": "🔁 [DEDUP] Webhook duplicado detectado — omitiendo",
+        "incoming": "📡 [TRÁFICO DE WEBHOOK ENTRANTE]"
+    },
+    "poller": {
+        "starting": "🔄 [POLLER] Iniciando — verificando cada {{interval}} minutos",
+        "stopped": "🔄 [POLLER] Detenido",
+        "checking": "🔄 [POLLER] Verificando cambios silenciosos de nivel en Patreon...",
+        "no_changes": "🔄 [POLLER] No se detectaron cambios silenciosos de nivel",
+        "detected": "🔄 [POLLER] Se detectaron {{count}} cambio(s) silencioso(s) de nivel",
+        "silent_change": "🔄 [POLLER] Cambio silencioso de nivel: \"{{title}}\" ({{old}} → {{new}})"
+    },
+    "errors": {
+        "failed_start": "❌ Error al iniciar el bot:",
+        "webhook_server_fail": "❌ Error al iniciar el servidor de webhooks:",
+        "config_invalid_json": "❌ FATAL: TIER_CONFIG no es un JSON válido.",
+        "config_not_array": "❌ FATAL: TIER_CONFIG debe ser un arreglo JSON",
+        "config_invalid_entry": "❌ FATAL: TIER_CONFIG tiene entradas de nivel inválidas:"
+    },
+    "messages": {
+        "set_channel": "✅ **Asignación de Nivel Actualizada**\n\nEl nivel **{{tier}}** ahora está asignado a {{channel}}.",
+        "channel_text_only": "❌ Por favor seleccione un canal de texto."
+    }
+}

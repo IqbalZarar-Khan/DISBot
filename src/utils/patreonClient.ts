@@ -127,7 +127,48 @@ export async function refreshAccessToken(): Promise<boolean> {
         return true;
 
     } catch (err: any) {
-        logger.error(`🔑 [TOKEN] Refresh failed: ${err.response?.data?.error || err.message}`);
+        const errData = err.response?.data?.error || err.message;
+        logger.error(`🔑 [TOKEN] Refresh failed: ${errData}`);
+
+        // Proactive alert to Discord admin if the refresh token was revoked
+        if (err.response?.data?.error === 'invalid_grant' || err.response?.status === 400 || err.response?.status === 401) {
+            try {
+                const { client } = await import('../index');
+                const { EmbedBuilder } = await import('discord.js');
+                const baseUrl = (config.publicUrl || process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+                const oauthUrl = baseUrl ? `${baseUrl}/oauth/start` : 'https://www.patreon.com/portal/registration/register-clients';
+
+                const alertEmbed = new EmbedBuilder()
+                    .setTitle('🚨 Patreon Refresh Token Revoked / Expired')
+                    .setDescription(
+                        `**Action Required:** Your Patreon OAuth connection has expired or was revoked.\n\n` +
+                        `Automated tier syncing and webhooks are paused until you re-authorize.\n\n` +
+                        `👉 **[Click Here to Re-Authorize Patreon](${oauthUrl})**\n` +
+                        `*(Or complete the OAuth flow at \`/oauth/start\`)*`
+                    )
+                    .setColor(0xff0000)
+                    .setTimestamp();
+
+                // 1. Send to log channel
+                if (config.logChannelId && client?.channels) {
+                    const logChan = await client.channels.fetch(config.logChannelId).catch(() => null);
+                    if (logChan && 'send' in logChan) {
+                        await (logChan as any).send({ embeds: [alertEmbed] }).catch(() => {});
+                    }
+                }
+
+                // 2. DM Root Admin
+                if (config.rootAdminId && client?.users) {
+                    const admin = await client.users.fetch(config.rootAdminId).catch(() => null);
+                    if (admin) {
+                        await admin.send({ embeds: [alertEmbed] }).catch(() => {});
+                    }
+                }
+            } catch {
+                // Non-critical alert delivery
+            }
+        }
+
         return false;
 
     } finally {

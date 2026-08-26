@@ -76,6 +76,28 @@ async function main() {
     try {
         console.log('🚀 Starting Patreon Tier-Waterfall Bot...');
 
+        // Verify build freshness to prevent stale dist execution on VPS/PM2
+        try {
+            const fs = await import('fs');
+            const path = await import('path');
+            const srcPath = path.join(process.cwd(), 'src', 'index.ts');
+            const distPath = path.join(process.cwd(), 'dist', 'index.js');
+            if (fs.existsSync(srcPath) && fs.existsSync(distPath)) {
+                const srcMtime = fs.statSync(srcPath).mtimeMs;
+                const distMtime = fs.statSync(distPath).mtimeMs;
+                if (srcMtime > distMtime) {
+                    console.warn('\n⚠️  ════════════════════════════════════════════════════════');
+                    console.warn('⚠️  STALE BUILD WARNING:');
+                    console.warn('⚠️    src/index.ts is newer than compiled dist/index.js.');
+                    console.warn('⚠️    You may be running outdated JavaScript.');
+                    console.warn('⚠️    Please run `npm run build` to update compiled dist/ files.');
+                    console.warn('⚠️  ════════════════════════════════════════════════════════\n');
+                }
+            }
+        } catch {
+            // Non-critical check
+        }
+
         // Initialize i18n
         initI18n(process.env.BOT_LOCALE || 'en');
 

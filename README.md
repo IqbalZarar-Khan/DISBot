@@ -695,15 +695,20 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 ## 🆕 Recent Updates
 
 ### Latest (Aug 2026 — Architectural Hardening & Reliability Pass)
-- 🔒 **Setup Mode Anti-Hijacking**: Setup wizard requires a cryptographically generated, one-time console `SETUP_TOKEN` when `DISCORD_TOKEN` is unset, securing public deployments against takeover
-- 🛡️ **Fatal Rank-Inversion Safeguards**: `TIER_CONFIG` now fails fast with a fatal error (`process.exit(1)`) on rank/cents inversions to strictly prevent premium content leaks (with `ALLOW_RANK_INVERSION=true` override)
-- 🗄️ **Cross-Instance Dedup & Retry**: Redis `SETNX` (60s TTL) distributed deduplication with local memory fallback; direct webhook processor now includes 3x retry with backoff
+- 🔒 **Setup Mode Hijacking Prevention**: Setup wizard generates a secure, one-time `SETUP_TOKEN` printed to the server console when `DISCORD_TOKEN` is unset; setup is locked once completed
+- 🛡️ **Tier Rank-Inversion Guard & Safe Waterfall**: Config validator fails fast with `process.exit(1)` on rank inversions; added `getWidestAudienceTier()` ensuring lowest access cost selection without leaking premium content
+- 🗄️ **Multi-Tier Deduplication (Redis + DB + Memory)**: Redis `SETNX` (60s TTL) with database query fallback (migration `015` with `dedup_hash`) and local memory fallback; direct webhook processor includes 3x retry with exponential backoff
+- 🚨 **Proactive Patreon Token Revocation Alerting**: Automatically detects `invalid_grant` / revoked OAuth tokens and alerts Root Admin via Discord embed with 1-click `/oauth/start` authorization link
+- 🔁 **Configurable Replay Batches & Legacy Post Hydration**: `/admin replay-webhook` supports `limit` (1–50) with 300ms pacing and queries `tracked_posts` to restore missing/redacted URLs on legacy post events
+- ⚠️ **Stale Build Prevention & Prestart Automation**: Auto-runs `prestart: npm run build`; boot sequence verifies compilation freshness and warns on stale `dist/` builds
+- 🔍 **Secrets Scanner**: Added `npm run check:secrets` pre-commit script to detect and prevent committed credentials
+- 🌐 **Expanded Localization**: Full i18n support for `en`, `es`, `de`, `fr`, `ja`, `zh-CN`, and `ru` with automatic key-level fallback to English
 - 💾 **DB-Persisted Diagnostics & Error Buffers**: Error ring buffers (`error_log_<id>`) and diagnostic counters persist to `bot_config` and flush synchronously on `SIGINT`/`SIGTERM` shutdowns
-- 🔑 **Proactive Patreon Token Refresh**: Background scheduler refreshes tokens every 25 days, preventing expired token 401s on idle bot deployments
+- 🔑 **32-Bit Overflow Proof Token Polling**: Hourly polling timer checks database `patreon_token_refreshed_at` to avoid 32-bit `setInterval` integer clamping, providing reliable 25-day token refreshes
 - ⚡ **Rate-Limit Safe Command Deployment**: Auto-deploy fingerprints command schemas via MD5 hash to skip redundant Discord API registration on restarts
 - 🔄 **Multi-Node Cache Invalidation**: `/admin sync-tiers` synchronizes in-memory tier maps across all cluster nodes via dual-channel invalidation: Redis pub/sub (`disbot:cache:invalidate`) and native Supabase Realtime WebSockets (`postgres_changes`) for non-Redis environments
 - 🎯 **Targeted Replay with Discord ID**: Migration `014` captures `discord_user_id` pre-redaction; `/admin replay-webhook` re-hydrates Discord IDs for win-back DMs
-- 🗃️ **SQLite Schema Auto-Upgrades**: SQLite adapter auto-applies missing columns (`member_name`, `discord_user_id`, `is_active`) on initialization
+- 🗃️ **SQLite Schema Auto-Upgrades**: SQLite adapter auto-applies missing columns (`member_name`, `discord_user_id`, `dedup_hash`, `is_active`) on initialization
 - ⏱️ **Ephemeral Scheduler Persistence**: Weekly digest and anniversary checkers persist run states to `bot_config` to avoid missed or repeated schedules across container recycles
 - 🩹 **Member Lifecycle Fixes**: Fixed join/rejoin announcements for paid members; added `is_active` tracking (migration `013`), cross-handler welcome guards, and fallback upgrade channels
 

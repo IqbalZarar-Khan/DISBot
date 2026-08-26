@@ -15,7 +15,7 @@ mirrors the core tables for local/offline runs, and an in-memory **DB cache** fr
 | `bot_config` | Key/value store: OAuth tokens, errors (`error_log_*`), diagnostics (`diag_*`), command hash, last run dates | key, value |
 | `webhook_log` | Audit trail of every verified webhook | see below |
 
-### `webhook_log` (migrations 011, 012, 014)
+### `webhook_log` (migrations 011, 012, 014, 015)
 
 The ground truth for "did the bot actually announce X":
 
@@ -24,6 +24,7 @@ The ground truth for "did the bot actually announce X":
 | `event_type` | Patreon event (`members:pledge:create`, …) |
 | `member_id` / `member_name` | Member reference (name captured pre-redaction) |
 | `discord_user_id` | Discord user ID (captured pre-redaction for replay DMs) |
+| `dedup_hash` | MD5 idempotency hash for database-backed deduplication when Redis is absent |
 | `payload` | JSONB, PII-redacted (see [Webhook Pipeline](Webhook-Pipeline.md#pii-redaction)) |
 | `processed` | Handler ran without throwing |
 | `announced` | A Discord message was actually sent |
@@ -36,8 +37,8 @@ as informational successes. This is also where weekly-digest tier changes are re
 
 ## Migrations
 
-- SQL files in `supabase/migrations/` (`000`–`014`), applied **automatically at boot** by
-  `src/database/autoMigrate.ts`. Post-migration checks verify critical columns.
+- SQL files in `supabase/migrations/` (`000`–`015`), applied **automatically at boot** by
+  `src/database/autoMigrate.ts`. Post-migration checks verify critical columns (`member_name`, `discord_user_id`, `dedup_hash`, `is_active`).
 - If the `exec_sql` RPC isn't bootstrapped in production Supabase, paste the migration into
   the Supabase SQL Editor manually — the bot degrades gracefully until then.
 - Self-hosted docker-compose path uses `docker/init.sql`.

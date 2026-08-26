@@ -21,6 +21,7 @@
 
 import { getSupabase } from './supabase';
 import { logger } from '../utils/logger';
+import * as crypto from 'crypto';
 
 // ── PII redaction ─────────────────────────────────────────────────────────────
 
@@ -138,6 +139,9 @@ export async function logWebhookReceived(
         // Extract Discord user ID before it gets scrubbed
         const discordUserId = extractDiscordUserId(payload);
 
+        // Compute idempotency dedup hash for cross-instance coordination
+        const dedupHash = crypto.createHash('md5').update(eventType + JSON.stringify(payload)).digest('hex');
+
         // Build the row dynamically — only include member_name for member
         // events so post:update / post:publish don't break if the column
         // hasn't been migrated yet, and don't store meaningless nulls.
@@ -148,6 +152,7 @@ export async function logWebhookReceived(
             processed: false,
             announced: false,
             discord_user_id: discordUserId,
+            dedup_hash: dedupHash,
         };
 
         if (isMemberEvent) {

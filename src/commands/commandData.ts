@@ -264,6 +264,14 @@ export function getCommandData() {
                             .setMinValue(1)
                             .setMaxValue(168)
                     )
+                    .addIntegerOption(option =>
+                        option
+                            .setName('limit')
+                            .setDescription('Max missed webhooks to replay in this batch (1-50, default 25)')
+                            .setRequired(false)
+                            .setMinValue(1)
+                            .setMaxValue(50)
+                    )
             ),
         new SlashCommandBuilder()
             .setName('link')

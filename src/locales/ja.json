@@ -1,0 +1,76 @@
+{
+    "bot": {
+        "starting": "🚀 Patreon Tier-Waterfall Bot を起動中...",
+        "login_attempt": "🔑 Discord ログイン試行 {{attempt}}/{{max}}...",
+        "login_success": "✅ Discord ログインに成功しました",
+        "login_failed": "⚠️ ログイン失敗: {{reason}}",
+        "login_retry": "   {{delay}}秒後に再試行します...",
+        "login_exhausted": "❌ すべてのログイン試行に失敗しました。Discord に接続できません。",
+        "shutdown": "👋 Bot をシャットダウンしています...",
+        "ready": "✅ Bot が {{tag}} としてログインしました"
+    },
+    "commands": {
+        "admin_only": "⛔ このコマンドはルート管理者のみが使用できます。",
+        "unknown": "❌ 不明な管理者コマンドです。",
+        "error": "❌ このコマンドの実行中にエラーが発生しました。",
+        "error_check_logs": "❌ エラーが発生しました。ログを確認してください。"
+    },
+    "setup": {
+        "no_tiers": "❌ プランが設定されていません。まず `/admin sync-tiers` を実行して Patreon からプランを取得してください。",
+        "step1_title": "🔧 対話型プラン設定",
+        "step1_desc": "**ステップ 1/2** — Discord チャンネルにマッピングするプランを選択してください。",
+        "step2_desc": "**ステップ 2/2** — **{{tier}}** に割り当てる Discord チャンネルを選択してください。",
+        "success_title": "✅ プランのマッピングが完了しました",
+        "timeout": "⏰ 設定がタイムアウトしました。準備ができたら再度 `/admin setup` を実行してください。",
+        "select_tier": "マッピングする Patreon プランを選択...",
+        "select_channel": "{{tier}} のチャンネルを選択...",
+        "current_mappings": "現在のマッピング一覧",
+        "unmapped": "⚠️ *未設定*"
+    },
+    "sync": {
+        "title": "✅ プラン同期完了",
+        "description": "Patreon から **{{count}}** 件のプランを取得し、データベースを更新しました。",
+        "no_tiers": "⚠️ Patreon キャンペーンに公開中のプランが見つかりませんでした。",
+        "missing_creds": "❌ 環境変数に `PATREON_ACCESS_TOKEN` または `PATREON_CAMPAIGN_ID` が設定されていません。",
+        "expired_token": "❌ Patreon API が 401 を返しました — アクセストークンが期限切れの可能性があります。",
+        "synced_tiers": "同期されたプラン",
+        "unmapped_tiers": "⚠️ 未割り当てのプラン"
+    },
+    "stats": {
+        "title": "📊 パトロン分析ダッシュボード",
+        "total_patrons": "👥 総パトロン数",
+        "active_tiers": "🏷️ 有効なプラン数",
+        "tracked_posts": "📝 追跡中の投稿数",
+        "growth_30d": "📈 成長率 (過去30日間)",
+        "tier_distribution": "🎯 プラン分布",
+        "recent_activity": "🕐 最近のアクティビティ",
+        "new_patrons": "新規パトロン: **{{count}}**",
+        "active_changes": "有効な変更: **{{count}}** 件のアップグレード/変更",
+        "new_this_week": "今週の新規: **{{count}}**"
+    },
+    "webhook": {
+        "signature_failed": "⛔ [セキュリティブロック] 署名検証に失敗しました",
+        "signature_passed": "✅ [セキュリティパス] 署名が正常に検証されました",
+        "duplicate": "🔁 [重複除外] 重複した Webhook を検出 — スキップします",
+        "incoming": "📡 [受信 Webhook トラフィック]"
+    },
+    "poller": {
+        "starting": "🔄 [ポーラー] 開始 — {{interval}} 分ごとにチェックします",
+        "stopped": "🔄 [ポーラー] 停止しました",
+        "checking": "🔄 [ポーラー] Patreon のプラン変更を確認中...",
+        "no_changes": "🔄 [ポーラー] 変更は検出されませんでした",
+        "detected": "🔄 [ポーラー] {{count}} 件のプラン変更を検出しました",
+        "silent_change": "🔄 [ポーラー] プラン変更: \"{{title}}\" ({{old}} → {{new}})"
+    },
+    "errors": {
+        "failed_start": "❌ Bot の起動に失敗しました:",
+        "webhook_server_fail": "❌ Webhook サーバーの起動に失敗しました:",
+        "config_invalid_json": "❌ 致命的: TIER_CONFIG が有効な JSON ではありません。",
+        "config_not_array": "❌ 致命的: TIER_CONFIG は JSON 配列である必要があります",
+        "config_invalid_entry": "❌ 致命的: TIER_CONFIG に無効なエントリが含まれています:"
+    },
+    "messages": {
+        "set_channel": "✅ **プラン割り当てを更新しました**\n\nプラン **{{tier}}** は {{channel}} にマッピングされました。",
+        "channel_text_only": "❌ テキストチャンネルを選択してください。"
+    }
+}

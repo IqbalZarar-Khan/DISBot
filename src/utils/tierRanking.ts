@@ -100,6 +100,40 @@ export function isWaterfall(oldTierRank: number, newTierRank: number): boolean {
     return newTierRank < oldTierRank;
 }
 
+/**
+ * Select the widest-audience (lowest access requirement) tier from a list of eligible tiers.
+ * Guarantees that the broadest tier is selected using rank AND cents cost to prevent
+ * accidental premium content leaks even if ranks were inverted in config.
+ */
+export function getWidestAudienceTier(availableTiers: string[]): { name: string; rank: number } {
+    if (!availableTiers || availableTiers.length === 0) {
+        return { name: 'Free', rank: 0 };
+    }
+
+    let lowestTierName = 'Free';
+    let lowestTierRank = Infinity;
+    let lowestTierCents = Infinity;
+
+    for (const tierName of availableTiers) {
+        const cleanName = tierName.trim().replace(/\.+$/, '');
+        const rank = getTierRank(cleanName);
+        const configTier = config.tierConfig.find(t => t.name.toLowerCase() === cleanName.toLowerCase());
+        const cents = configTier?.cents !== undefined ? configTier.cents : (rank * 100);
+
+        if (rank > 0 && (rank < lowestTierRank || (rank === lowestTierRank && cents < lowestTierCents))) {
+            lowestTierRank = rank;
+            lowestTierName = cleanName;
+            lowestTierCents = cents;
+        }
+    }
+
+    if (lowestTierRank === Infinity) {
+        return { name: 'Free', rank: 0 };
+    }
+
+    return { name: lowestTierName, rank: lowestTierRank };
+}
+
 // ── Color palette for dynamic tiers (cycles for unlimited tiers) ───
 const TIER_COLORS = [
     0x00ffff, // Cyan
