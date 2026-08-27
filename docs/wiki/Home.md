@@ -5,8 +5,10 @@
 > **waterfall release** strategy (day 1 for high tiers, progressively unlocking for lower tiers),
 > syncs Discord roles to pledge tiers, and gives the admin analytics, digests, and diagnostics.
 
-This wiki is the maintainers' knowledge base. For hands-on setup and deployment, see the
-[user-facing docs](../../README.md#-documentation) instead.
+This wiki is the maintainers' knowledge base. For creator and developer setup guides, see:
+- [Simple-Guide.md](../../Simple-Guide.md) — **Non-developer creator's click-by-click guide**
+- [README.md](../../README.md#-documentation) — Complete documentation index
+- [SETUP.md](../../SETUP.md) — Developer setup walkthrough
 
 ## Pages
 

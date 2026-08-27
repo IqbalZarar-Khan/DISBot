@@ -1,5 +1,8 @@
 # 🚀 Quick Deployment Configuration Guide
 
+> 💡 **Non-Developer?**  
+> If you are a creator looking for a simple click-by-click setup guide without code, see **[Simple-Guide.md (The Super Simple Creator's Guide)](Simple-Guide.md)**.
+
 This guide provides a quick reference for deploying DISBot across cloud platforms, containers, and bare-metal VPS environments using the included configuration files.
 
 ---

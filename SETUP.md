@@ -4,6 +4,9 @@
 
 # 📖 Complete Step-by-Step Setup Guide
 
+> 💡 **Looking for a non-technical guide?**  
+> If you have zero coding experience and want a simple click-by-click walkthrough in plain English without terminal commands, follow the **[Simple Creator's Guide (Simple-Guide.md)](Simple-Guide.md)** (~8 minutes).
+
 This guide walks you through setting up, deploying, configuring, and verifying DISBot from start to finish in the correct chronological order.
 
 ---

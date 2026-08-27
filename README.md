@@ -113,11 +113,16 @@
 
 ## 📚 Documentation
 
-- **[Setup Guide](SETUP.md)** — Detailed setup instructions for Discord, Patreon, and Supabase
-- **[Deployment Guide](DEPLOYMENT.md)** — Deploy to Railway, Render, Heroku, VPS, or run locally
-- **[Changelog](CHANGELOG.md)** — Full release history
-- **[Contributing Guide](CONTRIBUTING.md)** — How to contribute to this project
-- **[Code of Conduct](CPDSC.md)** — Community guidelines and standards
+> 💡 **Non-Developer or Creator?**  
+> If you have zero coding experience and want a simple click-by-click walkthrough in plain English, follow **[Simple-Guide.md (Super Simple Creator's Guide)](Simple-Guide.md)** (~8 minutes, zero terminal commands required!).
+
+- **[🌱 Simple Creator's Guide](Simple-Guide.md)** — **For Non-Developers**: Zero-code, click-by-click setup guide
+- **[📖 Detailed Setup Guide](SETUP.md)** — Step-by-step developer setup for Discord, Patreon, and Supabase
+- **[🚀 Deployment Guide](DEPLOYMENT.md)** — Production deployment on Railway, Render, VPS/PM2, Docker, and Heroku
+- **[⚡ Deployment Quick Reference](DEPLOY_CONFIG_GUIDE.md)** — Environment variables & platform blueprints
+- **[📜 Changelog](CHANGELOG.md)** — Full release history
+- **[🤝 Contributing Guide](CONTRIBUTING.md)** — How to contribute to this project
+- **[🛡️ Permissions & Security Architecture](CPDSC.md)** — Discord slash command permissions & security model
 
 ### 📖 Wiki (Maintainer Knowledge Base)
 
@@ -136,6 +141,8 @@
 | [Development](docs/wiki/Development.md) | Testing, conventions, extension points, i18n, known tech debt |
 
 ## 🚀 Quick Start
+
+> 💡 **Are you a non-developer?** Use the **[Simple Creator's Guide (Simple-Guide.md)](Simple-Guide.md)** instead of the developer instructions below.
 
 ### Prerequisites
 
