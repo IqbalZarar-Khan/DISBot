@@ -1,65 +1,96 @@
-Here is the detailed summary of configuring permissions for Discord slash commands using `discord.js` v14, formatted in Markdown.
+# 🛡️ Discord Slash Command Permissions & Security Architecture (discord.js v14)
+
+This document outlines how DISBot configures, registers, and enforces Discord Slash Command permissions at both the Discord API level and the internal application runtime level.
 
 ---
 
-# 🛡️ Configuring Permissions for Discord Slash Commands (discord.js v14)
+## 1. Registration Architecture
 
-This document details the process of registering slash commands and applying member-specific permission checks directly at the API level.
+DISBot uses guild-scoped slash command deployment (`Routes.applicationGuildCommands`) rather than global deployment. Guild commands propagate instantly across your Discord server without the 1-hour global cache delay.
 
-## 1. Initial Setup and Command Registration
-
-The process starts with setting up the bot environment and defining the command structure.
-
-### 1.1 Loading Variables and Routes
-
-| Action | Details | Purpose |
-| --- | --- | --- |
-| **Loading Variables** | Use the `dotenv` package to load configuration from environment variables (e.g., `BOT_TOKEN`, `CLIENT_ID`, `GUILD_ID`). | Securely manage sensitive credentials and configurations. |
-| **API Route Formatting** | Import the `Routes` constant from `discord.js`. | Provides helper methods (e.g., `applicationGuildCommands`) to format the API route without manual string construction. |
-| **Registration Route** | The route used is `applicationGuildCommands`, requiring the **Application ID (Client ID)** and the **Guild ID**. | Directs the command registration to a specific server. |
-
-### 1.2 Defining the Command Payload
-
-The `SlashCommandBuilder` class is used to create the command object.
-
-* **Instance Creation:** Instantiate a new `SlashCommandBuilder`.
-* **Definition:** Set the command's name (e.g., `"order-food"`) and a brief description.
-* **Payload Submission:** The command definition **must** call `.toJSON()` to convert the command object into a valid JSON payload that the Discord API expects for registration.
+### 1.1 Automated Registration with Hash Caching
+To prevent hitting Discord's API rate limits (HTTP 429) during frequent bot restarts or container deployments, DISBot fingerprints the command definitions on startup:
+1. `src/commands/commandData.ts` builds the array of `SlashCommandBuilder` instances.
+2. `src/index.ts` computes an MD5 hash of the command payload (`commandHash`).
+3. If `commandHash` matches the persisted `command_definition_hash` in `bot_config`, API deployment is skipped.
+4. If changed, the new payload is deployed via `rest.put(...)` and the new hash is stored in the database.
 
 ---
 
-## 2. Configuring Member Permissions
+## 2. Two-Tier Permission Model
 
-Permissions configurable directly on the slash command are specific to **Member Permissions** (General, Membership, Text/Voice Channel Permissions), which are defined by Discord.
+DISBot enforces security using a defense-in-depth model combining Discord native UI restrictions with runtime authorization checks:
 
-### 2.1 Setting Default Member Permissions
+```
+User enters command in Discord
+          │
+          ▼
+[Tier 1: Discord API & UI Filter]
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+  └─► If user lacks Admin, command is hidden from autocomplete
+          │
+          ▼ (If visible/executed)
+[Tier 2: DISBot Runtime Authorization]
+  checkAdminPermission(interaction)
+  └─► Verifies interaction.user.id === config.rootAdminId (or current_admin_id in DB)
+  └─► If unauthorized, returns ⛔ ephemeral rejection: "Only the Primary Administrator can use this command."
+```
 
-The core method for defining permissions is `.setDefaultMemberPermissions()`, which is called before `.toJSON()`.
+### 2.1 API-Level Permissions (`.setDefaultMemberPermissions`)
 
-* **Permission Requirement:** To specify required permissions, you must import the `PermissionFlagsBits` enum from the `discord.js` library.
-* **Example Usage:**
-* `builder.setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)`
-* If a user lacks `KickMembers` permission, they **will not see the command at all**.
+In `src/commands/commandData.ts`, administrative commands are configured with:
+```typescript
+new SlashCommandBuilder()
+    .setName('admin')
+    .setDescription('DISBot administrative management commands')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+```
+- **Behavior**: Only users possessing the `Administrator` permission in the Discord server will see the `/admin` command in their slash command menu.
+- **Why Tier 2 is still required**: Server administrators who are not the bot owner/creator must not be able to wipe mappings, expose OAuth tokens, or replay webhooks.
 
+### 2.2 Application-Level Authorization (`checkAdminPermission`)
 
+In `src/commands/admin/handler.ts`, all `/admin` subcommands pass through `checkAdminPermission()`:
+```typescript
+export async function checkAdminPermission(interaction: ChatInputCommandInteraction): Promise<boolean> {
+    const isOwner = interaction.user.id === config.rootAdminId;
+    const dbOwner = await getConfig('current_admin_id');
+    const isCurrentAdmin = dbOwner ? interaction.user.id === dbOwner : isOwner;
 
-### 2.2 Key Permissions Configurations
-
-| Configuration | Permission Value | Logic |
-| --- | --- | --- |
-| **Disabling the Command** | `0` (Zero) | Disables the command for **regular users by default**. Administrators with the `Administrator` permission can still see and use the command. |
-| **Specific Permission** | `PermissionFlagsBits.PermissionName` | The member must possess the referenced permission (e.g., `ManageGuild`). |
-| **Combining Permissions** | `Perm1 | Perm2` (Bitwise OR operator) | Uses **AND logic**. The member must possess **ALL specified permissions** (e.g., `KickMembers` AND `BanMembers`) to see and use the command. |
-
-> ⚠️ **Note on Role/User Checks:** Permission checks based on specific **Roles** or individual **User IDs** cannot be configured directly via `.setDefaultMemberPermissions()`. This custom logic must be implemented separately within the bot's `interactionCreate` event listener.
+    if (!isCurrentAdmin) {
+        await interaction.reply({
+            content: t('commands.admin_only'),
+            ephemeral: true,
+        });
+        return false;
+    }
+    return true;
+}
+```
 
 ---
 
-## 3. Direct Message (DM) Permissions
+## 3. Ephemeral Responses for Security
 
-You can control whether a slash command is available outside of a guild environment.
+All `/admin` commands defer their replies as **ephemeral** (`interaction.deferReply({ ephemeral: true })`):
+- Diagnostic metrics, OAuth token status, server IP/PM2 stats, and error logs are visible **only to the executing administrator**.
+- Webhook payloads containing patron display names and IDs are never leaked to public text channels.
 
-| Method | Value | Behavior | Requirement |
-| --- | --- | --- | --- |
-| `.setDMPermission()` | `false` | The command **will not work** in Direct Messages. | Only works for **Global Commands**, not Guild Commands. |
-| `.setDMPermission()` | `true` (Default) | The command is available in DMs. | Only works for **Global Commands**, not Guild Commands. |
+---
+
+## 4. Public Member-Facing Commands
+
+Commands intended for all community members (such as `/link` for self-serve Discord-to-Patreon account linking) do **not** set restrictive default member permissions:
+```typescript
+new SlashCommandBuilder()
+    .setName('link')
+    .setDescription('Link your Discord account to your Patreon membership for role sync')
+    .addStringOption(option =>
+        option
+            .setName('identifier')
+            .setDescription('Your Patreon email, display name, or member ID')
+            .setRequired(true)
+    )
+```
+- Available to all members on the server.
+- The bot replies ephemerally to protect the member's private email/identifier.

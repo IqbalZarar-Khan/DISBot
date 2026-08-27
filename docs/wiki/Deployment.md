@@ -31,15 +31,13 @@ gotchas. See:
 - **Patreon webhook URL.** Point the Patreon campaign's webhook at
   `https://<host>/webhooks/patreon` with the same `WEBHOOK_SECRET`, subscribing to the
   `members:*`, `members:pledge:*`, and `posts:*` triggers.
-- **Horizontal scaling.** Safe with `REDIS_URL` set (BullMQ workers, Redis-backed cache).
-  Without Redis, run a single instance only — direct processing has no cross-instance dedup
-  beyond the per-process 60s guard.
-- **Migrations** apply automatically at boot. If the Supabase `exec_sql` RPC isn't
+- **Horizontal scaling.** Fully supported with or without Redis.
+  - With Redis: BullMQ distributed queue + Redis pub/sub invalidation (`disbot:cache:invalidate`).
+  - Without Redis: Direct processing with database-backed deduplication (migration `015` `dedup_hash`) + native Supabase Realtime WebSocket synchronization (`postgres_changes` on `tier_mappings`/`bot_config`) across instances.
+- **Migrations** (`000`–`015`) apply automatically at boot. If the Supabase `exec_sql` RPC isn't
   bootstrapped, apply pending SQL via the SQL Editor once.
-- **Slash commands** deploy on `ClientReady` — new commands appear after restart
-  (or run `npm run deploy-commands` manually).
-- **Secrets hygiene.** If secrets were ever committed, rotate them (see the Git History
-  Warning in the README). Compose deliberately refuses to start with missing secrets.
+- **Slash commands** deploy on `ClientReady` (cached via `command_definition_hash` to eliminate Discord API rate limits).
+- **Secrets hygiene.** Run `npm run check:secrets` to verify no credentials are leak-prone. Compose deliberately refuses to start with missing secrets.
 
 ## Verification After Deploy
 

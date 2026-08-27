@@ -10,9 +10,11 @@ again via replay.
 2. Signature verify     HMAC-MD5, timing-safe compare (src/webhooks/verify.ts)
                         → 401 on failure; nothing else runs
 3. Webhook cache        logWebhookReceived() inserts a webhook_log row:
-                        event_type, member_id, member_name, discord_user_id, PII-redacted payload, processed=false
-4. Dedup guard          isDuplicateAsync() with Redis SETNX (60s TTL) for cross-instance coordination,
-                        falling back to in-memory map (60s TTL) when Redis is down
+                        event_type, member_id, member_name, discord_user_id, dedup_hash, PII-redacted payload, processed=false
+4. Dedup guard          isDuplicateAsync() checks:
+                        1. Redis SETNX (60s TTL) for cross-instance coordination
+                        2. Database webhook_log dedup_hash check (60s TTL, migration 015) when Redis is down
+                        3. Local in-memory map (60s TTL) fallback
 5. Ghost filter         update-events only: state fingerprint, 5min TTL — drops no-op updates
 6. Dispatch             Redis up   → BullMQ enqueue (3 attempts, exp. backoff,
                                      concurrency 3, 10 jobs / 10s rate limit)
@@ -99,17 +101,17 @@ Stored payloads are scrubbed before insert:
 Any logged webhook can be re-dispatched through the normal router:
 
 1. Fetch the row (`getWebhookLogById`, or `getMissedAnnouncements(hours)` for the
-   `replay-missed` batch action — capped at 10 per invocation since replays send real
-   Discord messages). `getMissedAnnouncements` automatically skips rows tagged `[UNSUPPORTED]`.
-2. `hydrateRedactedNames()` patches `full_name` back from `member_name` and restores `discord_user_id` into
-   social connections. Emails stay redacted (not recoverable — by design).
+   `replay-missed` batch action — supports configurable `limit` up to 50 rows with 300ms inter-message
+   rate-limit pacing). `getMissedAnnouncements` automatically skips rows tagged `[UNSUPPORTED]`.
+2. `hydrateRedactedPayload()`:
+   - Patches `full_name` back from `member_name` and restores `discord_user_id` into social connections.
+   - Restores missing/redacted post URLs and titles from `tracked_posts` for legacy post events.
+   - Emails stay redacted (not recoverable — by design).
 3. `routeWebhookEvent(eventType, payload, row.id)` runs the live pipeline; the same row is
    updated (`processed`/`announced`) as if the webhook had just arrived.
 
 Replays intentionally **bypass** the dedup/ghost filters (those guard HTTP ingress only) and
 explicitly display `(⚠️ dedup/ghost filters bypassed)` in response embeds.
-Rows logged before redaction was scoped still carry `[REDACTED]` post URLs — the command
-detects and warns about such legacy rows.
 
 ## Testing Webhooks Locally
 

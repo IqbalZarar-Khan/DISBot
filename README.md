@@ -145,76 +145,38 @@
 - A Supabase account ([Sign up here](https://supabase.com))
 - A server with HTTPS support for webhooks (Railway, Render, ngrok, etc.)
 
-### Installation
+### 3-Step Setup Flow
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd DISBot
-   ```
+#### Step 1: Deploy or Clone
+- **Cloud (1-Click Railway)**: Click [Deploy on Railway](https://railway.app/new/template/disbot?referralCode=nLfB6T)
+- **Local / Self-Hosted**:
+  ```bash
+  git clone https://github.com/yourusername/DISBot.git
+  cd DISBot
+  npm install
+  ```
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+#### Step 2: Configure Credentials
+Choose your preferred setup method:
 
-3. **Configure environment** (choose one):
+- **Option A — Web Setup Wizard (Recommended)**:
+  - Deploy to your host or run `npm run dev`.
+  - Check your container/server logs for the secure one-time `SETUP_TOKEN` (or use `DISCORD_TOKEN` if already set).
+  - Open `https://<your-domain>/setup` (or `http://localhost:3456/wizard` for `npm run setup:wizard`).
+  - Follow the visual setup to connect Patreon, Supabase, and configure your tier priority rankings.
 
-   **Option A — Cloud Setup Wizard (Recommended)**:
-   You don't need any terminal commands! Just add your Discord Bot Token to `.env` or your hosting provider's variables:
-   ```env
-   DISCORD_TOKEN=your_bot_token_here
-   ```
-   Start the bot (`npm start`). It will detect it's missing configuration and launch the Cloud Wizard. Visit `http://localhost:3000/setup` (or your Railway URL) to finish setup via the web UI!
+- **Option B — Direct `.env` File**:
+  ```bash
+  cp .env.example .env
+  # Populate DISCORD_TOKEN, PATREON_*, SUPABASE_*, and TIER_CONFIG
+  ```
+  *(Run `npm run setup:patreon` to auto-discover your tiers and auto-populate `TIER_CONFIG`)*
 
-   **Option B — Local Setup Wizard**:
-   ```bash
-   npm run setup:wizard
-   ```
-   Opens a local HTML dashboard at `http://localhost:3456/wizard` with buttons for Patreon OAuth, Supabase testing, and `.env` auto-writing.
+#### Step 3: Register Patreon Webhook & Map Discord Channels
+1. In Patreon Portal, create a webhook pointing to `https://<your-domain>/webhooks/patreon` with all 9 triggers.
+2. In Discord, run `/admin setup` to map your Patreon tiers to Discord announcement channels.
 
-   **Option C — Manual `.env`**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your credentials
-   ```
-
-4. **Set up Supabase database**
-   - Create a new Supabase project
-   - Database migrations run **automatically on first boot** — no manual SQL needed
-   - Follow the Cloud Wizard steps to add your Supabase URL and service_role key.
-
-5. **Configure your tiers (Automated Method)**
-   
-   Set your Creator Access Token in `.env`, then run:
-   ```bash
-   npm run setup:patreon
-   ```
-   
-   > **How to get the Creator Access Token:** Go to the [Patreon Clients Portal](https://www.patreon.com/portal/registration/register-clients) → click your app → copy the **"Creator's Access Token"** value.
-   
-   The script will:
-   - Fetch your `PATREON_CAMPAIGN_ID` automatically
-   - Display a formatted table of all your tiers with prices and patron counts
-   - **Auto-write** `TIER_CONFIG`, `PATREON_CAMPAIGN_ID`, and `WEBHOOK_SECRET` directly to `.env`
-   - Auto-assign ranks (highest-priced = 100)
-
-6. **Build the project**
-   ```bash
-   npm run build
-   ```
-
-7. **Deploy slash commands**
-   ```bash
-   npm run deploy-commands
-   ```
-
-8. **Start the bot**
-   ```bash
-   npm start
-   # For development with auto-reload:
-   npm run dev
-   ```
+> 📚 For comprehensive step-by-step guidance with screenshots, see **[SETUP.md](SETUP.md)**.
 
 ## ⚙️ Configuration
 

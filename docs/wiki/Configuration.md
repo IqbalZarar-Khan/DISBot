@@ -47,7 +47,10 @@ All configuration is environment-based (`.env` locally; platform env vars in the
 |---|---|---|
 | `TIER_CONFIG` | ✅ | JSON tier definitions — see below |
 | `DISCORD_ROLE_SYNC_ENABLED` | — | `true` enables automatic role management + boot reconciliation |
-| `BOT_LOCALE` | — | i18n locale. Shipped: `en`, `id`. Missing locale falls back to English |
+| `BOT_LOCALE` | — | i18n locale. Shipped: `en`, `es`, `de`, `fr`, `ja`, `zh-CN`, `ru`, `id`. Missing locale/keys fall back to English |
+| `DISABLE_SETUP_WIZARD` | — | `true` disables the `/setup` web route entirely |
+| `ALLOW_WIZARD_RECONFIG` | — | `true` allows re-running `/setup` wizard after initial completion |
+| `ALLOW_RANK_INVERSION` | — | `true` bypasses fatal boot exit on tier rank/cents inversion |
 
 Runtime-only: `RAILWAY_PUBLIC_DOMAIN` / `RAILWAY_STATIC_URL` are read by the setup wizard for
 URL detection on Railway.

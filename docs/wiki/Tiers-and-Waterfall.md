@@ -53,8 +53,8 @@ cheaper tiers over the following days. Mechanically:
 4. If a `posts:publish` arrives for an already-tracked post, it's treated as
    "Edit and Republish" and redirected through the update (waterfall) path.
 
-Rank sanity is enforced at boot: `src/config.ts` warns when a cheaper tier outranks a more
-expensive one, since that inversion would make the waterfall run backwards.
+Rank sanity is strictly enforced: `src/config.ts` **aborts at boot (`process.exit(1)`)** when a cheaper tier outranks a more
+expensive one (bypassable via `ALLOW_RANK_INVERSION=true`). Furthermore, `posts:update` resolves the target tier via `getWidestAudienceTier()` using both rank and cents cost to mathematically prevent premium content leaks.
 
 ## Role Sync
 

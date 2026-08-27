@@ -9,7 +9,7 @@ Everything an operator needs to keep an eye on a running DISBot.
 | `GET /health` | none | Liveness probe `{ status: 'ok' }` — used by the Docker healthcheck |
 | `GET /metrics` | optional `METRICS_TOKEN` | Prometheus text format |
 | `GET /dashboard` | JWT (generated via `/admin dashboard`) | Chart.js analytics SPA |
-| `GET /setup` | none (binds via `!claim`) | Cloud setup wizard (setup mode only) |
+| `GET /setup` | `SETUP_TOKEN` / `DISCORD_TOKEN` | Cloud setup wizard (locked once completed) |
 | `GET /oauth/start` → `/oauth/redirect` | none | Patreon OAuth flow; saves tokens to DB |
 
 ## `/metrics`

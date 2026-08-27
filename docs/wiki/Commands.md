@@ -35,10 +35,10 @@ auto-deploy on `ClientReady`, so a restart picks up changes.
 
 | Command | Purpose |
 |---|---|
-| `/admin replay-webhook [action] [log_id] [hours]` | Audit + replay the `webhook_log` table — see [Webhook Pipeline](Webhook-Pipeline.md#replay-admin-replay-webhook) |
+| `/admin replay-webhook [action] [log_id] [hours] [limit]` | Audit + replay the `webhook_log` table — see [Webhook Pipeline](Webhook-Pipeline.md#replay-admin-replay-webhook) |
 
 Actions: `view` (last 25 rows), `replay` (one row by `log_id`),
-`replay-missed` (all unannounced rows in `hours`, batch cap 10).
+`replay-missed` (all unannounced rows in `hours`, configurable `limit` 1–50 with 300ms rate-limit pacing, hydrating post URLs from `tracked_posts`).
 
 ### Operations
 

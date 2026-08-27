@@ -73,14 +73,20 @@ npm run dev
 Before submitting a PR:
 
 ```bash
+# Run unit test suite (53 tests)
+npm test
+
+# Verify secrets hygiene
+npm run check:secrets
+
 # Verify TypeScript compilation
 npm run build
 
 # Run verification checks
 npm run verify
 
-# Test webhook handlers
-npm run test:webhooks
+# Test webhook handlers with signed payload
+npm run test:webhook
 ```
 
 ## Commit Messages

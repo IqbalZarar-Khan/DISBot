@@ -1,137 +1,61 @@
-# Deployment Configuration Files Summary
+# Deployment Configuration Files Reference
 
-## ✅ Created Files
-
-All deployment configuration files have been successfully created for the DISBot project:
-
-### 1. **render.yaml** - Render.com Blueprint
-- Automated deployment configuration
-- Pre-configured environment variables
-- Health check endpoint: `/health`
-- Port: 10000 (Render's default)
-
-### 2. **railway.json** - Railway.app Configuration
-- Nixpacks builder settings
-- Build and start commands
-- Health check configuration
-- Auto-restart policy
-
-### 3. **Procfile** - Heroku Process File
-- Simple process declaration: `web: npm start`
-- Required for Heroku deployments
-
-### 4. **Dockerfile** - Container Image
-- Multi-stage build for optimization
-- Node.js 18 Alpine base
-- Built-in health check
-- Production-ready configuration
-
-### 5. **docker-compose.yml** - Docker Orchestration
-- Service definition for DISBot
-- Volume mounting for data persistence
-- Network configuration
-- Environment file integration
-
-### 6. **nginx.conf** - Reverse Proxy Configuration
-- Proxy settings for Node.js app
-- SSL/HTTPS preparation
-- Security headers
-- Logging configuration
-
-### 7. **ecosystem.config.js** - PM2 Process Manager
-- Process management settings
-- Auto-restart configuration
-- Memory limits
-- Log file locations
-
-### 8. **DEPLOY_CONFIG_GUIDE.md** - Quick Reference Guide
-- Platform-specific deployment steps
-- Environment variable reference
-- Troubleshooting tips
-- Post-deployment checklist
-
-## 📚 Documentation Structure
-
-```
-DISBot/
-├── SETUP.md                    # Initial setup guide
-├── DEPLOYMENT.md               # Detailed deployment guide
-├── DEPLOY_CONFIG_GUIDE.md      # Quick config reference (NEW)
-├── render.yaml                 # Render.com config (NEW)
-├── railway.json                # Railway.app config (NEW)
-├── Procfile                    # Heroku config (NEW)
-├── Dockerfile                  # Docker config (NEW)
-├── docker-compose.yml          # Docker Compose config (NEW)
-├── nginx.conf                  # Nginx config (NEW)
-└── ecosystem.config.js         # PM2 config (NEW)
-```
-
-## 🚀 Quick Start by Platform
-
-### Render.com
-```bash
-# Push to GitHub, then use Render Blueprint
-# Configuration: render.yaml
-```
-
-### Railway.app
-```bash
-# Connect GitHub repo
-# Configuration: railway.json (auto-detected)
-```
-
-### Heroku
-```bash
-heroku create your-bot-name
-git push heroku main
-# Configuration: Procfile
-```
-
-### Docker (VPS)
-```bash
-docker-compose up -d
-# Configuration: Dockerfile + docker-compose.yml
-```
-
-### PM2 (VPS)
-```bash
-pm2 start ecosystem.config.js
-# Configuration: ecosystem.config.js
-```
-
-## 🔧 Environment Variables
-
-All platforms require the same environment variables. See `.env.example` for the complete list.
-
-**Platform-specific notes:**
-- **Render**: Set `WEBHOOK_PORT=10000`
-- **Railway**: Port auto-assigned
-- **Heroku**: Set `PORT=3000`
-- **Docker/VPS**: Set `WEBHOOK_PORT=3000`
-
-## ✅ Health Check Endpoint
-
-All configurations use the built-in health check endpoint:
-- **URL**: `https://your-domain/health`
-- **Response**: `{"status":"ok","timestamp":"2026-01-07T..."}`
-- **Already implemented** in `src/webhooks/server.ts`
-
-## 📖 Next Steps
-
-1. Choose your deployment platform
-2. Follow the guide in `DEPLOY_CONFIG_GUIDE.md`
-3. Set up environment variables
-4. Deploy using the provided configuration files
-5. Configure Patreon webhook
-6. Test with `/admin status` command
-
-## 🔗 Related Documentation
-
-- [SETUP.md](SETUP.md) - Complete setup guide
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Detailed deployment instructions
-- [DEPLOY_CONFIG_GUIDE.md](DEPLOY_CONFIG_GUIDE.md) - Quick deployment reference
-- [README.md](README.md) - Project overview
+This document summarizes the deployment infrastructure, configuration files, and containerization assets included with DISBot.
 
 ---
 
-**All configuration files are ready for production deployment!** 🎉
+## 📁 Infrastructure Manifest
+
+### 1. `railway.json` — Railway.app Blueprint (Recommended)
+- Configured for Nixpacks with Node.js 20+ runtime.
+- Health check path set to `/health` with automatic container restart policy.
+- Dynamic `PORT` environment binding supported natively by Fastify.
+
+### 2. `render.yaml` — Render.com Blueprint
+- Infrastructure-as-code declaration for paid Web Service instances (`$7/mo`+ Starter).
+- Automatic health check at `/health` with pre-configured environment schema.
+
+### 3. `Procfile` — Heroku / Cloud Native
+- Standard Node.js process entrypoint: `web: npm start`.
+- Runs prestart auto-compilation (`tsc`) and launches `dist/index.js`.
+
+### 4. `Dockerfile` — Production Container Image
+- Multi-stage build based on `node:20-alpine`.
+- Non-root user execution with embedded `/health` curl check.
+- Optimized bundle size excluding dev dependencies and test suites.
+
+### 5. `docker-compose.yml` — Full Multi-Container Orchestration
+- Declares `disbot` application service + Redis cache/queue + PostgREST / PostgreSQL fallback.
+- Persistent volume mounting for local SQLite / database logs.
+
+### 6. `nginx.conf` — Reverse Proxy Configuration
+- Optimized proxy headers (`X-Forwarded-Proto`, `X-Real-IP`, `Upgrade` for WebSockets).
+- Configured for TLS termination via Let's Encrypt / Certbot.
+
+### 7. `ecosystem.config.js` — PM2 Process Manager
+- Production cluster/fork mode with memory ceilings and auto-restart rules.
+- Pre-configured stdout/stderr log paths in `./logs`.
+
+---
+
+## 🛠️ Build & Security Scripts
+
+| Script | Command | Purpose |
+|---|---|---|
+| `build` | `npm run build` | Compiles TypeScript (`src/`) to JavaScript (`dist/`) |
+| `prestart` | *(Auto-runs on `npm start`)* | Ensures `npm run build` always runs before starting in production |
+| `check:secrets` | `npm run check:secrets` | Scans repository for committed Discord bot tokens, Patreon secrets, and Supabase JWTs |
+| `test` | `npm test` | Executes Jest test suites (53 tests covering filters, waterfall ranking, chapter formatting, welcome guards) |
+| `setup:patreon` | `npm run setup:patreon` | Auto-discovers Patreon tiers, campaign IDs, and creates `TIER_CONFIG` |
+| `setup:wizard` | `npm run setup:wizard` | Launches local HTML GUI wizard on port 3456 |
+| `verify` | `npm run verify` | Verifies environment variables, ports, and API connections |
+
+---
+
+## 📚 Related Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — In-depth guide for Railway, Render, VPS, Docker, Heroku, and local tunnels
+- **[DEPLOY_CONFIG_GUIDE.md](DEPLOY_CONFIG_GUIDE.md)** — Quick platform setup steps and environment variable reference
+- **[DEPLOY_QUICK.md](DEPLOY_QUICK.md)** — 3-step rapid deployment summary
+- **[SETUP.md](SETUP.md)** — Initial Discord, Patreon, and Supabase credential setup
+- **[Wiki](docs/wiki/Home.md)** — Architectural internals, database migrations, and webhook pipeline
