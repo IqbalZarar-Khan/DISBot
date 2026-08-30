@@ -12,30 +12,56 @@ import { config } from '../../config';
  */
 export async function handleMembersPledgeDelete(payload: WebhookPayload): Promise<void> {
     try {
-        const pledge = payload.data;
+        const pledge = payload.data || {};
         const included = payload.included || [];
 
-        // Extract pledge data
+        // Extract pledge data & relationships
         const relationships = pledge.relationships || {};
 
-        // Get member information
-        const memberData = relationships.patron?.data;
-        if (!memberData) {
-            logger.warn('No patron data in pledge:delete webhook');
+        // Extract member/patron reference using multi-layer resolution:
+        // 1. relationships.patron?.data (pledge schema)
+        // 2. relationships.user?.data (member schema)
+        // 3. payload.data if it's a member record
+        // 4. included[] user record
+        const patronRef = relationships.patron?.data || relationships.user?.data;
+        let memberId = patronRef?.id || (pledge.type === 'member' ? pledge.id : null) || pledge.id;
+        let fullName = pledge.attributes?.full_name || '';
+        let email = pledge.attributes?.email || null;
+
+        if (patronRef) {
+            const userInfo = included.find((item: any) =>
+                item.type === 'user' && item.id === patronRef.id
+            );
+            if (userInfo?.attributes?.full_name) {
+                fullName = userInfo.attributes.full_name;
+            }
+            if (userInfo?.attributes?.email) {
+                email = email || userInfo.attributes.email;
+            }
+        }
+
+        if (!fullName) {
+            const userInIncluded = included.find((item: any) => item.type === 'user' && item.attributes?.full_name);
+            if (userInIncluded?.attributes?.full_name) {
+                fullName = userInIncluded.attributes.full_name;
+                if (!memberId) memberId = userInIncluded.id;
+                email = email || userInIncluded.attributes?.email;
+            }
+        }
+
+        if (!memberId) {
+            logger.warn('No patron or member data in pledge:delete webhook');
             return;
         }
 
-        // Find member details from included data
-        const memberInfo = included.find((item: any) =>
-            item.type === 'user' && item.id === memberData.id
-        );
-
-        const memberId = memberData.id;
-        const fullName = memberInfo?.attributes?.full_name || 'Unknown Member';
-        const email = memberInfo?.attributes?.email || null;
-
-        // Get existing member data
+        // Get existing member data to recover previous name if missing from payload
         const existingMember = await getTrackedMember(memberId);
+        if ((!fullName || fullName === 'Unknown Member') && existingMember?.full_name) {
+            fullName = existingMember.full_name;
+        }
+        if (!fullName) {
+            fullName = 'Unknown Member';
+        }
 
         // Update member to free tier (pledge deleted)
         const trackedMember = {

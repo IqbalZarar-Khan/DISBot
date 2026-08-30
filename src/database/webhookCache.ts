@@ -427,33 +427,106 @@ export async function getWeeklyTierChanges(
     }
 }
 
+export interface PaidJoinRecord {
+    memberName: string;
+    memberId: string | null;
+    tierName?: string;
+    joinedAt: string;
+}
+
+/**
+ * Fetch all paid pledge join events (members:pledge:create) from the past N days.
+ */
+export async function getWeeklyPaidJoined(
+    days = 7
+): Promise<PaidJoinRecord[]> {
+    try {
+        const supabase = getSupabase();
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data, error } = await supabase
+            .from('webhook_log')
+            .select('event_type, member_id, member_name, notes, received_at')
+            .eq('event_type', 'members:pledge:create')
+            .gte('received_at', since)
+            .order('received_at', { ascending: false });
+
+        if (error) {
+            logger.warn(`📋 [WEBHOOK CACHE] Could not fetch paid joins from webhook_log: ${error.message}`);
+            return [];
+        }
+
+        const records: PaidJoinRecord[] = [];
+        const seenMembers = new Set<string>();
+
+        for (const row of data || []) {
+            const name = row.member_name || 'Unknown';
+            const memberId = row.member_id;
+            const key = memberId || name;
+            if (seenMembers.has(key)) continue;
+            seenMembers.add(key);
+
+            let tierName = '';
+            if (row.notes) {
+                // If notes contains "Welcome sent for <Tier>" or similar
+                const match = row.notes.match(/for\s+([A-Za-z0-9_\-\s]+)/i);
+                if (match && match[1]) {
+                    tierName = match[1].trim();
+                }
+            }
+
+            records.push({
+                memberName: name,
+                memberId: memberId,
+                tierName: tierName || undefined,
+                joinedAt: row.received_at,
+            });
+        }
+
+        return records;
+    } catch (err) {
+        logger.warn(`📋 [WEBHOOK CACHE] Exception fetching paid joins`, err as Error);
+        return [];
+    }
+}
+
 /**
  * Extract the member name from a raw webhook payload at log-time.
  * This runs on the raw (pre-redaction) payload so full_name is still available.
  */
-function extractMemberNameFromPayload(payload: any, eventType: string): string {
+function extractMemberNameFromPayload(payload: any, _eventType?: string): string {
     if (!payload) return 'Unknown';
 
-    // members:delete / members:update → data.attributes.full_name
-    if (eventType.startsWith('members:') && !eventType.includes('pledge')) {
-        return payload.data?.attributes?.full_name || 'Unknown';
+    // 1. Direct attribute on data (common in Patreon v2 member and pledge payloads)
+    if (payload.data?.attributes?.full_name) {
+        return payload.data.attributes.full_name;
     }
 
-    // members:pledge:* → look in included[] for the user/patron
+    // 2. User or patron reference in relationships
     const included = payload.included || [];
-    const patronRef = payload.data?.relationships?.patron?.data;
-    if (patronRef) {
+    const userRef = payload.data?.relationships?.user?.data || payload.data?.relationships?.patron?.data;
+    if (userRef) {
         const userRecord = included.find(
-            (item: any) => item.type === 'user' && item.id === patronRef.id
+            (item: any) => item.type === 'user' && item.id === userRef.id
         );
         if (userRecord?.attributes?.full_name) {
             return userRecord.attributes.full_name;
         }
     }
 
-    // Fallback: search any user type in included
-    const anyUser = included.find((item: any) => item.type === 'user');
-    return anyUser?.attributes?.full_name || 'Unknown';
+    // 3. Search any user type in included
+    const anyUser = included.find((item: any) => item.type === 'user' && item.attributes?.full_name);
+    if (anyUser?.attributes?.full_name) {
+        return anyUser.attributes.full_name;
+    }
+
+    // 4. Search any member type in included
+    const anyMember = included.find((item: any) => item.type === 'member' && item.attributes?.full_name);
+    if (anyMember?.attributes?.full_name) {
+        return anyMember.attributes.full_name;
+    }
+
+    return 'Unknown';
 }
 
 // ── Type definition ───────────────────────────────────────────────────────────

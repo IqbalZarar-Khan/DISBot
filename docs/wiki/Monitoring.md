@@ -49,8 +49,8 @@ curl -H "Authorization: Bearer $METRICS_TOKEN" https://your-host/metrics
 ## Scheduled Reports
 
 - **Weekly digest** (`src/utils/weeklyDigest.ts`) — hourly check, fires once on Sundays (persisted to DB to catch up if restarted):
-  three embeds to the root admin with totals/new/changes from `tracked_members`, plus
-  cancellations and tier changes derived from `webhook_log`.
+  four embeds to the root admin with totals/new/changes from `tracked_members`, plus
+  **paid joined members**, cancellations, and tier changes derived from `webhook_log`.
 - **Anniversary checker** — daily 1yr/2yr pledge celebrations (persists execution date to DB).
 - **Proactive Token Refresh** — runs every 25 days and on boot to keep Patreon OAuth tokens refreshed.
 - **Keyword detector** — configurable keyword alerts on post content.

@@ -68,11 +68,13 @@ Patreon v2 fires multiple events for one action — dedup between handlers is by
 | Paid → paid change | `members:update` + `members:pledge:update` | `members-pledge-update.ts` | 1× Upgrade/Downgrade |
 | Departed member rejoins | any of `members:create` / `members:pledge:*` / `members:update` | first handler to see them (`welcomeGuard` dedupes) | 1× Welcome Back |
 | Member leaves | `members:delete` | `members-delete.ts` | 1× Leave notice, row flagged `is_active=false` |
+| Member cancels pledge | `members:pledge:delete` | `members-pledge-delete.ts` | Member downgraded to free, role synced, cancellation logged |
 
 ⚠️ **Invariants:**
 - `members-create.ts` *preserves the old tier on upsert* for existing members.
   Overwriting it would break upgrade detection in `members-pledge-create.ts`, which compares
   `getTrackedMember().current_tier_id` against the webhook tier.
+- `members-pledge-delete.ts` and `members-pledge-update.ts` use multi-layer patron resolution (`relationships.user`, `relationships.patron`, `payload.data`, and `getTrackedMember()`) to ensure member identities and cancellation logs are accurately recorded.
 - Departed members stay in `tracked_members` (history for win-back/anniversary) with
   `is_active=false`; **every** member handler (create, pledge create/update, members:update)
   announces a **Welcome Back** when it sees them active again — no single webhook is trusted

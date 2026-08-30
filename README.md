@@ -84,7 +84,7 @@
 
 ### 📊 Diagnostics & Analytics
 - **📊 Patron Analytics**: `/admin stats` shows growth, tier distribution, and recent activity
-- **📊 Weekly Digest**: Every Sunday, DMs root admin a detailed summary including cancellations and tier changes
+- **📊 Weekly Digest**: Every Sunday, DMs root admin a detailed community digest (total active, new joins, **paid joins with tier details**, cancellations, and tier changes)
 - **📦 Data Export**: `/admin export-data` generates CSV files of all patron data and DMs them to the admin
 - **🖥️ Server Monitoring**: `/admin server-stats` shows live CPU, memory, uptime, and PM2 info
 - **🔍 In-Discord Debug Logs**: `/admin debug-logs` shows the last 50 X-Ray log entries without leaving Discord
@@ -291,6 +291,7 @@ All admin commands are restricted to the user specified in `ROOT_ADMIN_ID`.
 | `/admin setup` | Interactive tier→channel mapping wizard |
 | `/admin bulk-map` | Map all unmapped tiers in a guided sequence |
 | `/admin stats` | View patron growth, tier distribution, recent activity |
+| `/admin digest [days] [dm_admin]` | Generate and preview the patron community digest on-demand |
 | `/admin set-event-channel <event> <channel>` | Route member events to specific channels |
 | `/admin debug-logs` | View last 50 X-Ray debug log entries |
 | `/admin export-data` | Export patron data as CSV files via DM |
@@ -680,6 +681,8 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - 🗃️ **SQLite Schema Auto-Upgrades**: SQLite adapter auto-applies missing columns (`member_name`, `discord_user_id`, `dedup_hash`, `is_active`) on initialization
 - ⏱️ **Ephemeral Scheduler Persistence**: Weekly digest and anniversary checkers persist run states to `bot_config` to avoid missed or repeated schedules across container recycles
 - 🩹 **Member Lifecycle Fixes**: Fixed join/rejoin announcements for paid members; added `is_active` tracking (migration `013`), cross-handler welcome guards, and fallback upgrade channels
+- 📊 **Paid Joined Section in Weekly Digest**: Added dedicated `✨ Paid Joined (N)` embed and metric field in Sunday digests listing paying patrons and tier names
+- 🛡️ **Multi-Layer Patron Extraction in Pledge Webhooks**: Fixed false `No patron data in pledge:delete webhook` warnings by supporting Patreon v2 `relationships.user`, `relationships.patron`, `payload.data`, and database fallbacks
 
 ### Previous Releases
 

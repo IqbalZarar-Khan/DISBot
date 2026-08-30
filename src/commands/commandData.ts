@@ -43,6 +43,25 @@ export function getCommandData() {
             )
             .addSubcommand(subcommand =>
                 subcommand
+                    .setName('digest')
+                    .setDescription('Generate and preview the patron community digest on-demand')
+                    .addIntegerOption(option =>
+                        option
+                            .setName('days')
+                            .setDescription('Lookback period in days (1-30, default 7)')
+                            .setRequired(false)
+                            .setMinValue(1)
+                            .setMaxValue(30)
+                    )
+                    .addBooleanOption(option =>
+                        option
+                            .setName('dm_admin')
+                            .setDescription('Forward a copy directly to root admin DM (default: false)')
+                            .setRequired(false)
+                    )
+            )
+            .addSubcommand(subcommand =>
+                subcommand
                     .setName('set-event-channel')
                     .setDescription('Route member events (joins, departures, upgrades) to specific channels')
                     .addStringOption(option =>

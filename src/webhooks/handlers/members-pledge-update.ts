@@ -18,27 +18,49 @@ export async function handleMembersPledgeUpdate(payload: WebhookPayload): Promis
         const pledge = payload.data;
         const included = payload.included || [];
 
-        // Extract pledge data
+        // Extract pledge data & relationships
         const relationships = pledge.relationships || {};
 
-        // Get member information
-        const memberData = relationships.patron?.data;
-        if (!memberData) {
-            logger.warn('No patron data in pledge:update webhook');
+        // Get member information with multi-layer fallback
+        const patronRef = relationships.patron?.data || relationships.user?.data;
+        let memberId = patronRef?.id || (pledge.type === 'member' ? pledge.id : null) || pledge.id;
+        let fullName = pledge.attributes?.full_name || '';
+        let email = pledge.attributes?.email || null;
+
+        if (patronRef) {
+            const userInfo = included.find((item: any) =>
+                item.type === 'user' && item.id === patronRef.id
+            );
+            if (userInfo?.attributes?.full_name) {
+                fullName = userInfo.attributes.full_name;
+            }
+            if (userInfo?.attributes?.email) {
+                email = email || userInfo.attributes.email;
+            }
+        }
+
+        if (!fullName) {
+            const userInIncluded = included.find((item: any) => item.type === 'user' && item.attributes?.full_name);
+            if (userInIncluded?.attributes?.full_name) {
+                fullName = userInIncluded.attributes.full_name;
+                if (!memberId) memberId = userInIncluded.id;
+                email = email || userInIncluded.attributes?.email;
+            }
+        }
+
+        if (!memberId) {
+            logger.warn('No patron or member data in pledge:update webhook');
             return;
         }
 
-        // Find member details from included data
-        const memberInfo = included.find((item: any) =>
-            item.type === 'user' && item.id === memberData.id
-        );
-
-        const memberId = memberData.id;
-        const fullName = memberInfo?.attributes?.full_name || 'Unknown Member';
-        const email = memberInfo?.attributes?.email || null;
-
-        // Get current tier from database
+        // Get current tier from database & recover name if needed
         const existingMember = await getTrackedMember(memberId);
+        if ((!fullName || fullName === 'Unknown Member') && existingMember?.full_name) {
+            fullName = existingMember.full_name;
+        }
+        if (!fullName) {
+            fullName = 'Unknown Member';
+        }
         const oldTierId = existingMember?.current_tier_id || 'free';
 
         // Get new tier information

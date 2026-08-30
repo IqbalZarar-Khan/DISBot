@@ -25,6 +25,7 @@ auto-deploy on `ClientReady`, so a restart picks up changes.
 |---|---|
 | `/admin status` | Patreon API health, DB health, uptime, webhook + tier-detection stats (DB-backed counters that survive restarts) |
 | `/admin stats` | Patron analytics: growth, tier distribution, activity |
+| `/admin digest [days] [dm_admin]` | Generate and preview the patron community digest on-demand (custom lookback days & DM forward) |
 | `/admin server-stats` | Live server CPU/memory/uptime (+PM2 where applicable) |
 | `/admin debug-logs` | Last 50 X-Ray debug log entries |
 | `/admin error-log [action] [severity] [count]` | Buffered errors with cause/fix explanations from the `explainError()` engine; `action: clear` resets |
