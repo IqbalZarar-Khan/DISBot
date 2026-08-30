@@ -683,6 +683,7 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - 🩹 **Member Lifecycle Fixes**: Fixed join/rejoin announcements for paid members; added `is_active` tracking (migration `013`), cross-handler welcome guards, and fallback upgrade channels
 - 📊 **Paid Joined Section in Weekly Digest**: Added dedicated `✨ Paid Joined (N)` embed and metric field in Sunday digests listing paying patrons and tier names
 - 🛡️ **Multi-Layer Patron Extraction in Pledge Webhooks**: Fixed false `No patron data in pledge:delete webhook` warnings by supporting Patreon v2 `relationships.user`, `relationships.patron`, `payload.data`, and database fallbacks
+- ⚡ **Instant Zero-Delay Healthcheck**: Webhook server starts immediately (<50ms) on boot so Railway, Render, and Docker `/health` health checks pass on Attempt #1 while database and Discord connections initialize in the background
 
 ### Previous Releases
 

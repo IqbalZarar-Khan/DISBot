@@ -6,6 +6,7 @@ All notable changes to DISBot, newest first. For setup, features, and deployment
 
 ## Aug 2026 (Part 2 — Architectural Hardening & Reliability Pass)
 
+- ⚡ **Instant Zero-Delay Healthcheck Readiness** (`src/index.ts`): Moved `startWebhookServer()` to start first before database connections, auto-migrations, Redis, and Discord gateway logins, ensuring Fastify binds immediately (<50ms) to pass Railway/Render/Docker `/health` health checks on Attempt #1 without timeouts
 - 📊 **On-Demand Community Digest Command** (`src/commands/admin/digest.ts`, `commandData.ts`): Added `/admin digest [days] [dm_admin]` to generate and view community summaries (with Paid Joined, Cancellations, and Tier Changes) at any time before Sunday, with optional custom lookback windows (1–30 days) and direct DM forwarding
 - 📊 **Paid Joined Section in Weekly Digest** (`weeklyDigest.ts`, `webhookCache.ts`): Weekly Sunday community digest now includes a dedicated `✨ Paid Joined (N)` embed and metric field detailing paying member names and tier titles (correlating `tracked_members` and `members:pledge:create` webhook logs) alongside cancellations and tier changes
 - 🛡️ **Multi-Layer Patron Extraction in Pledge Webhooks** (`members-pledge-delete.ts`, `members-pledge-update.ts`, `webhookCache.ts`): Resolved `No patron data in pledge:delete webhook` warning by inspecting `relationships.user`, `relationships.patron`, `payload.data`, and `included[]` with database fallbacks

@@ -101,28 +101,29 @@ async function main() {
         // Initialize i18n
         initI18n(process.env.BOT_LOCALE || 'en');
 
+        // Start webhook server FIRST so cloud health checks (/health) pass immediately on boot
+        try {
+            await startWebhookServer(config.webhookPort, config.webhookSecret);
+        } catch (error) {
+            console.error('❌ Failed to start webhook server:', error);
+            process.exit(1);
+        }
+
         // Validate configuration
         validateConfig();
+
         // Is the bot unconfigured? (Missing core tokens)
         if (config._isSetupMode) {
             console.log('🚧 CORE CONFIGURATION MISSING: Entering Cloud Setup Mode...');
-            console.log('   Starting web server only so you can run the Setup Wizard.');
-            try {
-                await startWebhookServer(config.webhookPort, config.webhookSecret);
-                
-                const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL;
-                if (railwayDomain) {
-                    // Strip http(s):// if it's there
-                    const cleanDomain = railwayDomain.replace(/^https?:\/\//, '');
-                    console.log(`\n\n🧙 CLOUD SETUP READY: Running on Railway!`);
-                    console.log(`   🌍 Open this URL in your browser to complete configuration:`);
-                    console.log(`   ▶️  https://${cleanDomain}/setup?mode=cloud\n\n`);
-                } else {
-                    console.log(`\n\n🧙 CLOUD SETUP READY: Open your domain at /setup to complete configuration (e.g. https://your-app.up.railway.app/setup?mode=cloud)\n\n`);
-                }
-            } catch (error) {
-                console.error('❌ Failed to start webhook server for setup:', error);
-                process.exit(1);
+            const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL;
+            if (railwayDomain) {
+                // Strip http(s):// if it's there
+                const cleanDomain = railwayDomain.replace(/^https?:\/\//, '');
+                console.log(`\n\n🧙 CLOUD SETUP READY: Running on Railway!`);
+                console.log(`   🌍 Open this URL in your browser to complete configuration:`);
+                console.log(`   ▶️  https://${cleanDomain}/setup?mode=cloud\n\n`);
+            } else {
+                console.log(`\n\n🧙 CLOUD SETUP READY: Open your domain at /setup to complete configuration (e.g. https://your-app.up.railway.app/setup?mode=cloud)\n\n`);
             }
             return; // Exit early, DO NOT login to Discord or start DB
         }
@@ -165,14 +166,6 @@ async function main() {
 
         // Initialize logger
         initLogger(client, config.logChannelId);
-
-        // Start webhook server EARLY so cloud platforms detect the open port
-        try {
-            await startWebhookServer(config.webhookPort, config.webhookSecret);
-        } catch (error) {
-            console.error('❌ Failed to start webhook server:', error);
-            process.exit(1);
-        }
 
         // Register event handlers
         registerEventHandlers();
