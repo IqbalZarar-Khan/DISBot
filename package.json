@@ -11,7 +11,6 @@
     "dev:ngrok": "ts-node scripts/dev-ngrok.ts",
     "dev:tunnel": "ts-node scripts/dev-tunnel.ts",
     "build": "tsc",
-    "prestart": "npm run build",
     "start": "node dist/index.js",
     "deploy-commands": "ts-node src/commands/deploy-commands.ts",
     "setup:patreon": "ts-node scripts/fetch-patreon-config.ts",
