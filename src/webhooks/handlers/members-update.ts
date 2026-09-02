@@ -126,7 +126,7 @@ export async function handleMembersUpdate(payload: WebhookPayload): Promise<void
             email: email,
             joined_at: oldMember?.joined_at || Date.now(),
             updated_at: Date.now(),
-            ...(derivedActive !== undefined ? { is_active: derivedActive } : {})
+            is_active: derivedActive !== undefined ? derivedActive : (oldMember?.is_active ?? true)
         };
 
         queueMemberUpsert(trackedMember);

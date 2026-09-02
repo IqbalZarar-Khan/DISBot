@@ -70,7 +70,8 @@ export async function handleMembersPledgeDelete(payload: WebhookPayload): Promis
             current_tier_id: 'free',
             email: email,
             joined_at: existingMember?.joined_at || Date.now(),
-            updated_at: Date.now()
+            updated_at: Date.now(),
+            is_active: existingMember?.is_active ?? true
         };
 
         queueMemberUpsert(trackedMember);

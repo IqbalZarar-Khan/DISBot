@@ -185,9 +185,14 @@ export async function getTrackedMember(memberId: string): Promise<TrackedMember 
 export async function upsertTrackedMember(member: TrackedMember): Promise<void> {
     const supabase = getSupabase();
 
+    const sanitized = {
+        ...member,
+        is_active: member.is_active !== undefined && member.is_active !== null ? Boolean(member.is_active) : true,
+    };
+
     const { error } = await supabase
         .from('tracked_members')
-        .upsert(member, { onConflict: 'member_id' });
+        .upsert(sanitized, { onConflict: 'member_id' });
 
     if (error) throw error;
 }

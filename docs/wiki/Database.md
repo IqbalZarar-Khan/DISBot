@@ -55,7 +55,7 @@ handlers ──▶ db.ts (facade + CRUD helpers)
                 └─▶ sqliteAdapter.ts (fallback with auto ALTER TABLE column upgrades)
 ```
 
-- **Batch writer** — bursts of member events coalesce into single upserts; protected by timestamp guards against out-of-order writes.
+- **Batch writer** — bursts of member events coalesce into single upserts; protected by timestamp guards against out-of-order writes, `is_active` boolean sanitization against PostgREST null padding, bounded retries (`MAX_RETRIES = 3`) to eliminate infinite flush loops, and individual recovery fallbacks.
 - **DB cache** — tier mappings, config, and templates are cached at `ClientReady`; invalidation broadcasts across instances via both Redis pub/sub (`disbot:cache:invalidate`) and Supabase Realtime WebSocket (`postgres_changes` on `tier_mappings`/`bot_config`) for instant sync without Redis.
 - **SQLite fallback** — implements the same helper surface for local dev, auto-adding missing schema columns on initialization.
 

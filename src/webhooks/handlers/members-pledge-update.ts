@@ -96,7 +96,7 @@ export async function handleMembersPledgeUpdate(payload: WebhookPayload): Promis
             email: email,
             joined_at: existingMember?.joined_at || Date.now(),
             updated_at: Date.now(),
-            ...(isReturningMember ? { is_active: true } : {})
+            is_active: isReturningMember ? true : (existingMember?.is_active ?? true)
         };
 
         queueMemberUpsert(trackedMember);
