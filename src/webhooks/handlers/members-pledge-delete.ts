@@ -2,7 +2,7 @@ import { WebhookPayload } from '../../database/schema';
 import { getTrackedMember } from '../../database/db';
 import { queueMemberUpsert } from '../../database/batchWriter';
 import { client } from '../../index';
-import { TextChannel, EmbedBuilder } from 'discord.js';
+import { TextChannel } from 'discord.js';
 import { logger } from '../../utils/logger';
 import { config } from '../../config';
 
@@ -63,6 +63,25 @@ export async function handleMembersPledgeDelete(payload: WebhookPayload): Promis
             fullName = 'Unknown Member';
         }
 
+        // Resolve previous tier before resetting to free in DB
+        let previousTierName: string | null = null;
+        if (existingMember && existingMember.current_tier_id && existingMember.current_tier_id !== 'free') {
+            const { getTierMapping } = await import('../../database/db');
+            const { tierIdMap } = await import('../../utils/tierRanking');
+            const mapping = await getTierMapping(existingMember.current_tier_id);
+            previousTierName = mapping?.tier_name || tierIdMap[existingMember.current_tier_id] || (existingMember.current_tier_id.toLowerCase() !== 'free' ? existingMember.current_tier_id : null);
+        }
+
+        if (!previousTierName || previousTierName.toLowerCase() === 'free') {
+            const tierRef = relationships.tier?.data;
+            if (tierRef) {
+                const tierInfo = included.find((item: any) => item.type === 'tier' && item.id === tierRef.id);
+                if (tierInfo?.attributes?.title) {
+                    previousTierName = tierInfo.attributes.title;
+                }
+            }
+        }
+
         // Update member to free tier (pledge deleted)
         const trackedMember = {
             member_id: memberId,
@@ -89,16 +108,19 @@ export async function handleMembersPledgeDelete(payload: WebhookPayload): Promis
             }
         }
 
-        // Send cancellation notification to log channel
-        if (config.logChannelId) {
+        // Send cancellation notification to event-routed channel or log channel
+        const { getEventChannel } = await import('../../commands/admin/set-event-channel');
+        const eventChannelId = (await getEventChannel('pledge_delete')) || config.logChannelId;
+        if (eventChannelId) {
             try {
-                const channel = await client.channels.fetch(config.logChannelId) as TextChannel;
+                const channel = await client.channels.fetch(eventChannelId) as TextChannel;
                 if (channel) {
-                    const embed = new EmbedBuilder()
-                        .setTitle('❌ Pledge Cancelled')
-                        .setDescription(`**${fullName}** has cancelled their pledge.`)
-                        .setColor(0xFF0000)
-                        .setTimestamp();
+                    const { createDepartureEmbed } = await import('../../utils/embedBuilder');
+                    const embed = createDepartureEmbed({
+                        fullName,
+                        tierName: previousTierName,
+                        isCancellation: true,
+                    });
 
                     await channel.send({ embeds: [embed] });
                 }
@@ -107,7 +129,7 @@ export async function handleMembersPledgeDelete(payload: WebhookPayload): Promis
             }
         }
 
-        logger.info(`Pledge deleted: ${fullName}`);
+        logger.info(`Pledge deleted: ${fullName}${previousTierName ? ` (${previousTierName})` : ''}`);
 
     } catch (error) {
         logger.error('Error handling members:pledge:delete webhook', error as Error);

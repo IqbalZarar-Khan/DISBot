@@ -97,6 +97,39 @@ export function createMemberEmbed(data: MemberAlertData): EmbedBuilder {
     return embed;
 }
 
+interface DepartureAlertData {
+    fullName: string;
+    tierName?: string | null;
+    isCancellation?: boolean;
+}
+
+/**
+ * Create a rich embed for member departure / pledge cancellation alerts
+ */
+export function createDepartureEmbed(data: DepartureAlertData): EmbedBuilder {
+    const hasTier = Boolean(
+        data.tierName &&
+        data.tierName.toLowerCase() !== 'free' &&
+        data.tierName !== 'Unknown Tier'
+    );
+    const emoji = hasTier ? getTierEmoji(data.tierName!) : '';
+    const tierDisplay = hasTier
+        ? ` **${emoji ? `${emoji} ` : ''}${data.tierName}**`
+        : '';
+
+    const title = data.isCancellation ? '❌ Pledge Cancelled' : '👋 Member Departed';
+    const action = data.isCancellation ? 'cancelled' : 'ended';
+    const description = tierDisplay
+        ? `**${data.fullName}** has ${action} their${tierDisplay} pledge.`
+        : `**${data.fullName}** has ${action} their pledge.`;
+
+    return new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(description)
+        .setColor(data.isCancellation ? 0xFF0000 : 0x808080)
+        .setTimestamp();
+}
+
 /**
  * Create a test alert embed
  */

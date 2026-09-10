@@ -1,23 +1,28 @@
 import { WebhookPayload } from '../../database/schema';
-import { getTrackedMember, setMemberActive } from '../../database/db';
+import { getTrackedMember, setMemberActive, getTierMapping } from '../../database/db';
 import { logger } from '../../utils/logger';
 import { client } from '../../index';
-import { TextChannel, EmbedBuilder } from 'discord.js';
+import { TextChannel } from 'discord.js';
 import { getEventChannel } from '../../commands/admin/set-event-channel';
+import { createDepartureEmbed } from '../../utils/embedBuilder';
+import { tierIdMap } from '../../utils/tierRanking';
 
 /**
  * Handle members:delete webhook event
  */
 export async function handleMembersDelete(payload: WebhookPayload): Promise<void> {
     try {
-        const member = payload.data;
+        const member = payload.data || {};
         const memberId = member.id;
+        const included = payload.included || [];
+        const relationships = member.relationships || {};
 
         // Get member info from database
         const trackedMember = await getTrackedMember(memberId);
+        const fullName = trackedMember?.full_name || member.attributes?.full_name || 'Unknown Member';
 
         if (trackedMember) {
-            logger.info(`Member departed: ${trackedMember.full_name}`);
+            logger.info(`Member departed: ${fullName}`);
 
             // Mark the row inactive so a later rejoin (members:create /
             // members:pledge:create) is recognized as a returning member and
@@ -28,17 +33,38 @@ export async function handleMembersDelete(payload: WebhookPayload): Promise<void
                 logger.warn(`Failed to mark member inactive: ${(markErr as Error).message}`);
             }
 
+            // Resolve tier name from:
+            // 1. trackedMember.current_tier_id (via tier mappings / tierIdMap)
+            // 2. payload relationships / included tiers
+            let tierName: string | null = null;
+            const previousTierId = trackedMember.current_tier_id;
+            if (previousTierId && previousTierId !== 'free') {
+                const mapping = await getTierMapping(previousTierId);
+                tierName = mapping?.tier_name || tierIdMap[previousTierId] || (previousTierId.toLowerCase() !== 'free' ? previousTierId : null);
+            }
+
+            if (!tierName || tierName.toLowerCase() === 'free') {
+                const entitledTiers = relationships.currently_entitled_tiers?.data || [];
+                if (entitledTiers.length > 0) {
+                    const firstTierId = entitledTiers[0].id;
+                    const tierInfo = included.find((item: any) => item.type === 'tier' && item.id === firstTierId);
+                    if (tierInfo?.attributes?.title) {
+                        tierName = tierInfo.attributes.title;
+                    }
+                }
+            }
+
             // Send departure log to event-routed channel
             const eventChannelId = await getEventChannel('member_leave');
             if (eventChannelId) {
                 try {
                     const channel = await client.channels.fetch(eventChannelId) as TextChannel;
                     if (channel) {
-                        const embed = new EmbedBuilder()
-                            .setTitle('👋 Member Departed')
-                            .setDescription(`**${trackedMember.full_name}** has ended their pledge.`)
-                            .setColor(0x808080)
-                            .setTimestamp();
+                        const embed = createDepartureEmbed({
+                            fullName,
+                            tierName,
+                            isCancellation: false,
+                        });
 
                         await channel.send({ embeds: [embed] });
                     }
