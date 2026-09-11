@@ -4,6 +4,7 @@ import { getAllTierMappings, getAllTrackedMembers, getAllTrackedPosts, getConfig
 import { config } from '../../config';
 import { getRecentLogs, LogLevel } from '../../utils/logger';
 import { getSupabase } from '../../database/supabase';
+import { getAllEventRoutes } from './set-event-channel';
 
 // ── DB-backed diagnostic counters ────────────────────────────────
 // In-memory cache for fast reads — persisted to database for survival
@@ -301,6 +302,20 @@ export async function handleStatus(interaction: ChatInputCommandInteraction): Pr
                 .join('\n');
         }
 
+        // ── Event Routing ────────────────────────────────────────
+        let eventRoutingText = '*Using default channels*';
+        try {
+            const eventRoutes = await getAllEventRoutes();
+            const routeEntries = Object.entries(eventRoutes).filter(([_, ch]) => !!ch);
+            if (routeEntries.length > 0) {
+                eventRoutingText = routeEntries
+                    .map(([event, ch]) => `**${event}** ➡️ <#${ch}>`)
+                    .join('\n');
+            }
+        } catch {
+            // Non-critical
+        }
+
         // ── Webhook diagnostics (from DB-backed counters) ────────
         const lastWh = counters.lastWebhookTimestamp
             ? `<t:${Math.floor(counters.lastWebhookTimestamp / 1000)}:R>`
@@ -340,6 +355,7 @@ export async function handleStatus(interaction: ChatInputCommandInteraction): Pr
                 { name: '🎯 Tier Detection', value: `${counters.tierDetectionSuccess}/${tdTotal} (${tdRate})`, inline: true },
                 { name: '\u200B', value: '\u200B' },
                 { name: '📊 Tier Mappings', value: tierMappingText },
+                { name: '🔧 Event Routing', value: eventRoutingText },
                 { name: '⚠️ Recent Errors', value: errorText },
             )
             .setTimestamp()

@@ -247,6 +247,14 @@ function registerEventHandlers() {
             console.warn('⚠️ Persisted error log load failed (non-fatal):', (err as Error).message);
         }
 
+        // Load persisted event routing channels (survives Redis outages and container restarts)
+        try {
+            const { loadPersistedEventRoutes } = await import('./commands/admin/set-event-channel');
+            await loadPersistedEventRoutes();
+        } catch (err) {
+            console.warn('⚠️ Persisted event routing load failed (non-fatal):', (err as Error).message);
+        }
+
         // Start proactive token refresh scheduler (loads tokens from DB, idle deployment protection)
         try {
             const { startProactiveTokenRefresh } = await import('./utils/patreonClient');

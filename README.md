@@ -70,7 +70,7 @@
 - **📖 Serialized Content Formatting**: Auto-detects "Chapter N" / "Part N" in titles for spoiler-tagged embeds
 
 ### 🤖 Automation & Management
-- **🔀 Event Routing**: Route member events (joins, departures, upgrades) to specific Discord channels
+- **🔀 Persistent Event Routing**: Route member events (joins, departures, upgrades, downgrades, new pledges, cancellations) to dedicated Discord channels with 4-tier crash-proof persistence (in-memory + environment variables + database)
 - **📋 Interactive Setup**: `/admin setup` with dropdown menus for tier→channel mapping
 - **🔧 Bulk Mapping Wizard**: `/admin bulk-map` maps all unmapped tiers in a guided sequence
 - **🔄 Live Tier Sync**: `/admin sync-tiers` fetches tiers from Patreon API without restarting

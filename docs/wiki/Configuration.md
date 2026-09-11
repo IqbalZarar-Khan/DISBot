@@ -52,6 +52,18 @@ All configuration is environment-based (`.env` locally; platform env vars in the
 | `ALLOW_WIZARD_RECONFIG` | — | `true` allows re-running `/setup` wizard after initial completion |
 | `ALLOW_RANK_INVERSION` | — | `true` bypasses fatal boot exit on tier rank/cents inversion |
 
+### Event Routing Overrides (Optional)
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `WELCOME_CHANNEL_ID` | — | Fallback welcome channel for member joins |
+| `EVENT_CHANNEL_MEMBER_JOIN` | — | Channel ID for new member joins |
+| `EVENT_CHANNEL_MEMBER_LEAVE` | — | Channel ID for member departure notices |
+| `EVENT_CHANNEL_PLEDGE_CREATE` | — | Channel ID for new pledges |
+| `EVENT_CHANNEL_PLEDGE_DELETE` | — | Channel ID for pledge cancellations |
+| `EVENT_CHANNEL_PLEDGE_UPGRADE` | — | Channel ID for tier upgrades |
+| `EVENT_CHANNEL_PLEDGE_DOWNGRADE` | — | Channel ID for tier downgrades |
+
 Runtime-only: `RAILWAY_PUBLIC_DOMAIN` / `RAILWAY_STATIC_URL` are read by the setup wizard for
 URL detection on Railway.
 
