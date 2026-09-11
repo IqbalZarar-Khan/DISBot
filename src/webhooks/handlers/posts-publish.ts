@@ -215,11 +215,13 @@ export async function handlePostsPublish(payload: WebhookPayload): Promise<boole
                         embed.setDescription(messageText + '\n\n' + formattedDescription);
                     }
 
-                    await channel.send({ embeds: [embed] }).then(async (msg) => {
-                        // Auto-create discussion thread if enabled
-                        const { createPostThread } = await import('../../utils/threadHelper');
-                        await createPostThread(channel, msg.id, title);
-                    });
+                    const { sendChannelWithRetry } = await import('../../utils/errorHandler');
+                    const msg = await sendChannelWithRetry(channel, { embeds: [embed] }, 3, `${tierName} channel alert`);
+
+                    // Auto-create discussion thread if enabled
+                    const { createPostThread } = await import('../../utils/threadHelper');
+                    await createPostThread(channel, msg.id, title);
+
                     announced = true;
                     recordTierDetection(true); // ✅ tier detected and announcement sent
                     logger.info(`✅ Broadcast alert sent to ${tierName} channel: ${title}`);

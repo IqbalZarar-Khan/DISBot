@@ -209,9 +209,8 @@ async function sendWaterfallAlert(title: string, url: string, tierName: string):
             isUpdate: true,
         });
         embed.setDescription(messageText);
-        embed.setFooter({ text: '🔄 Detected via automatic polling' });
-
-        await channel.send({ embeds: [embed] });
+        const { sendChannelWithRetry } = await import('./errorHandler');
+        await sendChannelWithRetry(channel, { embeds: [embed] }, 3, `${tierName} waterfall poller alert`);
         logger.info(`✅ [POLLER] Waterfall alert sent to ${tierName} channel: ${title}`);
     } catch (error) {
         logger.error(`🔄 [POLLER] Failed to send alert to ${tierName} channel`, error as Error);

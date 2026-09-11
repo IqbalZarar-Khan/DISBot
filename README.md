@@ -686,6 +686,7 @@ See [SETUP.md](SETUP.md) for detailed setup instructions.
 - ⚡ **Instant Zero-Delay Healthcheck**: Webhook server starts immediately (<50ms) on boot so Railway, Render, and Docker `/health` health checks pass on Attempt #1 while database and Discord connections initialize in the background
 - 🗄️ **Batch Writer `is_active` Constraint Fix**: Sanitized queued member payloads so `is_active` is guaranteed to be a boolean, preventing PostgREST null padding and bounding retry attempts (`MAX_RETRIES = 3`) to eliminate 5-second infinite error alert loops
 - 👋 **Tier-Aware Departure Alerts**: Member departure and pledge cancellation messages now display the specific Patreon tier/pledge the patron ended (e.g. `**Mhee Wattson** has ended their **💎 Diamond** pledge.`)
+- 🛡️ **Transient TLS/SSL Handshake Retry Resilience**: Discord API channel alert dispatch now uses `sendChannelWithRetry` with exponential backoff to transparently retry and deliver alerts when transient SSL/TLS handshake errors (`SSL alert 40`), `ECONNRESET`, or 5xx edge hiccups occur
 
 ### Previous Releases
 

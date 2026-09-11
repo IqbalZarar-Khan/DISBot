@@ -210,10 +210,12 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                             });
                             embed.setDescription(messageText);
 
-                            await channel.send({ embeds: [embed] }).then(async (msg) => {
-                                const { createPostThread } = await import('../../utils/threadHelper');
-                                await createPostThread(channel, msg.id, title);
-                            });
+                            const { sendChannelWithRetry } = await import('../../utils/errorHandler');
+                            const msg = await sendChannelWithRetry(channel, { embeds: [embed] }, 3, `${newTierName} waterfall alert`);
+
+                            const { createPostThread } = await import('../../utils/threadHelper');
+                            await createPostThread(channel, msg.id, title);
+
                             logger.info(`✅ Waterfall alert sent to ${newTierName} channel: ${title}`);
                         }
                     } catch (error) {
@@ -270,10 +272,12 @@ export async function handlePostsUpdate(payload: WebhookPayload): Promise<void> 
                             });
                             embed.setDescription(messageText);
 
-                            await channel.send({ embeds: [embed] }).then(async (msg) => {
-                                const { createPostThread } = await import('../../utils/threadHelper');
-                                await createPostThread(channel, msg.id, title);
-                            });
+                            const { sendChannelWithRetry } = await import('../../utils/errorHandler');
+                            const msg = await sendChannelWithRetry(channel, { embeds: [embed] }, 3, `${newTierName} update alert`);
+
+                            const { createPostThread } = await import('../../utils/threadHelper');
+                            await createPostThread(channel, msg.id, title);
+
                             logger.info(`✅ Update alert sent to ${newTierName} channel for untracked post: ${title}`);
                         }
                     } catch (error) {

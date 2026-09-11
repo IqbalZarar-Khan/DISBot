@@ -217,6 +217,13 @@ export function explainError(message: string, error?: Error): ErrorExplanation {
             severity: 'medium',
         };
     }
+    if (msg.includes('ssl') || msg.includes('tls') || msg.includes('handshake failure') || msg.includes('alert number 40')) {
+        return {
+            cause: 'A transient TLS/SSL handshake failure occurred between the container and Discord/Cloudflare API edge.',
+            fix: 'Transient network blip. The built-in retry backoff will re-send the alert automatically.',
+            severity: 'low',
+        };
+    }
     if (msg.includes('econnreset') || msg.includes('socket hang up')) {
         return {
             cause: 'A network connection was forcibly closed mid-request. Common on free/shared hosting tiers with connection limits.',
