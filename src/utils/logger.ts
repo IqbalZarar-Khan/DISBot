@@ -1,4 +1,5 @@
 import { Client, TextChannel, EmbedBuilder } from 'discord.js';
+import { captureError } from './sentry';
 
 export enum LogLevel {
     INFO = 'INFO',
@@ -324,6 +325,17 @@ export async function log(level: LogLevel, message: string, error?: Error): Prom
 
         // Persist to DB for crash survival (fire-and-forget)
         persistErrorToDb(entry).catch(() => {});
+
+        // Forward to Sentry if active (strips PII automatically)
+        try {
+            captureError(error || new Error(message), {
+                context,
+                message,
+                severity: explanation.severity,
+            });
+        } catch {
+            // Non-critical
+        }
     }
 
     // Discord log (only for WARN and ERROR)

@@ -56,7 +56,8 @@
 - **🚀 1-Click Railway Deploy**: Deploy button in README auto-provisions the entire app with env var form
 - **🚀 One-Command VPS Setup**: `setup-vps.sh` installs Node.js, PM2, Caddy (auto-HTTPS) in a single script
 - **🐳 Self-Contained Docker Compose**: Full stack (bot + PostgreSQL + PostgREST) — no Supabase Cloud needed
-- **🚇 Zero-Auth Local Tunnels**: `npm run dev:tunnel` — no ngrok account required (uses localtunnel)
+- **🚇 Zero-Auth Local Tunnels**: `npm run dev:tunnel` (localtunnel) & `npm run dev:cloudflare` (Cloudflare) — no ngrok account required
+- **☁️ Cloudflare Tunnel Ingress**: Portable webhook endpoint with zero-downtime hosting migrations and `npm run dev:cloudflare` auto-sync
 - **🔨 Auto-Capture IDs**: Type `!claim` in any channel — bot captures Guild ID, Admin ID, Channel ID automatically
 - **🎉 First-Deploy Welcome DM**: Interactive onboarding DM with setup checklist on first deployment
 
@@ -87,6 +88,7 @@
 - **📊 Weekly Digest**: Every Sunday, DMs root admin a detailed community digest (total active, new joins, **paid joins with tier details**, cancellations, and tier changes)
 - **📦 Data Export**: `/admin export-data` generates CSV files of all patron data and DMs them to the admin
 - **🖥️ Server Monitoring**: `/admin server-stats` shows live CPU, memory, uptime, and PM2 info
+- **🛡️ Production Observability (BetterStack & Sentry)**: Enriched `/health` endpoint for BetterStack uptime alerts; optional `@sentry/node` integration for zero-PII error tracking
 - **🔍 In-Discord Debug Logs**: `/admin debug-logs` shows the last 50 X-Ray log entries without leaving Discord
 - **🕵️ Enhanced Diagnostics**: `/admin status` shows API latency, uptime, webhook stats, and tier detection accuracy
 - **🧪 Template Preview**: `/admin test-alert <tier> <template_type>` previews custom templates with sample data
@@ -498,6 +500,8 @@ Patreon → HMAC Verify → Dedup Guard → Ghost Filter → Webhook Cache (audi
 |--------|-------------|
 | `npm run dev` | Start with hot reload (nodemon) |
 | `npm run dev:ngrok` | Auto-tunnel local dev with ngrok |
+| `npm run dev:tunnel` | Zero-auth local tunnel with localtunnel |
+| `npm run dev:cloudflare` | Auto-tunnel local dev with Cloudflare Tunnel |
 | `npm run build` | Compile TypeScript |
 | `npm start` | Run production build |
 | `npm run deploy-commands` | Register slash commands (also auto-runs on startup) |

@@ -36,6 +36,10 @@ COPY --from=builder /app/supabase ./supabase
 # Create data directory for any local storage
 RUN mkdir -p /app/data
 
+# Optional: Cloudflare Tunnel binary for single-container setups
+# RUN wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+#     -O /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
+
 # Expose webhook port
 EXPOSE 3000
 

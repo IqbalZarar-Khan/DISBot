@@ -52,14 +52,54 @@ export async function startWebhookServer(port: number, webhookSecret: string): P
     // Mount the analytics dashboard
     await fastify.register(dashboardPlugin, { prefix: '/dashboard' });
 
-    // Health check endpoint (root)
-    fastify.get('/', async (_request: FastifyRequest, reply: FastifyReply) => {
-        return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
+    // ── Sentry Fastify Error Hook ────────────────────────────────────
+    fastify.addHook('onError', async (request, _reply, error) => {
+        try {
+            const { captureError } = await import('../utils/sentry');
+            captureError(error, {
+                url: request.url,
+                method: request.method,
+            });
+        } catch {
+            // Sentry capture failure shouldn't crash
+        }
     });
 
-    // Health check endpoint (explicit)
+    // ── Health check helper ──────────────────────────────────────────
+    const getHealthPayload = async () => {
+        let discordStatus = 'connecting';
+        try {
+            const { client } = await import('../index');
+            discordStatus = client?.isReady() ? 'connected' : (config._isSetupMode ? 'setup_mode' : 'connecting');
+        } catch {
+            // Client not ready yet
+        }
+
+        let dbStatus = 'connecting';
+        try {
+            const { isDatabaseConnected } = await import('../database/db');
+            dbStatus = (await isDatabaseConnected()) ? 'connected' : 'degraded';
+        } catch {
+            // DB not ready yet
+        }
+
+        return {
+            status: 'ok',
+            uptime: Math.floor(process.uptime()),
+            discord: discordStatus,
+            db: dbStatus,
+            timestamp: new Date().toISOString(),
+        };
+    };
+
+    // Health check endpoint (root)
+    fastify.get('/', async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.send(await getHealthPayload());
+    });
+
+    // Health check endpoint (explicit — BetterStack / Railway)
     fastify.get('/health', async (_request: FastifyRequest, reply: FastifyReply) => {
-        return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
+        return reply.send(await getHealthPayload());
     });
 
     // ── Prometheus metrics endpoint ──────────────────────────────────

@@ -233,6 +233,17 @@ npm run dev:ngrok
 ```
 `dev:ngrok` auto-detects your active HTTPS tunnel and updates your webhook destination on Patreon via API!
 
+### Automated Cloudflare Tunnel with Auto-Patreon Registration
+```bash
+npm run dev:cloudflare
+```
+`dev:cloudflare` automatically creates a Cloudflare Quick Tunnel (or uses `TUNNEL_TOKEN`), detects the public HTTPS URL, auto-patches your Patreon webhook destination via API, and starts DISBot in development mode.
+
+For self-hosted Docker deployments with Cloudflare Tunnel:
+```bash
+docker compose --profile tunnel up -d
+```
+
 ---
 
 ## ✅ Post-Deployment Verification

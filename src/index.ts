@@ -1,3 +1,6 @@
+import { initSentry } from './utils/sentry';
+initSentry();
+
 import { Client, GatewayIntentBits, Events } from 'discord.js';
 import { config, validateConfig } from './config';
 import { initSupabase } from './database/supabase';

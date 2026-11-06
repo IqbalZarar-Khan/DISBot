@@ -32,6 +32,14 @@ All configuration is environment-based (`.env` locally; platform env vars in the
 | `PUBLIC_URL` | — | Public base URL for OAuth redirects and dashboard links |
 | `METRICS_TOKEN` | — | When set, `/metrics` requires `Authorization: Bearer <token>` (or `?token=`). Unset = open |
 
+### Observability & Tunnels
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `SENTRY_DSN` | — | Sentry error tracking & breadcrumbs (no-op if unset) |
+| `TUNNEL_TOKEN` | — | Cloudflare named tunnel token for portable ingress |
+| `CLOUDFLARE_TUNNEL_URL` | — | Custom Cloudflare Tunnel URL override |
+
 ### Storage
 
 | Variable | Required | Purpose |

@@ -4,6 +4,19 @@ import { TrackedPost, TierMapping, TrackedMember } from './schema';
 /**
  * Initialize the database (Supabase connection)
  */
+/**
+ * Check database connectivity (for health monitoring)
+ */
+export async function isDatabaseConnected(): Promise<boolean> {
+    try {
+        const supabase = getSupabase();
+        const { error } = await supabase.from('bot_config').select('key').limit(1);
+        return !error || error.code === 'PGRST116';
+    } catch {
+        return false;
+    }
+}
+
 export async function initDatabase(): Promise<void> {
     try {
         const supabase = getSupabase();

@@ -10,6 +10,7 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "dev:ngrok": "ts-node scripts/dev-ngrok.ts",
     "dev:tunnel": "ts-node scripts/dev-tunnel.ts",
+    "dev:cloudflare": "ts-node scripts/dev-cloudflare.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "deploy-commands": "ts-node src/commands/deploy-commands.ts",
@@ -32,6 +33,7 @@
   "license": "MIT",
   "dependencies": {
     "@fastify/formbody": "^8.0.2",
+    "@sentry/node": "^11.11.0",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.6.2",
     "bullmq": "^5.77.1",
