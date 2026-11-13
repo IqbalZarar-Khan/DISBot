@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://railway.app/new/template/disbot?referralCode=nLfB6T">
-    <img src="https://railway.com/button.svg" alt="Deploy on Railway" />
+    <img src="https://railway.com/button.svg" alt="Deploy on Railway" height="30" />
   </a>
 </p>
 

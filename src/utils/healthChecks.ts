@@ -63,10 +63,10 @@ export async function runHealthChecks(client: Client): Promise<void> {
         if (accessToken) {
             const axios = (await import('axios')).default;
 
-            // Use the v1 webhooks endpoint (v2 doesn't have a list route)
+            // Use the v2 campaigns endpoint to verify token validity
             try {
                 const res = await axios.get(
-                    'https://www.patreon.com/api/oauth2/api/current_user/campaigns',
+                    'https://www.patreon.com/api/oauth2/v2/campaigns',
                     { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 10000 }
                 );
                 // If we can reach the API, the token is valid

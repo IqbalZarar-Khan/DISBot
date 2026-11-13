@@ -25,11 +25,15 @@ export async function handleSyncTiers(interaction: ChatInputCommandInteraction):
             return;
         }
 
-        // Fetch campaign data with tiers from Patreon API v1
+        // Fetch campaign data with tiers from Patreon API v2
         const res = await axios.get(
-            `https://www.patreon.com/api/oauth2/api/current_user/campaigns`,
+            `https://www.patreon.com/api/oauth2/v2/campaigns`,
             {
                 headers: { Authorization: `Bearer ${config.patreonAccessToken}` },
+                params: {
+                    'include': 'tiers',
+                    'fields[tier]': 'title,amount_cents,published',
+                },
             }
         );
 
@@ -40,7 +44,7 @@ export async function handleSyncTiers(interaction: ChatInputCommandInteraction):
         }
 
         const included = res.data.included || [];
-        const tiers = included.filter((item: any) => item.type === 'reward'); // v1 uses 'reward' instead of 'tier'
+        const tiers = included.filter((item: any) => (item.type === 'tier' || item.type === 'reward') && item.attributes?.published !== false);
 
         if (tiers.length === 0) {
             await interaction.editReply({ content: '⚠️ No published tiers found on your Patreon campaign.' });

@@ -637,15 +637,19 @@ updatePreview();
                     const patreonToken = filtered.PATREON_ACCESS_TOKEN || env.PATREON_ACCESS_TOKEN;
                     try {
                         const axios = (await import('axios')).default;
-                        const cRes = await axios.get('https://www.patreon.com/api/oauth2/api/current_user/campaigns', {
-                            headers: { Authorization: `Bearer ${patreonToken}` }
+                        const cRes = await axios.get('https://www.patreon.com/api/oauth2/v2/campaigns', {
+                            headers: { Authorization: `Bearer ${patreonToken}` },
+                            params: {
+                                'include': 'tiers',
+                                'fields[tier]': 'title,amount_cents,published',
+                            },
                         });
                         if (cRes.data?.data?.[0]?.id) {
                             filtered.PATREON_CAMPAIGN_ID = cRes.data.data[0].id;
 
                             // Auto-fetch and rank tiers
                             const included = cRes.data.included || [];
-                            const tiers = included.filter((item: any) => item.type === 'reward');
+                            const tiers = included.filter((item: any) => (item.type === 'tier' || item.type === 'reward') && item.attributes?.published !== false);
                             tiers.sort((a: any, b: any) => (b.attributes.amount_cents || 0) - (a.attributes.amount_cents || 0));
                             const step = tiers.length > 1 ? Math.floor(100 / (tiers.length - 1)) : 100;
                             const formattedTiers = tiers.map((t: any, i: number) => ({

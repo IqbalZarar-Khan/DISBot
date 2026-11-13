@@ -214,11 +214,14 @@ async function getPatreonHealth(): Promise<{ status: string; latency: string }> 
         let response;
         try {
             response = await axios.get(
-                'https://www.patreon.com/api/oauth2/api/current_user',
+                'https://www.patreon.com/api/oauth2/v2/identity',
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
                         'Accept-Encoding': 'gzip, deflate',
+                    },
+                    params: {
+                        'fields[user]': 'full_name',
                     },
                     timeout: 5000,
                 }
@@ -230,11 +233,14 @@ async function getPatreonHealth(): Promise<{ status: string; latency: string }> 
                 if (refreshed) {
                     token = getCurrentAccessToken();
                     response = await axios.get(
-                        'https://www.patreon.com/api/oauth2/api/current_user',
+                        'https://www.patreon.com/api/oauth2/v2/identity',
                         {
                             headers: {
                                 Authorization: `Bearer ${token}`,
                                 'Accept-Encoding': 'gzip, deflate',
+                            },
+                            params: {
+                                'fields[user]': 'full_name',
                             },
                             timeout: 5000,
                         }
